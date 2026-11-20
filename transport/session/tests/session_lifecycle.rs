@@ -931,12 +931,22 @@ async fn a_lost_session_established_is_recovered_by_repeating_the_start_session(
         .times(1..)
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_alice.clone();
+            // Each StartSession, repeats included, brings the SURBs the Exit answers over.
+            let saved = if msg_type(&data, StartProtocolDiscriminants::StartSession) {
+                2
+            } else {
+                0
+            };
             Box::pin(async move {
+                let packet_info = IncomingPacketInfo {
+                    num_saved_surbs: saved,
+                    ..Default::default()
+                };
                 bob_mgr.dispatch_message(
                     alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
-                        packet_info: Default::default(),
+                        packet_info,
                     },
                 )?;
                 Ok(())

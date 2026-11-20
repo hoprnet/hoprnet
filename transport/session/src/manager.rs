@@ -3912,7 +3912,7 @@ pub struct SessionManager<S> {
     /// that reused the name after the TTL backstop expired the older marker.
     pending_outgoing: moka::sync::Cache<HoprPseudonym, PendingOutgoingToken>,
     /// Challenges of incoming `StartSession`s being admitted, by pseudonym, so a repeat is not admitted twice.
-    incoming_openings: moka::sync::Cache<HoprPseudonym, StartChallenge>,
+    incoming_openings: moka::sync::Cache<HoprPseudonym, Arc<InFlightOpening>>,
     /// Serialises `handle_ssa_request` per pseudonym.
     ///
     /// Start messages are processed under `for_each_concurrent`, so without this several
@@ -4230,18 +4230,24 @@ impl PendingOutgoingToken {
 /// How many repeats of one `StartSession` an Exit answers with a `SessionEstablished`.
 const MAX_ANSWERED_START_REPEATS: u32 = 4;
 
+/// An opening being admitted, and the SURBs its repeats brought meanwhile (no slot exists yet to book them to).
+struct InFlightOpening {
+    challenge: StartChallenge,
+    repeat_surbs: std::sync::atomic::AtomicU64,
+}
+
 /// Releases an Exit's claim on a pseudonym's opening in `incoming_openings` when the handler is done.
 struct IncomingOpeningGuard {
-    openings: moka::sync::Cache<HoprPseudonym, StartChallenge>,
+    openings: moka::sync::Cache<HoprPseudonym, Arc<InFlightOpening>>,
     pseudonym: HoprPseudonym,
-    challenge: StartChallenge,
+    opening: Arc<InFlightOpening>,
 }
 
 impl Drop for IncomingOpeningGuard {
     fn drop(&mut self) {
         self.openings.entry(self.pseudonym).and_compute_with(
-            |entry: Option<moka::Entry<HoprPseudonym, StartChallenge>>| match entry {
-                Some(entry) if *entry.value() == self.challenge => moka::ops::compute::Op::Remove,
+            |entry: Option<moka::Entry<HoprPseudonym, Arc<InFlightOpening>>>| match entry {
+                Some(entry) if entry.value().challenge == self.opening.challenge => moka::ops::compute::Op::Remove,
                 _ => moka::ops::compute::Op::Nop,
             },
         );
@@ -4251,7 +4257,7 @@ impl Drop for IncomingOpeningGuard {
 /// What an Exit made of an incoming `StartSession`, before any admission work.
 enum OpeningClaim {
     /// The same opening is being admitted right now; its handler will answer.
-    InFlightRepeat,
+    InFlightRepeat(Arc<InFlightOpening>),
     /// The Session for this opening exists already; the slot is the one to answer through.
     EstablishedRepeat(Box<SessionSlot>, IncomingOpeningGuard),
     /// Not a repeat; the guard, if any, holds the claim until the handler returns.
@@ -5138,7 +5144,9 @@ where
                                     };
                                     // Before any refusal or admission work: a repeat must not be admitted again.
                                     let _opening_guard = match myself.claim_opening(pseudonym, session_req.challenge) {
-                                        OpeningClaim::InFlightRepeat => {
+                                        OpeningClaim::InFlightRepeat(opening) => {
+                                            // Dispatch could not book these (no slot yet); the original does.
+                                            opening.repeat_surbs.fetch_add(stored.saved, Ordering::Relaxed);
                                             crate::counters::START_SESSION_REPEATS_RECEIVED
                                                 .fetch_add(1, Ordering::Relaxed);
                                             debug!(
@@ -5179,10 +5187,16 @@ where
                                             if opened.is_ok()
                                                 && let Some(slot) = myself.sessions.get(&pseudonym)
                                             {
+                                                let repeats = _opening_guard.as_ref().map_or(0, |guard| {
+                                                    guard.opening.repeat_surbs.swap(0, Ordering::Relaxed)
+                                                });
                                                 let _ = book_start_message_surbs(
                                                     &slot,
                                                     &pseudonym,
-                                                    SurbsStored { evicted: 0, ..stored },
+                                                    SurbsStored {
+                                                        saved: stored.saved + repeats,
+                                                        evicted: 0,
+                                                    },
                                                 );
                                             }
                                             opened
@@ -5572,6 +5586,10 @@ where
                 futures::future::Either::Left((Err(_), _)) => break Ok(Ok(None)),
                 futures::future::Either::Right(_) if next_resend.is_none() => break Err(()),
                 futures::future::Either::Right(_) => {
+                    let now = Instant::now();
+                    if now >= deadline {
+                        break Err(());
+                    }
                     resends += 1;
                     info!(
                         challenge,
@@ -5582,15 +5600,19 @@ where
                     crate::counters::START_SESSION_RESENDS.fetch_add(1, Ordering::Relaxed);
                     #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_START_SESSION_RESENT.increment();
-                    if let Err(error) = send_via_msg_sender(
+                    // Bounded by the remaining budget, so a slow repeat cannot push the attempt past the deadline.
+                    match send_via_msg_sender(
                         &mut msg_sender,
                         forward_routing.clone(),
                         start_session_msg.clone(),
                         "repeated session request message",
                     )
+                    .timeout(futures_time::time::Duration::from(deadline - now))
                     .await
                     {
-                        debug!(challenge, %error, "failed to repeat the session request");
+                        Ok(Ok(())) => {}
+                        Ok(Err(error)) => debug!(challenge, %error, "failed to repeat the session request"),
+                        Err(_) => debug!(challenge, "repeating the session request ran into the deadline"),
                     }
                     next_resend = self.next_initiation_resend(started, resends, deadline);
                 }
@@ -6002,9 +6024,17 @@ where
     fn claim_opening(&self, pseudonym: HoprPseudonym, challenge: StartChallenge) -> OpeningClaim {
         use moka::ops::compute::{CompResult, Op};
 
+        let opening = Arc::new(InFlightOpening {
+            challenge,
+            repeat_surbs: Default::default(),
+        });
         let claim = self.incoming_openings.entry(pseudonym).and_compute_with(
-            |entry: Option<moka::Entry<HoprPseudonym, StartChallenge>>| {
-                if entry.is_none() { Op::Put(challenge) } else { Op::Nop }
+            |entry: Option<moka::Entry<HoprPseudonym, Arc<InFlightOpening>>>| {
+                if entry.is_none() {
+                    Op::Put(opening.clone())
+                } else {
+                    Op::Nop
+                }
             },
         );
         match claim {
@@ -6012,7 +6042,7 @@ where
                 let guard = IncomingOpeningGuard {
                     openings: self.incoming_openings.clone(),
                     pseudonym,
-                    challenge,
+                    opening,
                 };
                 match self.sessions.get(&pseudonym) {
                     Some(slot)
@@ -6026,7 +6056,9 @@ where
                     _ => OpeningClaim::New(Some(guard)),
                 }
             }
-            CompResult::Unchanged(entry) if *entry.value() == challenge => OpeningClaim::InFlightRepeat,
+            CompResult::Unchanged(entry) if entry.value().challenge == challenge => {
+                OpeningClaim::InFlightRepeat(entry.into_value())
+            }
             _ => OpeningClaim::New(None),
         }
     }
@@ -6039,6 +6071,14 @@ where
         slot: &SessionSlot,
     ) -> errors::Result<()> {
         crate::counters::START_SESSION_REPEATS_RECEIVED.fetch_add(1, Ordering::Relaxed);
+        // As for the SSA re-send: a return packet that finds no SURB stalls everything this node originates.
+        if slot.surb_estimator.saturating_diff() == 0 {
+            debug!(
+                challenge = session_req.challenge,
+                "not answering a repeated session request: no SURB held"
+            );
+            return Ok(());
+        }
         let answered = slot.opening.as_ref().map_or(MAX_ANSWERED_START_REPEATS, |opening| {
             opening.answered_repeats.fetch_add(1, Ordering::Relaxed)
         });
@@ -21099,6 +21139,20 @@ mod tests {
         .with_context(|| format!("no {want:?} was sent"))?
     }
 
+    /// A repeated PIX opening that brought `saved` SURBs.
+    fn repeated_start_packet(saved: usize) -> anyhow::Result<ApplicationDataIn> {
+        let mut packet = start_packet(HoprStartProtocol::StartSession(pix_offer()))?;
+        packet.packet_info.num_saved_surbs = saved;
+        Ok(packet)
+    }
+
+    /// Gives the Session a stock of SURBs to answer over, which its own control traffic would otherwise use up.
+    fn give_surb_stock(mgr: &RecordingManager, pseudonym: HoprPseudonym) -> anyhow::Result<()> {
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        slot.surb_estimator.produced.fetch_add(100, Ordering::Relaxed);
+        Ok(())
+    }
+
     /// Waits until the Exit has released its claim on `pseudonym`'s opening, i.e. the handler is done.
     async fn opening_released(mgr: &RecordingManager, pseudonym: HoprPseudonym) -> anyhow::Result<()> {
         timeout(Duration::from_secs(5), async {
@@ -21144,6 +21198,7 @@ mod tests {
         mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
         next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
         opening_released(&mgr, pseudonym).await?;
+        give_surb_stock(&mgr, pseudonym)?;
         let reserved = mgr.live_cycle_bytes.load(Ordering::Relaxed);
         assert!(reserved > 0, "fixture: a PIX Session holds cycle budget");
         let _ = settled_answers(&mut sent).await;
@@ -21235,7 +21290,10 @@ mod tests {
         })
         .await
         .context("the original was never claimed")?;
-        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        let repeat = repeated_start_packet(3)?;
+        let carried = repeat.num_surbs_with_msg() as u64;
+        assert!(carried > 0, "fixture: the repeat must leave room for a SURB");
+        mgr.dispatch_message(pseudonym, repeat)?;
         timeout(Duration::from_secs(5), async {
             while crate::counters::START_SESSION_REPEATS_RECEIVED.load(Ordering::Relaxed) == repeats_before {
                 tokio::time::sleep(Duration::from_millis(2)).await;
@@ -21255,7 +21313,38 @@ mod tests {
             "exactly one SessionEstablished and no SessionError, got {answers:?}"
         );
         assert_eq!(1, mgr.num_active_sessions());
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        assert_eq!(
+            carried,
+            slot.surb_estimator.produced.load(Ordering::Relaxed),
+            "the repeat's SURBs are booked once the Session exists"
+        );
         handler.abort();
+        Ok(())
+    }
+
+    /// A repeat is answered only while the Session holds a SURB to answer over.
+    #[test_log::test(tokio::test)]
+    async fn a_repeat_is_not_answered_while_the_session_holds_no_surb() -> anyhow::Result<()> {
+        let (mgr, mut sent, _incoming) = exit_answering_repeats(None)?;
+        let pseudonym = HoprPseudonym::random();
+
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
+        opening_released(&mgr, pseudonym).await?;
+        let _ = settled_answers(&mut sent).await;
+
+        // The opening brought none, and the establishment used one, so the estimate is 0.
+        mgr.dispatch_message(pseudonym, repeated_start_packet(0)?)?;
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        opening_released(&mgr, pseudonym).await?;
+        let answers = settled_answers(&mut sent).await;
+        assert!(answers.is_empty(), "no SURB, no answer, got {answers:?}");
+
+        // The skipped repeat did not use up the cap: with a stock the next one is answered.
+        give_surb_stock(&mgr, pseudonym)?;
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
         Ok(())
     }
 
@@ -21268,6 +21357,7 @@ mod tests {
         mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
         next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
         opening_released(&mgr, pseudonym).await?;
+        give_surb_stock(&mgr, pseudonym)?;
 
         for _ in 0..MAX_ANSWERED_START_REPEATS {
             mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
