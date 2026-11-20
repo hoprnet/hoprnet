@@ -637,6 +637,9 @@ fn close_session(
 /// Takes the slot off `METRIC_ACTIVE_SESSIONS`, which counts slots from their allocation (see
 /// [`SessionManager::allocate_session_slot`]), so a slot torn down before its commit is paired too.
 ///
+/// Parks the Entry's PIX ledger, unless [`remove_slot_if`] already did when it took the slot out (see
+/// [`SlotInstance::park_ledger`]).
+///
 /// Retires the Session's pseudonym from the SURB store's admitted class, but not immediately: the
 /// retire is pushed past the packet pipeline's SURB-resolution window, so the return-routed
 /// notification a closing Exit has just enqueued — the PIX-failure notice is the one such packet —
@@ -699,9 +702,10 @@ fn release_session_slot(
     session_data.instance.supersede();
     session_data.pix_supervisor.mark_torn_down();
 
-    // The Entry's PIX ledger leaves the slot for the retention cache here, on every teardown path
-    // (scoped close, idle eviction, supersede by a reconnect, rollback of a failed initiation), so
-    // its retention starts now and not when the Session was initiated.
+    // The Entry's PIX ledger leaves the slot for the retention cache on every teardown path, so its
+    // retention starts now and not when the Session was initiated. Every removal through
+    // `remove_slot_if` has parked it already, inside the removal, and this is then a no-op; this call
+    // parks for the slots the cache itself evicted (idle expiry, capacity).
     session_data.instance.park_ledger(session_id);
 
     if reason != ClosureReason::EmptyRead {
@@ -1801,6 +1805,8 @@ pub(crate) struct SlotInstance {
     last_refresh_ms: std::sync::atomic::AtomicU64,
     /// Where an Entry slot's PIX ledger goes when the slot is torn down, see [`LedgerHome`].
     ledger_home: OnceLock<LedgerHome>,
+    /// Set by the first [`park_ledger`](Self::park_ledger): what the slot parks leaves it once.
+    parked: std::sync::atomic::AtomicBool,
 }
 
 impl SlotInstance {
@@ -1814,6 +1820,7 @@ impl SlotInstance {
             created: std::time::Instant::now(),
             last_refresh_ms: std::sync::atomic::AtomicU64::new(0),
             ledger_home: OnceLock::new(),
+            parked: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -1854,8 +1861,16 @@ impl SlotInstance {
     /// Parks the slot's ledger in the retention cache under `pseudonym`, starting its retention now.
     ///
     /// Called by every teardown of the slot, and a no-op for a slot without a ledger.
+    ///
+    /// Parks **once per instance**: [`remove_slot_if`] parks inside the removal itself, so that no reader
+    /// can find the slot gone and the ledger not yet parked, and the later call from
+    /// [`release_session_slot`] must not put back a ledger a successor has meanwhile claimed (a live Session
+    /// holds its ledger alone). A slot removed some other way (the cache's own eviction) is parked by that
+    /// later call, the first one it sees.
     fn park_ledger(&self, pseudonym: HoprPseudonym) {
-        if let Some(home) = self.ledger_home.get() {
+        if let Some(home) = self.ledger_home.get()
+            && !self.parked.swap(true, std::sync::atomic::Ordering::AcqRel)
+        {
             home.cache.insert(pseudonym, home.ledger.clone());
         }
     }
@@ -1978,6 +1993,20 @@ enum DrainStep {
 ///
 /// Built on the cache's compute rather than `remove`, which does not serialise with a concurrent
 /// compute: a plain `remove` could take out a successor allocated an instant after the check.
+///
+/// Parks the slot's PIX ledger inside that compute, before the slot is removed. A reconnect under the same
+/// pseudonym that no longer finds the slot therefore always finds the ledger in the retention cache; one
+/// that still finds the slot reads the ledger from it, and its claim takes the parked copy (the same
+/// ledger) out. Parking later, in [`release_session_slot`], left a window between the two in which the
+/// reconnect found neither and started a fresh ledger against a generator that still remembered.
+///
+/// The one removal that does not go through here is the cache's own eviction, which parks in
+/// [`release_session_slot`] from the eviction listener. A client cannot learn of such a close before that
+/// park: the Session's channel closes when the slot is dropped and its tasks are aborted, both after it.
+/// A reconnect that comes regardless (after an outage that let the slot idle out) does not miss it
+/// either: [`SessionManager::new_session`] first runs the cache's pending tasks, which evict an expired
+/// slot and run the listener synchronously, before it looks the slot up. Only a slot whose idle time
+/// runs out within that call's own few microseconds escapes this.
 fn remove_slot_if(
     sessions: &moka::sync::Cache<SessionId, SessionSlot>,
     id: &SessionId,
@@ -1990,6 +2019,7 @@ fn remove_slot_if(
                 // Inside the removal, so no writer or driver of this slot outlives it into a successor.
                 entry.value().instance.supersede();
                 entry.value().pix_supervisor.mark_torn_down();
+                entry.value().instance.park_ledger(*id);
                 moka::ops::compute::Op::Remove
             }
             _ => moka::ops::compute::Op::Nop,
@@ -5309,6 +5339,13 @@ where
                     // manager here: this closure is not `&self`, and the eviction may fire
                     // long after the manager that built the cache has been cloned elsewhere.
                     let surb_admission = surb_admission_for_listener.get().cloned();
+                    // The cache has already removed the slot, and the ledger is parked only by the
+                    // `close_session` below. A client cannot learn of the close before that: its
+                    // channel closes when the slot is dropped, and its tasks are aborted, both after
+                    // the park in `release_session_slot`. Nor can a reconnect that comes on its own
+                    // (after an outage that let the slot idle out, say) miss it: `new_session` runs the
+                    // cache's pending tasks first, which evicts an expired slot and calls this
+                    // listener on its own thread before the slot is looked up.
                     match &reason {
                         moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
                             trace!(?session_id, ?reason, "session evicted from the cache");
@@ -5790,7 +5827,10 @@ where
     /// Takes the PIX ledger of `pseudonym` for a new initiation: the one `live` (the superseded local
     /// Session's own) carries, else the one parked in the retention cache, else a new one.
     ///
-    /// The cache entry is taken out, so a Session that is live holds its ledger alone; the claim parks it
+    /// A slot removed by [`remove_slot_if`] has parked its ledger before it left `sessions`, so a reader
+    /// that sees no slot finds the parked ledger, and one that still sees the slot reads it as `live`
+    /// (the same ledger the parked copy is, which this takes out). The cache entry is taken out, so a
+    /// Session that is live holds its ledger alone; the claim parks it
     /// again if the initiation fails before a slot carries it. A ledger whose dimensions differ from the
     /// generator's current ones is replaced, and the generator's state for the pseudonym forgotten with
     /// it: neither describes the other any more.
@@ -5864,6 +5904,9 @@ where
         target: SessionTarget,
         cfg: SessionClientConfig,
     ) -> errors::Result<HoprSession> {
+        // Evicts a slot that idled out but that the cache has not yet evicted, running its eviction
+        // listener here and now: that is what parks an expired predecessor's PIX ledger before the
+        // lookups below (see `remove_slot_if`), so a reconnect after an outage continues it.
         self.sessions.run_pending_tasks();
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
@@ -31070,6 +31113,76 @@ mod tests {
             ),
             "the same ledger"
         );
+        Ok(())
+    }
+
+    /// The slot's removal parks its ledger: a reader that no longer sees the slot finds the ledger, even
+    /// though `release_session_slot` has not run yet.
+    #[test_log::test(tokio::test)]
+    async fn removing_an_entry_slot_parks_its_ledger_in_the_same_step() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.connect_pix(Some(pseudonym)).await?;
+        assert!(
+            rig.parked_ledger(&pseudonym).is_none(),
+            "a live Session holds its ledger alone"
+        );
+
+        let slot = remove_slot_if(&rig.mgr.sessions, &pseudonym, |_| true).context("the slot is removed")?;
+        let carried = slot.instance.ledger().context("an Entry slot carries its ledger")?;
+        let parked = rig.parked_ledger(&pseudonym).context("parked before the release ran")?;
+        assert!(Arc::ptr_eq(&carried.ssa_state, &parked.ssa_state), "the same ledger");
+        assert!(Arc::ptr_eq(&carried.returned_packets, &parked.returned_packets));
+        Ok(())
+    }
+
+    /// A predecessor's late teardown does not put back a ledger its successor has taken.
+    #[test_log::test(tokio::test)]
+    async fn a_late_park_does_not_return_a_claimed_ledger() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.connect_pix(Some(pseudonym)).await?;
+        let slot = remove_slot_if(&rig.mgr.sessions, &pseudonym, |_| true).context("the slot is removed")?;
+
+        let claim = rig.mgr.claim_pix_ledger(pseudonym, rig.params, None);
+        assert!(rig.parked_ledger(&pseudonym).is_none(), "the claim took it out");
+
+        slot.instance.park_ledger(pseudonym);
+        release_session_slot(
+            pseudonym,
+            slot,
+            ClosureReason::Eviction,
+            None,
+            Duration::ZERO,
+            AdmissionToken::NONE,
+        );
+        assert!(
+            rig.parked_ledger(&pseudonym).is_none(),
+            "a live Session holds its ledger alone"
+        );
+        drop(claim);
+        Ok(())
+    }
+
+    /// A reconnect that claims right after the removal continues the predecessor's accounting.
+    #[test_log::test(tokio::test)]
+    async fn a_claim_right_after_the_removal_continues_the_ledger() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.connect_pix(Some(pseudonym)).await?;
+        rig.request(pseudonym, 1).await?;
+        rig.emit_cycle(&pseudonym)?;
+        assert_eq!(Some(SsaIndex::MIN), rig.watermark(&pseudonym));
+
+        let slot = remove_slot_if(&rig.mgr.sessions, &pseudonym, |_| true).context("the slot is removed")?;
+        // The close has not got to `release_session_slot` yet.
+        let claim = rig.mgr.claim_pix_ledger(pseudonym, rig.params, None);
+        assert!(claim.ledger.has_watermark(), "the ledger continues");
+        assert!(
+            rig.generator.emission_progress(&pseudonym).is_some(),
+            "the generator is kept"
+        );
+        drop(slot);
         Ok(())
     }
 
