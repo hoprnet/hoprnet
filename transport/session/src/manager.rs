@@ -3836,16 +3836,21 @@ impl PixToolbox {
 /// The Exit receives the client commitment messages in `handle_ssa_commit`, inserts the
 /// coefficient commitments into the [`SsaReconstructor`], and extracts the deposit address.
 /// It emits [`HoprSessionOutPixEvent::DepositNeeded`] to the upper layer with the
-/// [`AgreedSsaQuota`] and a channel to confirm the deposit.
+/// [`AgreedSsaQuota`] and a deposit channel for confirmations.
 ///
 /// A verifiable commitment is what starts the deposit clock, so the supervisor is told
 /// (`CommitmentVerified`) before anything can be reported against it. A `PixDepositObserver` task
-/// then forwards every confirmation arriving on that channel as `DepositConfirmed`: top-ups
-/// accumulate, and the supervisor is what decides when enough has landed. The observer carries no
-/// timeout of its own — `max_deposit_wait` is the deadline, and a second authority racing the
-/// first is exactly what the supervisor exists to prevent. If the upper layer drops the sender
-/// without ever confirming, the observer reports that (`DepositObserverClosed`) rather than
-/// letting the deadline run out on a deposit that is never coming.
+/// forwards every confirmation arriving on the deposit channel as `DepositConfirmed` until the
+/// upper layer drops the sender. A cycle is funded once at least one non-zero confirmation has
+/// been forwarded. A zero-amount confirmation does not make it funded or stop the observer.
+/// When the deposit channel ends, the observer always reports `DepositObserverClosed`; the
+/// supervisor's phase guard ignores it for a funded cycle.
+///
+/// A funded deposit channel ending is logged at DEBUG. The observer warns only when no non-zero
+/// confirmation was forwarded, because an unfunded cycle still awaiting its deposit is written
+/// off by the supervisor, which logs "closing PIX SSA". The observer carries no timeout of its
+/// own — `max_deposit_wait` is the deadline, and a second authority racing the first is exactly
+/// what the supervisor exists to prevent.
 ///
 /// Once the deposit suffices, the SSA moves to *recovering*. Its recovery deadlines start when it
 /// reaches the front, and its deposit releases the egress gate only while it is there. When a paid
