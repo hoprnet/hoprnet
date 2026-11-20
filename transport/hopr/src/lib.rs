@@ -84,7 +84,9 @@ use hopr_protocol_pix::ShareResolution;
 /// Every engine feature is already enabled by this crate's dependency declaration, so `create`,
 /// `poisson_channel`, `channel` and `MixerSink` are reached through this module.
 pub use hopr_transport_mixer as mixer;
-pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
+pub use hopr_transport_probe::{
+    Dial, NeighborTelemetry, PathTelemetry, ProbeControl, errors::ProbeError, ping::PingQueryReplier,
+};
 use hopr_transport_probe::{
     Probe,
     ping::{PingConfig, Pinger},
@@ -465,6 +467,8 @@ pub struct HoprTransport<Chain, Graph, Net> {
     smgr: Arc<HoprSessionManager>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
+    /// Sets the rate of generated probes while the probe process runs.
+    probe_control: ProbeControl,
     counters: PeerProtocolCounterRegistry,
     cfg: HoprProtocolConfig,
 }
@@ -660,6 +664,7 @@ where
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
+            probe_control: ProbeControl::default(),
             counters: PeerProtocolCounterRegistry::default(),
             cfg,
         })
@@ -1387,7 +1392,8 @@ where
             crossfire::mpsc::bounded_async::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
         let manual_ping_rx = manual_ping_rx_raw.into_stream();
 
-        let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
+        let probe =
+            Probe::new(self.cfg.probe, self.probing_tag_allocator.clone()).with_control(self.probe_control.clone());
 
         let (probing_processes, probe_classifier) = probe
             .continuously_scan(probe_msg_tx.clone(), manual_ping_rx, cover_traffic, self.graph.clone())
@@ -1533,6 +1539,14 @@ where
     /// Returns a reference to the network graph.
     pub fn graph(&self) -> &Graph {
         &self.graph
+    }
+
+    /// The handle that sets the rate of generated probes.
+    ///
+    /// A change reaches the running probe process on its next pull. The handle stays valid across restarts of
+    /// the probe process.
+    pub fn probe_control(&self) -> ProbeControl {
+        self.probe_control.clone()
     }
 
     /// Returns the per-relayer health, so connectivity events can report neighbours we lost or regained.

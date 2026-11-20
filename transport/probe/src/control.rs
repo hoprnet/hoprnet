@@ -91,12 +91,36 @@ impl ProbeControl {
 /// The first item is not delayed. Each later item waits until `pace / dial` after the previous one, and `inner` is
 /// polled only once that time is up, so the generator sees the graph as it is at release time. A dial change
 /// during a wait applies at once; a `None` dial holds the stream until a dial is set again.
-pub(crate) fn paced<S>(inner: S, control: &ProbeControl, pace: Duration) -> impl Stream<Item = S::Item>
+pub(crate) fn paced<S>(inner: S, control: &ProbeControl, pace: Duration) -> impl Stream<Item = S::Item> + use<S>
 where
     S: Stream + Unpin,
 {
-    let _ = (control, pace);
-    inner
+    futures::stream::unfold(
+        (inner, control.subscribe(), None::<Instant>),
+        move |(mut inner, mut dial, last)| async move {
+            loop {
+                let multiplier = match dial.wait_for(Option::is_some).await {
+                    Ok(dial) => dial.map_or(Dial::HIGH.multiplier(), Dial::multiplier),
+                    // Every `ProbeControl` is gone, so nothing can switch probing on again.
+                    Err(_) => return None,
+                };
+                let Some(last) = last else { break };
+                let due = last + pace.div_f64(multiplier);
+                // A deadline in the past still costs a timer tick (1 ms), which would cap a zero pace at 1000/s.
+                if Instant::now() >= due {
+                    break;
+                }
+
+                tokio::select! {
+                    () = tokio::time::sleep_until(due) => break,
+                    changed = dial.changed() => if changed.is_err() { return None },
+                }
+            }
+
+            let item = inner.next().await?;
+            Some((item, (inner, dial, Some(Instant::now()))))
+        },
+    )
 }
 
 #[cfg(test)]
@@ -202,7 +226,11 @@ mod tests {
         control.set_dial(None);
         let held = tokio::time::timeout(PACE * 100, stream.next()).await;
         assert!(held.is_err(), "a stopped dial must not yield probes");
-        assert_eq!(polled.load(Ordering::SeqCst), 1, "the generator must not be pulled while stopped");
+        assert_eq!(
+            polled.load(Ordering::SeqCst),
+            1,
+            "the generator must not be pulled while stopped"
+        );
 
         control.set_dial(Some(Dial::HIGH));
         assert!(stream.next().await.is_some());

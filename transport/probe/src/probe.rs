@@ -21,7 +21,7 @@ use crate::{
     HoprProbeProcess,
     config::ProbeConfig,
     content::Message,
-    control::ProbeControl,
+    control::{ProbeControl, paced},
     ping::PingQueryReplier,
     types::{NeighborProbe, NeighborTelemetry, PathTelemetry},
 };
@@ -232,7 +232,9 @@ impl Probe {
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
 
-        let probing_routes = probing_traffic_generator.build();
+        // The generator keeps no clock: the dial sets how often it is pulled. Manual pings join after this
+        // gate, so they are never delayed or stopped by it.
+        let probing_routes = paced(probing_traffic_generator.build(), &self.control, self.cfg.pace);
 
         // Currently active probes
         let network_graph_internal_neighbor = network_graph.clone();
@@ -1007,6 +1009,7 @@ mod tests {
             timeout: std::time::Duration::from_millis(20),
             max_parallel_probes: NEIGHBOURS.len(),
             interval: std::time::Duration::from_secs(0),
+            pace: std::time::Duration::ZERO,
             ..Default::default()
         };
 
@@ -1064,6 +1067,7 @@ mod tests {
             timeout: std::time::Duration::from_millis(10),
             max_parallel_probes: NEIGHBOURS.len(),
             interval: std::time::Duration::from_secs(0),
+            pace: std::time::Duration::ZERO,
             ..Default::default()
         };
 

@@ -1171,7 +1171,12 @@ mod tests {
         let probe_tx = DepthSink::new(probe_tx, depth.clone());
         let probe_rx = DepthStream::new(probe_rx, depth.clone());
 
-        let (processes, _classifier) = crate::Probe::new(crate::config::ProbeConfig::default(), allocator)
+        // The share is only tested against a saturated lane, so the emitter must run unpaced.
+        let probe_cfg = crate::config::ProbeConfig {
+            pace: std::time::Duration::ZERO,
+            ..Default::default()
+        };
+        let (processes, _classifier) = crate::Probe::new(probe_cfg, allocator)
             .continuously_scan(
                 probe_tx,
                 futures::stream::pending(),
