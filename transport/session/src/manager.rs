@@ -7322,6 +7322,9 @@ where
         // it carries it, so a driver outliving its Session cannot touch a fresh one under the same
         // pseudonym.
         let control_plane = slot.pix_supervisor.clone();
+        // Shares its counters with the slot's, so reading it needs no lookup either. The re-send arm
+        // asks it whether the Session holds a SURB to send over at all.
+        let surb_estimator = slot.surb_estimator.clone();
 
         hopr_utils::spawn_as_abortable!(async move {
             let _retirement_scope = retirement_scope;
@@ -7490,6 +7493,19 @@ where
                                 continue;
                             }
                         };
+
+                        // A re-send is best-effort, and a return packet that finds no SURB is retried
+                        // for up to `surb_resolution_wait` while everything else this node originates
+                        // queues behind it, so one is not sent while the Session holds none. The
+                        // registration was refreshed above all the same. Nothing is reported back: the
+                        // attempt counts against the supervisor's cap and the next one tries again.
+                        if surb_estimator.saturating_diff() == 0 {
+                            tracing::debug!(
+                                %session_id, batch_size = ssa_ids.len(),
+                                "skipping the SSA request re-send — the Session holds no SURB to send it over"
+                            );
+                            continue;
+                        }
 
                         // Failure is logged and dropped, as for the re-request above, and nothing is
                         // reported back: the supervisor pushed the batch's deadline when it emitted
@@ -24294,7 +24310,13 @@ mod tests {
             "clamped max_recovery_idle ({:?}) must stay under the reconstructor lifetime ({lifetime:?})",
             sup.max_recovery_idle
         );
-        crate::supervision::validate_pix_supervision(sup, &hopr_protocol_pix::SsaReconstructorConfig::default())
+        // The reconstructor's registration lifetime is raised past the clamped delivery window, which the
+        // validator requires to be shorter than it; everything else is the default's.
+        let long_lived = hopr_protocol_pix::SsaReconstructorConfig {
+            incomplete_commitment_lifetime: cap + Duration::from_secs(1),
+            ..Default::default()
+        };
+        crate::supervision::validate_pix_supervision(sup, &long_lived)
             .expect("a normalized config must satisfy every cross-component invariant, not only representability");
 
         // Which is exactly the condition that makes every deadline representable.

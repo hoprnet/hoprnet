@@ -2166,6 +2166,9 @@ mod tests {
         // configuration whose declared memory cannot hold the batch it asks for. Leaving the default
         // 2 GiB here would make every case below fail on memory rather than on the batch range this
         // test is about.
+        //
+        // The delivery time is lowered for the same reason: the batch-scaled window has to stay shorter
+        // than the reconstructor's registration lifetime, and 20 s x the ceiling does not.
         let with_supervision = |supervision: SupervisorConfig| HoprProtocolConfig {
             incoming_session_pix_config: IncomingSessionPixConfig {
                 max_live_cycle_bytes: u64::MAX,
@@ -2179,6 +2182,7 @@ mod tests {
             assert!(
                 with_supervision(SupervisorConfig {
                     ssas_per_request,
+                    max_ssa_delivery_time: Duration::from_secs(4),
                     ..Default::default()
                 })
                 .validate()
@@ -2190,6 +2194,7 @@ mod tests {
         assert!(
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
+                max_ssa_delivery_time: Duration::from_secs(4),
                 ..Default::default()
             })
             .validate()
@@ -2210,6 +2215,7 @@ mod tests {
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
                 max_deposit_wait: per_cycle,
+                max_ssa_delivery_time: Duration::from_secs(4),
                 ..Default::default()
             })
             .validate()
