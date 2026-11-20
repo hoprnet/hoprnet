@@ -5,4 +5,5 @@ expression: cfg
 timeout: 3s
 max_parallel_probes: 50
 interval: 5s
+pace: 50ms
 recheck_threshold: 1m

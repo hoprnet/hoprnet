@@ -20,6 +20,7 @@
 
 pub mod config;
 pub mod content;
+pub mod control;
 pub mod errors;
 pub mod ping;
 pub mod probe;
@@ -33,6 +34,7 @@ pub use hopr_api::{
 pub use crate::{
     config::ProbeConfig,
     content::Message as TrafficReturnedObservation,
+    control::{Dial, ProbeControl},
     probe::{Probe, ProbeClassifierState, ProbeDispatch},
     types::{NeighborTelemetry, PathTelemetry},
 };
