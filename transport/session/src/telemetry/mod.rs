@@ -338,6 +338,27 @@ pub fn owns_session_metrics(session_id: &SessionId, owner: u64) -> bool {
         .is_none_or(|state| state.owner == 0 || state.owner == owner)
 }
 
+/// The slot instance that owns the metrics state of `session_id`, if there is any.
+#[cfg(test)]
+pub fn session_metrics_owner(session_id: &SessionId) -> Option<u64> {
+    SESSION_RUNTIME.lock().get(session_id).map(|state| state.owner)
+}
+
+/// Hands the metrics state of `session_id` to `owner`, a successor slot instance that took the
+/// Session's control plane over, and marks the Session active again.
+///
+/// Without it the successor's later teardown would find the state owned by its predecessor and leave
+/// it behind. A no-op when no state exists, which is a Session whose teardown already ran.
+pub fn adopt_session_metrics(session_id: &SessionId, owner: u64) {
+    let adopted = {
+        let mut state = SESSION_RUNTIME.lock();
+        state.get_mut(session_id).map(|s| s.owner = owner).is_some()
+    };
+    if adopted {
+        set_session_state(session_id, SessionLifecycleState::Active);
+    }
+}
+
 /// Removes the metrics state of `session_id` on behalf of `owner`, unless a successor has taken it.
 pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool, owner: u64) {
     // Before the zeroing below: a concurrent touch landing in between would refresh the gauges back to nonzero.
