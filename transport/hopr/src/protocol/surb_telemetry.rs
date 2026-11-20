@@ -1956,7 +1956,8 @@ where
     }
 }
 
-/// Re-judges relayer health, records what changed in the graph, and re-plans when it or a neighbour
+/// Re-judges relayer health (first refreshing the forward-receipt state, which lifts expired forward
+/// verdicts before they are read), records what changed in the graph, and re-plans when it or a neighbour
 /// changed, before writing off the SURBs of relayers judged dead. Recording precedes the re-plan, so
 /// the re-plan already avoids them; the write-off follows it, so the refill goes over new paths.
 ///

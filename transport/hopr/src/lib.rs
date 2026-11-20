@@ -313,8 +313,9 @@ async fn dispatch_incoming_messages<G, In, Out>(
             let _entered = span.enter();
             let _dispatch = tracing::debug_span!("session.dispatch").entered();
             hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
-            // try_send); it never blocks. However, the crossfire stream that feeds
+            // `dispatch_message` is synchronous (moka::sync + crossfire try_send) and
+            // never yields; the locks it takes, the forward receipts' among them, are
+            // held briefly. However, the crossfire stream that feeds
             // this loop does not participate in tokio's cooperative budget, so
             // `future::ready` — which is always Poll::Ready — would let this task
             // monopolize its worker thread under a saturated inbound queue (Processed

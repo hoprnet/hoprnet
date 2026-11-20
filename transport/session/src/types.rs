@@ -570,7 +570,7 @@ pub trait SurbAdmissionControl: Send + Sync + 'static {
 /// Receives the forward receipts an Exit sent for an outgoing Session.
 ///
 /// Implemented by `hopr-transport`, which matches the tags against the packets it sent. Called from the
-/// packet dispatch, so it must be cheap and non-blocking.
+/// packet dispatch, so it must return quickly and may take only brief locks.
 pub trait ForwardReceiptSink: Send + Sync + 'static {
     /// A receipt from the Exit of the Session `pseudonym`, with the `tags` it received in the intervals
     /// `first_seq..=seq`.
