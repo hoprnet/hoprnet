@@ -9,6 +9,16 @@ pub trait SessionTelemetryTracker {
     fn frame_completed(&self);
     /// Records a frame that has been discarded due to timeout or other errors.
     fn frame_discarded(&self);
+    /// Records `count` consecutive frames that have been discarded at once.
+    ///
+    /// The Sequencer gives up on a whole gap in one step, and a gap can span up to 2^32 frame ids, so
+    /// an implementation should override this to account for them in one step as well. The default
+    /// records each frame with [`frame_discarded`](Self::frame_discarded), one by one.
+    fn frames_discarded(&self, count: u32) {
+        for _ in 0..count {
+            self.frame_discarded();
+        }
+    }
     /// Records an incomplete frame that could not be reassembled.
     fn incomplete_frame(&self);
     /// Records an incoming Session message.
@@ -29,6 +39,8 @@ impl SessionTelemetryTracker for NoopTracker {
     fn frame_completed(&self) {}
 
     fn frame_discarded(&self) {}
+
+    fn frames_discarded(&self, _: u32) {}
 
     fn incomplete_frame(&self) {}
 
@@ -90,8 +102,12 @@ pub mod tests {
 
     impl TestTelemetryTracker {
         fn increment(&self, key: &str) {
+            self.increment_by(key, 1);
+        }
+
+        fn increment_by(&self, key: &str, by: usize) {
             let mut map = self.0.lock();
-            *map.entry(key.to_string()).or_insert(0) += 1;
+            *map.entry(key.to_string()).or_insert(0) += by;
         }
     }
 
@@ -106,6 +122,10 @@ pub mod tests {
 
         fn frame_discarded(&self) {
             self.increment("frames_discarded");
+        }
+
+        fn frames_discarded(&self, count: u32) {
+            self.increment_by("frames_discarded", count as usize);
         }
 
         fn incomplete_frame(&self) {
@@ -123,5 +143,38 @@ pub mod tests {
         fn error(&self) {
             self.increment("errors");
         }
+    }
+
+    /// A tracker written before runs of discarded frames existed: it only knows `frame_discarded`.
+    #[derive(Default)]
+    struct PerFrameTracker(std::sync::atomic::AtomicU32);
+
+    impl SessionTelemetryTracker for PerFrameTracker {
+        fn frame_emitted(&self) {}
+
+        fn frame_completed(&self) {}
+
+        fn frame_discarded(&self) {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        fn incomplete_frame(&self) {}
+
+        fn incoming_message(&self, _: SessionMessageDiscriminants) {}
+
+        fn outgoing_message(&self, _: SessionMessageDiscriminants) {}
+
+        fn error(&self) {}
+    }
+
+    #[test]
+    fn a_tracker_without_its_own_run_handling_should_see_every_discarded_frame() {
+        let tracker = PerFrameTracker::default();
+
+        tracker.frames_discarded(0);
+        assert_eq!(0, tracker.0.load(std::sync::atomic::Ordering::Relaxed));
+
+        tracker.frames_discarded(5);
+        assert_eq!(5, tracker.0.load(std::sync::atomic::Ordering::Relaxed));
     }
 }

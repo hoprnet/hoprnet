@@ -53,6 +53,16 @@ pub trait SocketState<const C: usize>: Send {
     /// Called when a frame could not be completed from the segments received from Downstream.
     fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError>;
 
+    /// Called when all the frames from `first` to `last`, both inclusive, could not be completed from the
+    /// segments received from Downstream.
+    ///
+    /// The Socket gives up on a whole gap in one step, and a gap can span up to 2^32 frame ids, so a
+    /// state should override this to handle them in one step as well. The default calls
+    /// [`frame_discarded`](Self::frame_discarded) for each frame, one by one, and stops at the first error.
+    fn frames_discarded(&mut self, first: FrameId, last: FrameId) -> Result<(), SessionError> {
+        (first..=last).try_for_each(|id| self.frame_discarded(id))
+    }
+
     /// Called when a segment of a Frame was sent to the Downstream.
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
 
@@ -112,6 +122,10 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
     }
 
     fn frame_discarded(&mut self, _: FrameId) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn frames_discarded(&mut self, _: FrameId, _: FrameId) -> Result<(), SessionError> {
         Ok(())
     }
 

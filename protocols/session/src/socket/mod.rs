@@ -351,20 +351,15 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         lr3.frame_emitted();
                         #[cfg(feature = "telemetry")]
                         s3.frame_emitted();
-                        Some(Ok(frame.0))
+                        Some(Ok::<_, std::io::Error>(frame.0))
                     }
                     // Downstream skips discarded frames
-                    Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        tracing::debug!(frame_id, "frame discarded");
-                        lr3.frame_discarded();
+                    Err(gap) => {
+                        tracing::debug!(first = gap.first, last = gap.last, "frames discarded");
+                        lr3.frames_discarded(u64::from(gap.count()));
                         #[cfg(feature = "telemetry")]
-                        s3.frame_discarded();
+                        s3.frames_discarded(gap.count());
                         None
-                    }
-                    Err(err) => {
-                        #[cfg(feature = "telemetry")]
-                        s3.error();
-                        Some(Err(std::io::Error::other(err)))
                     }
                 })
             })
@@ -588,22 +583,17 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         lr3.frame_emitted();
                         #[cfg(feature = "telemetry")]
                         s3.frame_emitted();
-                        Some(Ok(frame.0))
+                        Some(Ok::<_, std::io::Error>(frame.0))
                     }
-                    Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        tracing::debug!(frame_id, "frame discarded");
-                        lr3.frame_discarded();
-                        if let Err(error) = st_3.frame_discarded(frame_id) {
+                    Err(gap) => {
+                        tracing::debug!(first = gap.first, last = gap.last, "frames discarded");
+                        lr3.frames_discarded(u64::from(gap.count()));
+                        if let Err(error) = st_3.frames_discarded(gap.first, gap.last) {
                             log_state_update_error(&error, "frame discarded state update failed");
                         }
                         #[cfg(feature = "telemetry")]
-                        s3.frame_discarded();
+                        s3.frames_discarded(gap.count());
                         None // Downstream skips discarded frames
-                    }
-                    Err(err) => {
-                        #[cfg(feature = "telemetry")]
-                        s3.error();
-                        Some(Err(std::io::Error::other(err)))
                     }
                 })
             })
@@ -1676,6 +1666,46 @@ mod tests {
                 "a duplicate is not a loss (reliable={reliable})"
             );
             assert!(!signal.lost_within(Duration::from_secs(30)), "reliable={reliable}");
+        }
+        Ok(())
+    }
+
+    /// A frame far ahead of the one due next is reached at once, not by giving up every id before it
+    /// one poll at a time, and all of those ids still count as lost.
+    ///
+    /// Frame 1 is delivered, then frame 2^31 arrives: ids `2..2^31` are the gap. Walking it id by id
+    /// takes minutes of a busy core on a single frame, which is why the read is bounded by a couple of
+    /// seconds. The reliable socket also cancels the retries of the ids it gives up, through
+    /// `AcknowledgementState::frames_discarded`.
+    #[test_log::test(tokio::test)]
+    async fn a_frame_far_ahead_is_reached_without_walking_the_gap_on_both_socket_kinds() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use tokio::io::AsyncWriteExt;
+
+        const FAR: u32 = 1 << 31;
+
+        for reliable in [false, true] {
+            let signal = Arc::new(FrameLossSignal::new());
+            let (mut socket, mut remote) = open_raw_receiver(reliable, Duration::from_millis(100), &signal)?;
+
+            let mut buf = [0u8; 9];
+            remote.write_all(&raw_segment(1, 0, 1, b"frame one")).await?;
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf))
+                .await
+                .context("the first frame timed out")??;
+            assert_eq!(b"frame one", &buf, "reliable={reliable}");
+
+            remote.write_all(&raw_segment(FAR, 0, 1, b"far frame")).await?;
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf))
+                .await
+                .context("the far frame was not reached within the time budget")??;
+            assert_eq!(b"far frame", &buf, "reliable={reliable}");
+
+            assert_eq!(
+                u64::from(FAR) - 2,
+                signal.lost_total(),
+                "every id between the two frames is a loss (reliable={reliable})"
+            );
         }
         Ok(())
     }

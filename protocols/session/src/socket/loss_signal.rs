@@ -88,12 +88,20 @@ impl FrameLossSignal {
     ///
     /// A duplicate segment is not loss: the frame it belongs to was delivered.
     pub fn record(&self) {
+        self.record_lost(1);
+    }
+
+    /// Records that `frames` consecutive frames were lost at once, as one loss event.
+    ///
+    /// The same as [`record`](Self::record) called `frames` times, for the cost of one: the sequencer
+    /// gives up a run of any length in a single step, and a run is a single instant for the reader.
+    pub(crate) fn record_lost(&self, frames: u64) {
         let elapsed = u64::try_from(self.origin.elapsed().as_millis()).unwrap_or(u64::MAX - 1);
         // The previous stamp may be newer than this one when two loss events race; `fetch_max` keeps
         // the most recent instant, which is the one an observer is asking about.
         self.last_loss_ms
             .fetch_max(elapsed.saturating_add(1), Ordering::Relaxed);
-        self.lost_total.fetch_add(1, Ordering::Relaxed);
+        self.lost_total.fetch_add(frames, Ordering::Relaxed);
         self.end_stall();
     }
 
@@ -176,6 +184,17 @@ mod tests {
         assert!(signal.lost_within(Duration::from_millis(1000)));
         assert!(signal.lost_within(Duration::from_secs(3)));
         assert_eq!(1, signal.lost_total());
+    }
+
+    #[test]
+    fn a_run_of_lost_frames_is_one_loss_event_of_that_many_frames() {
+        let signal = FrameLossSignal::new();
+        signal.record_lost(5);
+        assert_eq!(5, signal.lost_total());
+        assert!(signal.lost_within(Duration::from_millis(500)));
+
+        signal.record();
+        assert_eq!(6, signal.lost_total(), "a single loss adds one");
     }
 
     #[test]
