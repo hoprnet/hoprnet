@@ -489,9 +489,9 @@
 //! 8. When the Exit first learns an SSA's deposit address, a `PixDepositObserver` task forwards every confirmation on
 //!    the deposit channel as `DepositConfirmed` until the upper layer drops the sender. It then always reports
 //!    `DepositObserverClosed`. The supervisor ignores this event for a funded cycle — one with at least one non-zero
-//!    confirmation forwarded — and the observer logs that deposit channel ending at DEBUG. The observer warns only
-//!    when no non-zero confirmation was forwarded: an unfunded cycle still awaiting its deposit is written off by
-//!    the supervisor, which logs "closing PIX SSA".
+//!    confirmation forwarded — and the observer logs that deposit channel ending at DEBUG. The observer warns only when
+//!    no non-zero confirmation was forwarded: an unfunded cycle still awaiting its deposit is written off by the
+//!    supervisor, which logs "closing PIX SSA".
 //! 9. `SessionPixEvent::SessionClosed` is the one event that does not come from `dispatch_pix_event`. The manager's own
 //!    close paths raise it, from `begin_surb_drain`, and the supervisor answers by either draining the funded cycle or
 //!    closing at once — see "Draining a closed Session" above.
