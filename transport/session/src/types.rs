@@ -616,6 +616,8 @@ pub struct HoprSession {
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
+    /// The slot instance the manager built this Session for; see [`HoprSession::slot_instance`].
+    slot_instance: Option<u64>,
 }
 
 pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
@@ -844,7 +846,26 @@ impl HoprSession {
             routing,
             cfg,
             on_close,
+            slot_instance: None,
         })
+    }
+
+    /// Binds this Session to the manager's slot instance it was built for.
+    pub(crate) fn with_slot_instance(mut self, instance_id: u64) -> Self {
+        self.slot_instance = Some(instance_id);
+        self
+    }
+
+    /// Identifies the establishment of the manager's slot this Session object belongs to.
+    ///
+    /// A pseudonym ([`SessionId`]) can be taken by a successor Session while this object still exists.
+    /// Handing this to [`SessionManager::close_session_instance`] closes only this Session, never a
+    /// successor's. `None` for a Session not built by a [`SessionManager`].
+    ///
+    /// [`SessionManager`]: crate::SessionManager
+    /// [`SessionManager::close_session_instance`]: crate::SessionManager::close_session_instance
+    pub fn slot_instance(&self) -> Option<u64> {
+        self.slot_instance
     }
 
     /// ID of this Session.
@@ -912,8 +933,9 @@ impl futures::AsyncWrite for HoprSession {
         futures::ready!(this.inner.poll_close(cx))?;
         tracing::trace!("hopr session closed");
 
-        #[cfg(feature = "telemetry")]
-        crate::telemetry::set_session_state(this.id, crate::telemetry::SessionLifecycleState::Closing);
+        // The `Closing` telemetry state is not set here: this object may outlive its slot, and the
+        // state is keyed by pseudonym, which a successor can hold. The manager sets it when it handles
+        // the notification below, and only for the instance that sent it.
 
         if let Some(notifier) = this.on_close.take() {
             tracing::trace!("notifying write half closure of session");
