@@ -6039,12 +6039,31 @@ where
     /// brings, starts neither the Exit's SURB-level reports nor the reserve it keeps for them. An Exit
     /// that predates the mark does take it for one.
     pub async fn ping_session(&self, id: &SessionId) -> errors::Result<()> {
-        if let Some(session_data) = self.sessions.get(id) {
+        self.ping_session_scoped(id, None).await
+    }
+
+    /// Same as [`ping_session`](Self::ping_session), but only if the slot under `id` is the slot instance
+    /// `instance_id` (see [`HoprSession::slot_instance`]).
+    ///
+    /// For callers that hold a handle to one specific Session object: once its pseudonym is reused, a
+    /// ping through that stale handle must not be sent over the successor Session. Fails with
+    /// [`SessionManagerError::NonExistingSession`] when the slot is gone or belongs to another instance.
+    pub async fn ping_session_instance(&self, id: &SessionId, instance_id: u64) -> errors::Result<()> {
+        self.ping_session_scoped(id, Some(instance_id)).await
+    }
+
+    async fn ping_session_scoped(&self, id: &SessionId, instance_id: Option<u64>) -> errors::Result<()> {
+        let routing_opts = self
+            .sessions
+            .get(id)
+            .filter(|s| instance_id.is_none_or(|i| s.instance.id() == i))
+            .map(|s| s.routing_opts.clone());
+        if let Some(routing_opts) = routing_opts {
             trace!(session_id = ?id, "pinging manually session");
             let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
             send_via_msg_sender(
                 &mut msg_sender,
-                session_data.routing_opts.clone(),
+                routing_opts,
                 HoprStartProtocol::KeepAlive(KeepAliveMessage {
                     session_id: *id,
                     flags: KeepAliveFlag::ManualPing.into(),
@@ -7228,9 +7247,34 @@ where
     /// Returns an error if the Session with the given `id` does not exist, or
     /// if it does not use SURB balancing.
     pub fn update_surb_balancer_config(&self, id: &SessionId, config: SurbBalancerConfig) -> errors::Result<()> {
+        self.update_surb_balancer_config_scoped(id, None, config)
+    }
+
+    /// Same as [`update_surb_balancer_config`](Self::update_surb_balancer_config), but only if the slot
+    /// under `id` is the slot instance `instance_id` (see [`HoprSession::slot_instance`]).
+    ///
+    /// For callers that hold a handle to one specific Session object: once its pseudonym is reused, an
+    /// update through that stale handle must not change the successor Session's balancer. Fails with
+    /// [`SessionManagerError::NonExistingSession`] when the slot is gone or belongs to another instance.
+    pub fn update_surb_balancer_config_instance(
+        &self,
+        id: &SessionId,
+        instance_id: u64,
+        config: SurbBalancerConfig,
+    ) -> errors::Result<()> {
+        self.update_surb_balancer_config_scoped(id, Some(instance_id), config)
+    }
+
+    fn update_surb_balancer_config_scoped(
+        &self,
+        id: &SessionId,
+        instance_id: Option<u64>,
+        config: SurbBalancerConfig,
+    ) -> errors::Result<()> {
         let cfg = self
             .sessions
             .get(id)
+            .filter(|s| instance_id.is_none_or(|i| s.instance.id() == i))
             .ok_or(SessionManagerError::NonExistingSession)?
             .surb_mgmt;
 
@@ -7247,7 +7291,33 @@ where
     ///
     /// Returns an error if the Session with the given `id` does not exist.
     pub fn get_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
-        match self.sessions.get(id) {
+        self.get_surb_balancer_config_scoped(id, None)
+    }
+
+    /// Same as [`get_surb_balancer_config`](Self::get_surb_balancer_config), but only if the slot under
+    /// `id` is the slot instance `instance_id` (see [`HoprSession::slot_instance`]).
+    ///
+    /// For callers that hold a handle to one specific Session object: once its pseudonym is reused, a
+    /// read through that stale handle must not report the successor Session's balancer. Fails with
+    /// [`SessionManagerError::NonExistingSession`] when the slot is gone or belongs to another instance.
+    pub fn get_surb_balancer_config_instance(
+        &self,
+        id: &SessionId,
+        instance_id: u64,
+    ) -> errors::Result<Option<SurbBalancerConfig>> {
+        self.get_surb_balancer_config_scoped(id, Some(instance_id))
+    }
+
+    fn get_surb_balancer_config_scoped(
+        &self,
+        id: &SessionId,
+        instance_id: Option<u64>,
+    ) -> errors::Result<Option<SurbBalancerConfig>> {
+        match self
+            .sessions
+            .get(id)
+            .filter(|s| instance_id.is_none_or(|i| s.instance.id() == i))
+        {
             Some(session) => Ok(Some(session.surb_mgmt.as_ref())
                 .filter(|c| !c.is_disabled())
                 .map(|d| d.as_config())),
@@ -29060,6 +29130,189 @@ mod tests {
 
         assert!(mgr.close_session_instance(&pseudonym, new_instance.id()));
         assert!(wait_for_no_active_sessions(&mgr).await);
+        Ok(())
+    }
+
+    /// A configurator of a predecessor Session cannot read, update or ping the successor that took its pseudonym.
+    #[test_log::test(tokio::test)]
+    async fn instance_scoped_configurator_operations_do_not_reach_another_instance() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, mut incoming, pseudonym) =
+            exit_session_originating_keep_alives(Default::default(), None).await?;
+        let _predecessor = timeout(Duration::from_secs(2), incoming.next())
+            .await
+            .context("the Exit must hand over its Session")?
+            .context("the incoming channel must stay open")?;
+        let old_id = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the first slot must exist")?
+            .instance
+            .id();
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+
+        let _successor = exit_successor_on(&mgr, &mut incoming, pseudonym).await?;
+        let new_id = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the successor's slot must exist")?
+            .instance
+            .id();
+        assert_ne!(old_id, new_id);
+
+        let before = mgr.get_surb_balancer_config(&pseudonym)?;
+        let current = mgr.get_surb_balancer_config_instance(&pseudonym, new_id)?;
+        assert_eq!(current, before, "the current instance reads its own config");
+
+        let new_cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 12_345,
+            ..Default::default()
+        };
+        assert!(matches!(
+            mgr.get_surb_balancer_config_instance(&pseudonym, old_id),
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        assert!(matches!(
+            mgr.update_surb_balancer_config_instance(&pseudonym, old_id, new_cfg),
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        assert_eq!(
+            mgr.get_surb_balancer_config(&pseudonym)?,
+            before,
+            "a stale update must leave the successor's config unchanged"
+        );
+
+        // On the current instance the call reaches the slot (and is judged on its own merits).
+        let on_current = mgr.update_surb_balancer_config_instance(&pseudonym, new_id, new_cfg);
+        assert!(
+            !matches!(
+                on_current,
+                Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+            ),
+            "the current instance must be found, got {on_current:?}"
+        );
+        if before.is_some() {
+            assert_eq!(mgr.get_surb_balancer_config(&pseudonym)?, Some(new_cfg));
+        }
+
+        // Ping: stale sends nothing, current sends a keep-alive.
+        while msg_rx.try_recv().is_ok() {}
+        assert!(matches!(
+            mgr.ping_session_instance(&pseudonym, old_id).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        mgr.ping_session_instance(&pseudonym, new_id).await?;
+        assert!(mgr.close_session_instance(&pseudonym, new_id));
+        Ok(())
+    }
+
+    /// On an Entry Session with a SURB balancer, a stale instance id neither reads nor changes the balancer
+    /// config, nor pings; the current instance does all three.
+    #[test_log::test(tokio::test)]
+    async fn stale_instance_cannot_read_update_or_ping_a_balanced_entry_session() -> anyhow::Result<()> {
+        let mgr = RecordingManager::new(Default::default());
+        let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let initial = SurbBalancerConfig::default();
+        let opening = tokio::spawn({
+            let mgr = mgr.clone();
+            async move {
+                mgr.new_session(
+                    (&ChainKeypair::random()).into(),
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    SessionClientConfig {
+                        capabilities: Capabilities::empty(),
+                        pseudonym: pseudonym.into(),
+                        surb_management: Some(initial),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(anyhow::Error::from)
+            }
+        });
+
+        let start = timeout(Duration::from_secs(2), msg_rx.next())
+            .await
+            .context("the Entry must send its StartSession")?
+            .context("the sender must stay open")?;
+        let Ok(StartProtocol::StartSession(initiation)) =
+            HoprStartProtocol::decode(start.1.data.application_tag, &start.1.data.plain_text)
+        else {
+            anyhow::bail!("the first message must be a StartSession");
+        };
+        mgr.dispatch_message(
+            pseudonym,
+            start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge: initiation.challenge,
+                session_id: pseudonym,
+            }))?,
+        )?;
+        let session = timeout(Duration::from_secs(5), opening)
+            .await
+            .context("the Entry must establish")???;
+        let current = session.slot_instance().context("the Session names its instance")?;
+        let stale = current + 1_000_000;
+
+        let before = mgr.get_surb_balancer_config(&pseudonym)?;
+        assert!(before.is_some(), "the Entry runs a balancer");
+        let changed = SurbBalancerConfig {
+            target_surb_buffer_size: initial.target_surb_buffer_size + 1_000,
+            ..initial
+        };
+
+        assert!(matches!(
+            mgr.get_surb_balancer_config_instance(&pseudonym, stale),
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        assert!(matches!(
+            mgr.update_surb_balancer_config_instance(&pseudonym, stale, changed),
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        assert_eq!(
+            mgr.get_surb_balancer_config(&pseudonym)?,
+            before,
+            "a stale update must leave the config unchanged"
+        );
+
+        mgr.update_surb_balancer_config_instance(&pseudonym, current, changed)?;
+        assert_eq!(
+            mgr.get_surb_balancer_config_instance(&pseudonym, current)?
+                .map(|c| c.target_surb_buffer_size),
+            Some(changed.target_surb_buffer_size)
+        );
+
+        while msg_rx.try_recv().is_ok() {}
+        assert!(matches!(
+            mgr.ping_session_instance(&pseudonym, stale).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        let manual_pings = |sent: Vec<(DestinationRouting, ApplicationDataOut)>| {
+            sent.iter()
+                .filter(|(_, d)| {
+                    matches!(
+                        HoprStartProtocol::decode(d.data.application_tag, &d.data.plain_text),
+                        Ok(StartProtocol::KeepAlive(KeepAliveMessage { flags, .. })) if flags.contains(KeepAliveFlag::ManualPing)
+                    )
+                })
+                .count()
+        };
+        assert_eq!(
+            manual_pings(originated_during(&mut msg_rx, Duration::from_millis(200)).await),
+            0,
+            "a stale ping must send nothing"
+        );
+        mgr.ping_session_instance(&pseudonym, current).await?;
+        assert_eq!(
+            manual_pings(originated_during(&mut msg_rx, Duration::from_millis(500)).await),
+            1,
+            "a ping on the current instance must send a manual keep-alive"
+        );
+
+        assert!(mgr.close_session_instance(&pseudonym, current));
         Ok(())
     }
 
