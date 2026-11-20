@@ -32,7 +32,9 @@ use crate::{
     MAX_SESSION_MTU,
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
-    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage, stop_on_invalid_header},
+    protocol::{
+        FrameId, OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage, stop_on_invalid_header,
+    },
     session_frame_size,
 };
 
@@ -128,73 +130,47 @@ pub struct SessionSocketConfig {
     /// Default is true.
     #[default(true)]
     pub adapt_gap_wait: bool,
-    /// Guards a successor socket against frames of the stream it replaces: while the guard is
-    /// active (see [`Self::successor_guard_period`]), a segment whose frame id exceeds the highest
-    /// admitted one by more than this window (0 at the start) is dropped as stale and counted,
-    /// terminating ones included. Afterwards everything is admitted, as without the option.
+    /// The first frame id of the stream, for a socket that succeeds an earlier stream under the
+    /// same pseudonym. `None` (default) starts at 1; otherwise it must lie in
+    /// `1..=`[`MAX_STREAM_BASE`], or the socket is not created
+    /// ([`SessionError::InvalidConfig`]).
     ///
-    /// For a socket that resumes a pseudonym of a previous Session: frames of the old stream
-    /// still in flight are routed to the new socket, before and after its first frames. Without
-    /// the guard the sequencer holds such a frame, gives up the gap in front of it, skips to it,
-    /// and then discards the new stream's low ids as old, while a stale terminating frame closes
-    /// the socket. Applies to stateless and stateful sockets alike; a stateful socket drops the
-    /// stale segments before they reach the acknowledgement state, so they trigger no
-    /// acknowledgements or retransmission requests.
+    /// Frame ids restart at 1 with every socket, so a late frame of the predecessor stream (its
+    /// terminating one included) cannot be told from a frame of the successor by its id. With a
+    /// base, the successor sends its first frame as `stream_base` and expects the peer's first
+    /// frame as `stream_base` too, and the base is chosen above every id the predecessor used.
+    /// Each predecessor frame is then below the base, and the socket drops it as an already seen
+    /// (old) frame: stateless sockets before reassembly, and the sequencer for anything that
+    /// still reaches it. It does not move the expected id, close the stream or count as a loss
+    /// (the loss report counts it as a duplicate segment).
     ///
-    /// Use [`DEFAULT_SUCCESSOR_START_WINDOW`] unless the expected stream is known better.
-    /// A terminating frame is held to a tighter bound: the sequencer admits it only within
-    /// [`DEFAULT_SUCCESSOR_TERMINATING_SLACK`] frames of the stream's contiguous progress (not of
-    /// the highest id seen, which stale tail frames of the old stream can raise), so the stale FIN
-    /// of a short old stream cannot close the new one. Before reassembly only the data window
-    /// applies to a terminating segment.
+    /// Both peers must use the same value. The Start protocol negotiates it (`SessionResumed`);
+    /// a one-sided base leaves the other side waiting for frame 1, or dropping the peer's frames.
     ///
-    /// Limitation: non-terminating frames of an old stream shorter than the window can still leak
-    /// through, so the guard is meant for unreliable (stateless) sockets, where a few stray
-    /// datagrams are tolerable.
-    ///
-    /// Trade-offs: during the guard, a legitimate jump of more than the window (over that many
-    /// consecutive frames lost or reordered at once) is dropped until the guard ends; an old
-    /// stream whose ids lie within the window of the new stream's cannot be told apart.
-    ///
-    /// Default `None`: no guard, as for any ordinary Session.
+    /// Stateless sockets only: [`SessionSocket::new`] (the acknowledged socket) rejects it, because
+    /// retransmission and acknowledgement state has not been verified for a stream that does not
+    /// start at 1, and the transport takes over only stateless Sessions.
     #[default(None)]
-    pub successor_start_window: Option<u32>,
-    /// How long the [`Self::successor_start_window`] guard lasts from the creation of the socket.
-    /// Has no effect without a window.
-    ///
-    /// Default is [`DEFAULT_SUCCESSOR_GUARD_PERIOD`].
-    #[default(DEFAULT_SUCCESSOR_GUARD_PERIOD)]
-    pub successor_guard_period: Duration,
+    pub stream_base: Option<FrameId>,
 }
 
-/// A sensible [`SessionSocketConfig::successor_guard_period`]: an upper bound on how long frames
-/// of a previous Session can still be in flight through the mixnet (paths are mixed and delayed
-/// for seconds, and a retransmitting peer keeps going for a while), with margin. Longer only
-/// prolongs the window in which a legitimate large jump would be dropped.
-pub const DEFAULT_SUCCESSOR_GUARD_PERIOD: Duration = Duration::from_secs(30);
-
-/// How far ahead of the stream's contiguous progress a terminating frame may be, during a
-/// successor socket's guard (see [`SessionSocketConfig::successor_start_window`]).
+/// The highest allowed [`SessionSocketConfig::stream_base`], 2^31.
 ///
-/// The reference is the frame up to which the sequencer has delivered or given up, not the highest
-/// frame seen: stale tail frames of the old stream (its last data frames and its FIN are in flight
-/// together) raise the highest but cannot fill the gap below them. The new stream's own
-/// terminating frame can only overtake the few data frames right before it, through reordering
-/// across mixnet paths, so a small slack suffices. 64 covers a reordering depth far beyond what is
-/// observed in practice while staying well below the data window. A stale FIN further ahead is
-/// dropped, as it would otherwise be held until the new stream reaches its id and close it.
-/// Limitation: a stale FIN that arrives once the new stream's progress is within the slack of the
-/// FIN's id is indistinguishable from the new stream's own.
-pub const DEFAULT_SUCCESSOR_TERMINATING_SLACK: u32 = 64;
+/// It leaves half of the `u32` frame id space (2^31 frames) to the stream, which cannot be
+/// exhausted in practice, and keeps the sequencer's "frame id 0 ends the sequence" wrap-around
+/// far away.
+pub const MAX_STREAM_BASE: FrameId = 1 << 31;
 
-/// A sensible [`SessionSocketConfig::successor_start_window`].
-///
-/// 1024 is four times the 256-frame head-of-line bound (`max_frames_behind_gap`) the transport
-/// uses, which is the deepest run of lost or reordered frames a Session is expected to bridge: a
-/// legitimate jump of the new stream stays within it, while frames of an old stream, whose ids
-/// are typically far higher, fall outside. An old stream whose ids lie within the window of the
-/// new stream's cannot be told apart from it; a Session worth resuming has carried far more frames.
-pub const DEFAULT_SUCCESSOR_START_WINDOW: u32 = 1024;
+/// Validates the configured stream base and returns the first frame id (1 for `None`).
+fn first_frame_id(stream_base: Option<FrameId>) -> Result<FrameId, SessionError> {
+    match stream_base {
+        None => Ok(1),
+        Some(base) if (1..=MAX_STREAM_BASE).contains(&base) => Ok(base),
+        Some(base) => Err(SessionError::InvalidConfig(format!(
+            "stream base {base} is outside of 1..={MAX_STREAM_BASE}"
+        ))),
+    }
+}
 
 /// Logs a failed update of the socket state.
 ///
@@ -270,6 +246,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
+        let first_frame_id = first_frame_id(cfg.stream_base)?;
         let span = tracing::debug_span!("session.socket");
         let _entered = span.enter();
         // Preserve frame boundaries within the number of segments SeqIndicator can enumerate.
@@ -298,9 +275,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 
                 future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
             })
-            .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
+            .segmenter_with_terminating_segment_from::<C>(frame_size, cfg.datagram, first_frame_id);
 
-        let last_emitted_frame = Arc::new(AtomicU32::new(0));
+        // Everything below the first frame id counts as seen, a predecessor stream's frames included
+        let last_emitted_frame = Arc::new(AtomicU32::new(first_frame_id - 1));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
         // Dropped frames are counted and reported once per window, not logged one by one
@@ -314,9 +292,6 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // The reordering the reassembler and the sequencer both see, which sizes the gap wait.
         let reorder = cfg.adapt_gap_wait.then(crate::processing::SharedReorder::default);
         let reorder_s1 = reorder.clone();
-        let mut start_gate = cfg
-            .successor_start_window
-            .map(|window| crate::processing::StartGuard::new(window, cfg.successor_guard_period));
 
         // Debug tracing spans for individual pipeline stages
         let stage1_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly");
@@ -337,19 +312,6 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         packet.try_as_segment().filter(|s| {
                             #[cfg(feature = "telemetry")]
                             s1.incoming_message(SessionMessageDiscriminants::Segment);
-
-                            // A segment of the previous stream, before the new one has started
-                            if let Some(gate) = start_gate.as_mut()
-                                && !(if s.is_terminating() {
-                                    gate.admit_terminating(s.frame_id, None)
-                                } else {
-                                    gate.admit_data(s.frame_id)
-                                })
-                            {
-                                tracing::debug!(frame_id = s.frame_id, "dropping stale segment of a previous stream");
-                                lr1.stale_segment();
-                                return false;
-                            }
 
                             // Filter old frame ids to save space in the Reassembler
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
@@ -417,8 +379,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     max_item_age: cfg.max_frame_age,
                     max_frames_behind_gap: cfg.max_frames_behind_gap,
                     adapt_to_reordering: cfg.adapt_gap_wait,
-                    successor_start_window: cfg.successor_start_window,
-                    successor_guard_period: cfg.successor_guard_period,
+                    stream_base: cfg.stream_base,
                 },
                 reorder,
             )
@@ -487,6 +448,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
+        if cfg.stream_base.is_some() {
+            return Err(SessionError::InvalidConfig(
+                "a stream base is supported on stateless sockets only".into(),
+            ));
+        }
         let span = tracing::debug_span!("session.socket");
         let _entered = span.enter();
         // The upper bound is additionally limited by the missing-segment bitmap in SegmentRequests.
@@ -581,9 +547,6 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let mut st_1 = state.clone();
         let mut st_2 = state.clone();
         let mut st_3 = state.clone();
-        let mut start_gate = cfg
-            .successor_start_window
-            .map(|window| crate::processing::StartGuard::new(window, cfg.successor_guard_period));
 
         // Continue receiving packets from downstream, unless we received a terminating frame.
         // Once the terminating frame is received, the `packets_in_abort_handle` is triggered, terminating the pipeline.
@@ -593,20 +556,6 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 let _span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly").entered();
                 futures::future::ready(match packet {
                     Ok(packet) => {
-                        // A segment of the previous stream, before the new one has started, must not
-                        // reach the state: it would be acknowledged or requested for retransmission.
-                        if let SessionMessage::Segment(s) = &packet
-                            && let Some(gate) = start_gate.as_mut()
-                            && !(if s.is_terminating() {
-                                gate.admit_terminating(s.frame_id, None)
-                            } else {
-                                gate.admit_data(s.frame_id)
-                            })
-                        {
-                            tracing::debug!(frame_id = s.frame_id, "dropping stale segment of a previous stream");
-                            lr1.stale_segment();
-                            return futures::future::ready(None);
-                        }
                         if let Err(error) = st_1.incoming_message(&packet) {
                             tracing::debug!(%error, "incoming message state update failed");
                         }
@@ -670,8 +619,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
                 // A retransmission can still fill the gap, so it is waited out in full.
                 adapt_to_reordering: false,
-                successor_start_window: cfg.successor_start_window,
-                successor_guard_period: cfg.successor_guard_period,
+                stream_base: None,
             })
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
@@ -848,290 +796,6 @@ mod tests {
             log_state_update_error(&SessionError::InvalidFrameId, "frame complete state update failed");
         });
         assert_eq!(*levels.lock(), vec![tracing::Level::DEBUG, tracing::Level::ERROR]);
-    }
-
-    /// A raw segment carrying `payload` as a whole frame `frame_id`.
-    fn raw_frame(frame_id: crate::FrameId, terminating: bool, payload: &[u8]) -> Vec<u8> {
-        use crate::protocol::{Segment, SeqIndicator};
-
-        Vec::from(SessionMessage::<MTU>::Segment(Segment {
-            frame_id,
-            seq_idx: 0,
-            seq_flags: SeqIndicator::new_with_flags(1, terminating),
-            data: payload.to_vec().into_boxed_slice(),
-        }))
-    }
-
-    /// A successor socket must ignore the leftovers of the stream it replaces, and tolerate a stale
-    /// terminating frame, on both socket kinds.
-    #[test_log::test(tokio::test)]
-    async fn successor_socket_should_ignore_stale_frames_of_the_previous_stream() -> anyhow::Result<()> {
-        use tokio_util::compat::TokioAsyncReadCompatExt;
-
-        let cfg = SessionSocketConfig {
-            // A gap wait that would show up as a failure if a stale frame were held
-            frame_timeout: Duration::from_secs(30),
-            max_frames_behind_gap: Some(256),
-            successor_start_window: Some(crate::DEFAULT_SUCCESSOR_START_WINDOW),
-            ..Default::default()
-        };
-
-        for stateless in [true, false] {
-            let (transport, mut remote) = tokio::io::duplex(65536);
-            let mut socket = if stateless {
-                SessionSocket::<MTU, _>::new_stateless(
-                    "successor",
-                    transport.compat(),
-                    cfg,
-                    None,
-                    #[cfg(feature = "telemetry")]
-                    NoopTracker,
-                )?
-            } else {
-                SessionSocket::<MTU, _>::new(
-                    transport.compat(),
-                    Stateless::<MTU>::new("successor"),
-                    cfg,
-                    None,
-                    #[cfg(feature = "telemetry")]
-                    NoopTracker,
-                )?
-            };
-
-            let mut bytes = Vec::new();
-            // Leftovers of the previous stream, one of them terminating, then the new stream.
-            bytes.extend(raw_frame(5000, false, b"stale-a"));
-            bytes.extend(raw_frame(5001, true, b"stale-terminating"));
-            bytes.extend(raw_frame(1, false, b"one,"));
-            // ... and one arriving after the new stream began, which must not make it skip ahead
-            bytes.extend(raw_frame(5002, false, b"stale-b"));
-            bytes.extend(raw_frame(2, false, b"two,"));
-            tokio::io::AsyncWriteExt::write_all(&mut remote, &bytes).await?;
-
-            let mut received = [0u8; 8];
-            socket
-                .read_exact(&mut received)
-                .timeout(futures_time::time::Duration::from_secs(5))
-                .await??;
-            assert_eq!(b"one,two,", &received, "stateless={stateless}");
-
-            // The stale terminating frame did not close the socket, while the new stream's own
-            // terminating frame (within the window) does.
-            tokio::io::AsyncWriteExt::write_all(&mut remote, &raw_frame(3, true, b"end")).await?;
-            let mut rest = Vec::new();
-            socket
-                .read_to_end(&mut rest)
-                .timeout(futures_time::time::Duration::from_secs(5))
-                .await??;
-            assert_eq!(b"end", rest.as_slice(), "stateless={stateless}");
-        }
-        Ok(())
-    }
-
-    /// Without the option the same leftovers are not special: a stale terminating frame closes the
-    /// socket (the behaviour the option exists to prevent).
-    #[test_log::test(tokio::test)]
-    async fn socket_without_a_start_window_should_be_closed_by_a_stale_terminating_frame() -> anyhow::Result<()> {
-        use tokio_util::compat::TokioAsyncReadCompatExt;
-
-        let (transport, mut remote) = tokio::io::duplex(65536);
-        let mut socket = SessionSocket::<MTU, _>::new_stateless(
-            "plain",
-            transport.compat(),
-            SessionSocketConfig::default(),
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        // Without the lock the sequencer holds frame 5001 for the frame timeout before skipping to it.
-        tokio::io::AsyncWriteExt::write_all(&mut remote, &raw_frame(5001, true, b"stale")).await?;
-        let mut rest = Vec::new();
-        socket
-            .read_to_end(&mut rest)
-            .timeout(futures_time::time::Duration::from_secs(10))
-            .await??;
-        assert_eq!(b"stale", rest.as_slice());
-        Ok(())
-    }
-
-    /// A stale frame must not reach the acknowledgement state of a stateful successor socket.
-    #[test_log::test(tokio::test)]
-    async fn stateful_successor_socket_should_not_acknowledge_stale_frames() -> anyhow::Result<()> {
-        use tokio_util::compat::TokioAsyncReadCompatExt;
-
-        let (transport, remote) = tokio::io::duplex(65536);
-        let mut socket = SessionSocket::<MTU, _>::new(
-            transport.compat(),
-            AcknowledgementState::new(
-                "successor",
-                AcknowledgementStateConfig {
-                    expected_packet_latency: Duration::from_millis(2),
-                    acknowledgement_delay: Duration::from_millis(5),
-                    ..Default::default()
-                },
-            ),
-            SessionSocketConfig {
-                successor_start_window: Some(crate::DEFAULT_SUCCESSOR_START_WINDOW),
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-
-        let mut remote = asynchronous_codec::Framed::new(remote.compat(), SessionCodec::<MTU>);
-        remote
-            .send(SessionMessage::Segment(crate::protocol::Segment {
-                frame_id: 5000,
-                seq_idx: 0,
-                seq_flags: SeqIndicator::new(1),
-                data: b"stale".to_vec().into_boxed_slice(),
-            }))
-            .await?;
-        remote
-            .send(SessionMessage::Segment(crate::protocol::Segment {
-                frame_id: 1,
-                seq_idx: 0,
-                seq_flags: SeqIndicator::new(1),
-                data: b"new".to_vec().into_boxed_slice(),
-            }))
-            .await?;
-
-        let mut received = [0u8; 3];
-        socket
-            .read_exact(&mut received)
-            .timeout(futures_time::time::Duration::from_secs(5))
-            .await??;
-        assert_eq!(b"new", &received);
-
-        // Collect whatever the socket sends back for a while
-        let mut acknowledged = Vec::new();
-        while let Ok(Some(message)) = remote
-            .next()
-            .timeout(futures_time::time::Duration::from_millis(500))
-            .await
-        {
-            if let SessionMessage::Acknowledge(acks) = message? {
-                acknowledged.extend(acks);
-            }
-        }
-        assert!(
-            acknowledged.contains(&1),
-            "the new frame is acknowledged: {acknowledged:?}"
-        );
-        assert!(
-            !acknowledged.contains(&5000),
-            "a stale frame must not be acknowledged: {acknowledged:?}"
-        );
-        Ok(())
-    }
-
-    /// The old stream was short, so its FIN is within the data window: it must still not close the
-    /// resumed socket, while the new stream's own FIN, slightly ahead of its last data, does.
-    #[test_log::test(tokio::test)]
-    async fn successor_stateless_socket_should_survive_the_terminating_frame_of_a_short_old_stream()
-    -> anyhow::Result<()> {
-        use tokio_util::compat::TokioAsyncReadCompatExt;
-
-        let (transport, mut remote) = tokio::io::duplex(1 << 20);
-        let mut socket = SessionSocket::<MTU, _>::new_stateless(
-            "successor",
-            transport.compat(),
-            SessionSocketConfig {
-                frame_timeout: Duration::from_secs(30),
-                successor_start_window: Some(crate::DEFAULT_SUCCESSOR_START_WINDOW),
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-
-        // The old stream's tail (data 85..90 and its FIN 91) arrives right after new frames 1 and 2,
-        // and its FIN once more a little later. The new stream ends on its own FIN 201.
-        let mut bytes = Vec::new();
-        for id in 1..=2 {
-            bytes.extend(raw_frame(id, false, b"x"));
-        }
-        for id in 85..=90 {
-            bytes.extend(raw_frame(id, false, b"x"));
-        }
-        bytes.extend(raw_frame(91, true, b"x"));
-        for id in 3..=5 {
-            bytes.extend(raw_frame(id, false, b"x"));
-        }
-        bytes.extend(raw_frame(91, true, b"x"));
-        for id in 6..=200 {
-            bytes.extend(raw_frame(id, false, b"x"));
-        }
-        bytes.extend(raw_frame(201, true, b"x"));
-        tokio::io::AsyncWriteExt::write_all(&mut remote, &bytes).await?;
-
-        let mut all = Vec::new();
-        socket
-            .read_to_end(&mut all)
-            .timeout(futures_time::time::Duration::from_secs(10))
-            .await??;
-        assert_eq!(201, all.len(), "the whole new stream, closed only by its own FIN");
-        Ok(())
-    }
-
-    /// Acknowledgements and retransmission requests of the previous stream's peer name frames this
-    /// socket never sent. They must neither fail nor disturb the stream.
-    #[test_log::test(tokio::test)]
-    async fn stateful_socket_should_ignore_control_messages_for_frames_it_never_sent() -> anyhow::Result<()> {
-        use tokio_util::compat::TokioAsyncReadCompatExt;
-
-        let (transport, remote) = tokio::io::duplex(65536);
-        let mut socket = SessionSocket::<MTU, _>::new(
-            transport.compat(),
-            AcknowledgementState::new("successor", AcknowledgementStateConfig::default()),
-            SessionSocketConfig {
-                successor_start_window: Some(crate::DEFAULT_SUCCESSOR_START_WINDOW),
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        let mut remote = asynchronous_codec::Framed::new(remote.compat(), SessionCodec::<MTU>);
-        remote
-            .send(SessionMessage::Acknowledge(vec![777, 778].try_into()?))
-            .await?;
-        remote
-            .send(SessionMessage::Request(SegmentRequest::from_iter([(
-                777,
-                [0b01000000].into(),
-            )])))
-            .await?;
-        remote
-            .send(SessionMessage::Segment(crate::protocol::Segment {
-                frame_id: 1,
-                seq_idx: 0,
-                seq_flags: SeqIndicator::new(1),
-                data: b"new".to_vec().into_boxed_slice(),
-            }))
-            .await?;
-
-        let mut received = [0u8; 3];
-        socket
-            .read_exact(&mut received)
-            .timeout(futures_time::time::Duration::from_secs(5))
-            .await??;
-        assert_eq!(b"new", &received);
-
-        // Nothing is retransmitted for the unknown frame
-        while let Ok(Some(message)) = remote
-            .next()
-            .timeout(futures_time::time::Duration::from_millis(300))
-            .await
-        {
-            assert!(
-                !matches!(message?, SessionMessage::Segment(s) if s.frame_id == 777),
-                "nothing to retransmit for an unknown frame"
-            );
-        }
-        Ok(())
     }
 
     #[tokio::test]
@@ -2611,6 +2275,247 @@ mod tests {
         assert!(a.is_ok());
         assert!(b.is_ok());
 
+        Ok(())
+    }
+
+    // ---- stream base ----
+
+    /// A terminating segment message, as it arrives off the wire.
+    fn raw_terminating(frame_id: u32) -> Vec<u8> {
+        Vec::from(SessionMessage::<MTU>::Segment(crate::protocol::Segment::terminating(
+            frame_id,
+        )))
+    }
+
+    /// Opens the receive side of a stateless socket expecting `stream_base`, with a gap bound of 256 frames.
+    fn open_based_receiver(
+        stream_base: Option<FrameId>,
+        frame_timeout: Duration,
+        signal: &Arc<FrameLossSignal>,
+    ) -> anyhow::Result<(SessionSocket<MTU, Stateless<MTU>>, tokio::io::DuplexStream)> {
+        use tokio_util::compat::TokioAsyncReadCompatExt;
+
+        let (transport, remote) = tokio::io::duplex(1 << 20);
+        let socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            transport.compat(),
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                frame_timeout,
+                max_frames_behind_gap: Some(256),
+                stream_base,
+                ..Default::default()
+            },
+            Some(signal.clone()),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        Ok((socket, remote))
+    }
+
+    /// Reads exactly `expected.len()` bytes and compares them.
+    async fn expect_read(socket: &mut (impl futures::io::AsyncRead + Unpin), expected: &[u8]) -> anyhow::Result<()> {
+        let mut buf = vec![0u8; expected.len()];
+        anyhow::Context::context(
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf)).await,
+            "timed out waiting for data",
+        )??;
+        assert_eq!(expected, buf.as_slice());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stream_base_should_number_the_first_sent_frame_with_the_base() -> anyhow::Result<()> {
+        use crate::protocol::{Segment, SeqIndicator};
+
+        for (base, expected_first) in [
+            (None, 1),
+            (Some(1), 1),
+            (Some(5000), 5000),
+            (Some(MAX_STREAM_BASE), MAX_STREAM_BASE),
+        ] {
+            let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+            let mut socket = SessionSocket::<MTU, _>::new_stateless(
+                "alice",
+                alice,
+                SessionSocketConfig {
+                    stream_base: base,
+                    ..Default::default()
+                },
+                None,
+                #[cfg(feature = "telemetry")]
+                NoopTracker,
+            )?;
+            socket.write_all(b"first").await?;
+            socket.flush().await?;
+            socket.write_all(b"second").await?;
+            socket.flush().await?;
+            socket.close().await?;
+
+            let messages = futures::TryStreamExt::try_collect::<Vec<_>>(asynchronous_codec::FramedRead::new(
+                bob,
+                SessionCodec::<MTU>,
+            ))
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
+            let segment = |id: u32, data: &[u8]| {
+                SessionMessage::Segment(Segment {
+                    frame_id: id,
+                    seq_idx: 0,
+                    seq_flags: SeqIndicator::new_with_flags(1, false),
+                    data: data.to_vec().into_boxed_slice(),
+                })
+            };
+            assert_eq!(
+                messages,
+                vec![
+                    segment(expected_first, b"first"),
+                    segment(expected_first + 1, b"second"),
+                    SessionMessage::Segment(Segment::terminating(expected_first + 2)),
+                ],
+                "base={base:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stream_base_should_deliver_the_stream_in_order_and_drop_every_predecessor_frame() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(Some(1000), Duration::from_secs(30), &signal)?;
+
+        // Predecessor frames (data and terminating) before, between and after the new stream's frames,
+        // the new stream's own frames out of order.
+        remote.write_all(&raw_segment(900, 0, 1, b"old 900")).await?;
+        remote.write_all(&raw_terminating(6)).await?;
+        remote.write_all(&raw_segment(1000, 0, 1, b"new 1000")).await?;
+        remote.write_all(&raw_terminating(999)).await?;
+        remote.write_all(&raw_segment(1002, 0, 1, b"new 1002")).await?;
+        remote.write_all(&raw_segment(999, 0, 1, b"old 999")).await?;
+        remote.write_all(&raw_segment(1001, 0, 1, b"new 1001")).await?;
+        remote.write_all(&raw_terminating(1)).await?;
+        remote.write_all(&raw_segment(5, 0, 1, b"old 5")).await?;
+
+        expect_read(&mut socket, b"new 1000").await?;
+        expect_read(&mut socket, b"new 1001").await?;
+        expect_read(&mut socket, b"new 1002").await?;
+
+        // The successor's own terminating frame still closes the stream, and a late predecessor one does not.
+        remote.write_all(&raw_terminating(1003)).await?;
+        let mut buf = [0u8; 8];
+        assert_eq!(
+            0,
+            tokio::time::timeout(Duration::from_secs(2), socket.read(&mut buf)).await??
+        );
+
+        assert_eq!(0, signal.lost_total(), "predecessor frames are not a loss");
+        Ok(())
+    }
+
+    /// Review finding: a delayed predecessor frame 900 was admitted by the guard's window, and the gap rule
+    /// (`max_frames_behind_gap` = 256) then discarded the successor's frames. Below the base it is just old.
+    #[test_log::test(tokio::test)]
+    async fn a_delayed_predecessor_frame_should_not_discard_the_successor_frames() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(Some(1 << 16), Duration::from_secs(30), &signal)?;
+
+        remote.write_all(&raw_segment(900, 0, 1, b"old 900")).await?;
+        for id in (1u32 << 16)..(1u32 << 16) + 900 {
+            remote.write_all(&raw_segment(id, 0, 1, &id.to_be_bytes())).await?;
+        }
+        for id in (1u32 << 16)..(1u32 << 16) + 900 {
+            expect_read(&mut socket, &id.to_be_bytes()).await?;
+        }
+        assert_eq!(0, signal.lost_total());
+        Ok(())
+    }
+
+    /// Review finding: an in-order predecessor FIN numbered 6 that arrived after successor frames 1-5 closed the
+    /// successor. With a base above 6, it is dropped.
+    #[test_log::test(tokio::test)]
+    async fn a_predecessor_fin_arriving_after_new_frames_should_not_close_the_successor() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(Some(100), Duration::from_secs(30), &signal)?;
+
+        for id in 100..105u32 {
+            remote.write_all(&raw_segment(id, 0, 1, &id.to_be_bytes())).await?;
+        }
+        remote.write_all(&raw_terminating(6)).await?;
+        remote.write_all(&raw_segment(105, 0, 1, &105u32.to_be_bytes())).await?;
+        for id in 100..106u32 {
+            expect_read(&mut socket, &id.to_be_bytes()).await?;
+        }
+        assert_eq!(0, signal.lost_total());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_lost_first_frame_should_be_handled_by_the_gap_rule_with_a_stream_base() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(Some(5000), Duration::from_millis(100), &signal)?;
+
+        // Frame 5000 never arrives; the predecessor's frames do, which change nothing about that.
+        remote.write_all(&raw_segment(4999, 0, 1, b"old")).await?;
+        remote.write_all(&raw_segment(5001, 0, 1, b"new 5001")).await?;
+        remote.write_all(&raw_segment(5002, 0, 1, b"new 5002")).await?;
+
+        expect_read(&mut socket, b"new 5001").await?;
+        expect_read(&mut socket, b"new 5002").await?;
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn no_stream_base_should_start_at_frame_one() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(None, Duration::from_secs(30), &signal)?;
+        // 1 is accepted and delivered first, and no frame is treated as predecessor
+        remote.write_all(&raw_segment(2, 0, 1, b"two")).await?;
+        remote.write_all(&raw_segment(1, 0, 1, b"one")).await?;
+        expect_read(&mut socket, b"one").await?;
+        expect_read(&mut socket, b"two").await?;
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_invalid_stream_base_should_be_rejected() -> anyhow::Result<()> {
+        let signal = Arc::new(FrameLossSignal::new());
+        for base in [0, MAX_STREAM_BASE + 1, FrameId::MAX] {
+            let result = open_based_receiver(Some(base), Duration::from_secs(1), &signal);
+            assert!(
+                matches!(result, Err(e) if e.downcast_ref::<SessionError>().is_some_and(|e| matches!(e, SessionError::InvalidConfig(_)))),
+                "base {base} must be rejected"
+            );
+        }
+        assert!(open_based_receiver(Some(1), Duration::from_secs(1), &signal).is_ok());
+        assert!(open_based_receiver(Some(MAX_STREAM_BASE), Duration::from_secs(1), &signal).is_ok());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_stateful_socket_should_reject_a_stream_base() -> anyhow::Result<()> {
+        let (alice, _bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let result = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::<MTU>::new("alice", AcknowledgementStateConfig::default()),
+            SessionSocketConfig {
+                stream_base: Some(10),
+                ..Default::default()
+            },
+            None,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        );
+        assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
         Ok(())
     }
 }

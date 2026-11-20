@@ -15,98 +15,10 @@ use crate::{
     errors::SessionError,
     processing::reorder::{ABANDONED_MEMORY, SharedReorder},
     protocol::FrameId,
-    socket::DEFAULT_SUCCESSOR_TERMINATING_SLACK,
 };
 
 /// Floor on a gap timer, so a gap already past its wait still yields to the runtime once.
 const MIN_GAP_WAIT: Duration = Duration::from_millis(1);
-
-/// Items that carry the [`FrameId`] they are sequenced by.
-pub(crate) trait HasFrameId {
-    fn frame_id(&self) -> FrameId;
-
-    /// Whether the item ends the stream.
-    fn is_terminating(&self) -> bool {
-        false
-    }
-}
-
-impl HasFrameId for FrameId {
-    fn frame_id(&self) -> FrameId {
-        *self
-    }
-}
-
-impl HasFrameId for crate::protocol::OrderedFrame {
-    fn frame_id(&self) -> FrameId {
-        self.0.frame_id
-    }
-
-    fn is_terminating(&self) -> bool {
-        self.0.is_terminating
-    }
-}
-
-/// Tells the frames of a successor stream from late ones of the stream it replaces.
-///
-/// Until `period` has elapsed from creation (afterwards everything is admitted):
-/// - A data id is stale if it exceeds the highest admitted data id by more than `window`. The highest starts at 0, so
-///   before the first admitted frame this is "id above the window".
-/// - A terminating id is judged by *contiguous progress* of the stream, not by that highest: the tail of a short old
-///   stream (say frames 85..90 and its FIN 91) is in flight together, and its data frames pass the window and raise the
-///   highest, so a FIN judged against it would be admitted, wait in the buffer and close the successor once its stream
-///   reaches 91. Stale frames cannot fill the gap below them, so they cannot move the contiguous progress. The
-///   sequencer knows it (its next expected id, which advances over delivered and given-up frames), and admits a FIN
-///   only within [`DEFAULT_SUCCESSOR_TERMINATING_SLACK`] of it: the new stream's own FIN can overtake only a bounded
-///   number of its last data frames.
-/// - The segment gate has no such knowledge and passes `None`: it applies only the data window to a terminating
-///   segment, leaving the slack decision to the sequencer. A terminating item never moves the highest.
-///
-/// The sequencer and the socket's segment gate share this type so the rules cannot drift.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct StartGuard {
-    window: FrameId,
-    deadline: Instant,
-    highest: FrameId,
-}
-
-impl StartGuard {
-    pub(crate) fn new(window: FrameId, period: Duration) -> Self {
-        Self {
-            window,
-            deadline: Instant::now() + period,
-            highest: 0,
-        }
-    }
-
-    /// Data item: returns `false` if `id` is stale and must be dropped.
-    pub(crate) fn admit_data(&mut self, id: FrameId) -> bool {
-        if self.expired() {
-            return true;
-        }
-        if id > self.highest.saturating_add(self.window) {
-            return false;
-        }
-        self.highest = self.highest.max(id);
-        true
-    }
-
-    /// Terminating item: returns `false` if `id` is stale and must be dropped.
-    ///
-    /// `contiguous` is the highest id up to which the stream is known to be complete or given up,
-    /// when the caller knows it (the sequencer); `None` applies the data window only.
-    pub(crate) fn admit_terminating(&self, id: FrameId, contiguous: Option<FrameId>) -> bool {
-        if self.expired() {
-            return true;
-        }
-        id <= self.highest.saturating_add(self.window)
-            && contiguous.is_none_or(|c| id <= c.saturating_add(DEFAULT_SUCCESSOR_TERMINATING_SLACK))
-    }
-
-    fn expired(&self) -> bool {
-        Instant::now() >= self.deadline
-    }
-}
 
 /// Buffer entry pairing an item with when it entered the buffer.
 ///
@@ -192,17 +104,13 @@ pub struct Sequencer<S: futures::Stream> {
     max_frames_behind_gap: Option<usize>,
     /// Waits on a gap only as long as the reordering seen supports, when set.
     reorder: Option<SharedReorder>,
-    /// Successor jump guard: see [`SequencerConfig::successor_start_window`]. `None` disables it.
-    guard: Option<StartGuard>,
-    /// Number of frames dropped as stale by the guard.
-    stale_dropped: u64,
     state: State,
 }
 
 impl<S> Sequencer<S>
 where
     S: futures::Stream,
-    S::Item: Ord + PartialOrd<FrameId> + HasFrameId,
+    S::Item: Ord + PartialOrd<FrameId>,
 {
     /// Creates a new instance, wrapping the given `inner` Segment sink.
     ///
@@ -215,14 +123,14 @@ where
         max_item_age: Option<Duration>,
         max_frames_behind_gap: Option<usize>,
         reorder: Option<SharedReorder>,
-        guard: Option<StartGuard>,
+        first_frame_id: FrameId,
     ) -> Self {
         assert!(capacity > 0, "capacity should be positive");
         Self {
             inner,
             buffer: BinaryHeap::with_capacity(capacity),
             timer: futures_time::task::sleep(max_wait.max(MIN_GAP_WAIT).into()),
-            next_id: 1,
+            next_id: first_frame_id,
             max_wait,
             max_item_age: max_item_age.filter(|age| !age.is_zero()),
             // Zero would abandon the frame due next before anything had arrived to justify it,
@@ -230,8 +138,6 @@ where
             // that still *is* evidence.
             max_frames_behind_gap: max_frames_behind_gap.map(|n| n.max(1)),
             reorder,
-            guard,
-            stale_dropped: 0,
             state: State::Polling,
         }
     }
@@ -247,7 +153,7 @@ enum State {
 impl<S> futures::Stream for Sequencer<S>
 where
     S: futures::Stream,
-    S::Item: Ord + PartialOrd<FrameId> + HasFrameId,
+    S::Item: Ord + PartialOrd<FrameId>,
 {
     type Item = Result<S::Item, SessionError>;
 
@@ -284,25 +190,6 @@ where
                                 return Poll::Pending;
                             }
                             (Poll::Ready(Some(item)), _) => {
-                                if let Some(guard) = this.guard.as_mut()
-                                    && !if item.is_terminating() {
-                                        // Contiguous progress: everything below `next_id` is delivered or given up
-                                        guard.admit_terminating(item.frame_id(), Some(this.next_id.saturating_sub(1)))
-                                    } else {
-                                        guard.admit_data(item.frame_id())
-                                    }
-                                {
-                                    // Not the new stream (a terminating frame included): drop it without
-                                    // touching `next_id`, the buffer or the gap timer.
-                                    *this.stale_dropped += 1;
-                                    tracing::debug!(
-                                        frame_id = item.frame_id(),
-                                        stale_dropped = *this.stale_dropped,
-                                        "dropping frame too far ahead of the successor stream"
-                                    );
-                                    *this.state = State::Polling;
-                                    continue;
-                                }
                                 if item.lt(this.next_id) {
                                     // Do not accept older frame ids. A frame whose gap was given up
                                     // is reordering the wait did not cover, and lengthens it.
@@ -498,30 +385,12 @@ pub struct SequencerConfig {
     /// milliseconds of each other holds everything behind it for seconds, waiting for something
     /// that is never coming. A frame that comes after its gap was given up lengthens the wait.
     pub adapt_to_reordering: bool,
-    /// Guards a successor stream against frames of the stream it replaces; `None` (the default)
-    /// disables the guard.
+    /// The first frame id of the sequence; `None` (the default) starts at 1.
     ///
-    /// For a socket that takes over a pseudonym from a previous Session: frames still in flight
-    /// from the old stream carry high ids, and arrive before *and after* the new stream's first
-    /// frames. The sequencer would hold such a frame, give up the gap in front of it and skip to
-    /// it, black-holing the new stream's lower ids. While the guard is active (for
-    /// [`Self::successor_guard_period`] from creation) a frame is stale if its id exceeds the
-    /// highest admitted one by more than this window (0 at the start). Stale frames, terminating
-    /// ones included, are dropped: they do not move the expected id, do not start the gap timer
-    /// and are not a gap or a loss. Afterwards everything is admitted.
-    ///
-    /// A terminating frame is judged against this sequencer's contiguous progress (its next
-    /// expected id) instead, with the much tighter bound
-    /// [`DEFAULT_SUCCESSOR_TERMINATING_SLACK`](crate::DEFAULT_SUCCESSOR_TERMINATING_SLACK).
-    ///
-    /// Trade-off: during the guard, a legitimate jump of more than the window (that many
-    /// consecutive frames lost or reordered at once) is dropped until the guard ends, and an old
-    /// stream whose ids lie within the window of the new stream's cannot be told apart.
-    /// See [`DEFAULT_SUCCESSOR_START_WINDOW`](crate::DEFAULT_SUCCESSOR_START_WINDOW).
-    pub successor_start_window: Option<u32>,
-    /// How long the [`Self::successor_start_window`] guard lasts, from creation of the sequencer.
-    /// Without a window it has no effect.
-    pub successor_guard_period: Duration,
+    /// Everything below it is an old item and is dropped (terminating frames included, see
+    /// [`SessionSocketConfig::stream_base`](crate::SessionSocketConfig::stream_base)). Must lie in
+    /// `1..=`[`MAX_STREAM_BASE`](crate::MAX_STREAM_BASE); the socket validates it.
+    pub stream_base: Option<FrameId>,
 }
 
 /// Stream extensions methods for item sequencing.
@@ -530,10 +399,10 @@ pub trait SequencerExt: futures::Stream {
     /// of items.
     fn sequencer(self, timeout: Duration, capacity: usize) -> Sequencer<Self>
     where
-        Self::Item: Ord + PartialOrd<FrameId> + HasFrameId,
+        Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity, None, None, None, None)
+        Sequencer::new(self, timeout, capacity, None, None, None, 1)
     }
 
     /// As [`SequencerExt::sequencer`], but discards items buffered longer than `max_item_age`
@@ -545,16 +414,16 @@ pub trait SequencerExt: futures::Stream {
         max_item_age: Option<Duration>,
     ) -> Sequencer<Self>
     where
-        Self::Item: Ord + PartialOrd<FrameId> + HasFrameId,
+        Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity, max_item_age, None, None, None)
+        Sequencer::new(self, timeout, capacity, max_item_age, None, None, 1)
     }
 
     /// As [`SequencerExt::sequencer`], with every stopping rule stated explicitly.
     fn sequencer_with(self, cfg: SequencerConfig) -> Sequencer<Self>
     where
-        Self::Item: Ord + PartialOrd<FrameId> + HasFrameId,
+        Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
         self.sequencer_sharing(cfg, None)
@@ -566,7 +435,7 @@ pub trait SequencerExt: futures::Stream {
     /// sequencer's own samples alone.
     fn sequencer_sharing(self, cfg: SequencerConfig, reorder: Option<SharedReorder>) -> Sequencer<Self>
     where
-        Self::Item: Ord + PartialOrd<FrameId> + HasFrameId,
+        Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
         Sequencer::new(
@@ -576,8 +445,7 @@ pub trait SequencerExt: futures::Stream {
             cfg.max_item_age,
             cfg.max_frames_behind_gap,
             cfg.adapt_to_reordering.then(|| reorder.unwrap_or_default()),
-            cfg.successor_start_window
-                .map(|window| StartGuard::new(window, cfg.successor_guard_period)),
+            cfg.stream_base.unwrap_or(1),
         )
     }
 }
@@ -727,8 +595,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: Some(2),
             adapt_to_reordering: false,
-            successor_start_window: None,
-            successor_guard_period: Duration::ZERO,
+            stream_base: None,
         });
         pin_mut!(seq_stream);
 
@@ -777,8 +644,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: Some(4),
             adapt_to_reordering: false,
-            successor_start_window: None,
-            successor_guard_period: Duration::ZERO,
+            stream_base: None,
         });
         pin_mut!(seq_stream);
 
@@ -824,8 +690,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: Some(3),
             adapt_to_reordering: false,
-            successor_start_window: None,
-            successor_guard_period: Duration::ZERO,
+            stream_base: None,
         });
         pin_mut!(seq_stream);
 
@@ -862,8 +727,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: None,
             adapt_to_reordering: false,
-            successor_start_window: None,
-            successor_guard_period: Duration::ZERO,
+            stream_base: None,
         });
         pin_mut!(seq_stream);
 
@@ -1163,253 +1027,6 @@ mod tests {
         Ok(())
     }
 
-    fn windowed(window: u32, max_wait: Duration) -> SequencerConfig {
-        SequencerConfig {
-            max_wait,
-            capacity: 4096,
-            max_item_age: None,
-            max_frames_behind_gap: None,
-            adapt_to_reordering: false,
-            successor_start_window: Some(window),
-            successor_guard_period: Duration::from_secs(60),
-        }
-    }
-
-    /// Feeds `frames` and collects what the sequencer yields until the stream is closed.
-    async fn run_windowed(
-        window: u32,
-        max_wait: Duration,
-        frames: Vec<u32>,
-    ) -> anyhow::Result<(Vec<Result<u32, SessionError>>, u64)> {
-        let mut seq = futures::stream::iter(frames).sequencer_with(windowed(window, max_wait));
-        let mut out = Vec::new();
-        while let Some(item) = seq.next().timeout(futures_time::time::Duration::from_secs(5)).await? {
-            out.push(item);
-        }
-        Ok((out, seq.stale_dropped))
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_ignore_stale_frames_before_lock_on() -> anyhow::Result<()> {
-        // Old high ids from the previous stream, then the new stream. No gap wait may be incurred.
-        let (out, dropped) = run_windowed(100, Duration::from_secs(30), vec![5000, 5001, 7777, 1, 2, 3, 4]).await?;
-        assert_eq!(vec![1, 2, 3, 4], out.into_iter().collect::<Result<Vec<_>, _>>()?);
-        assert_eq!(3, dropped);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_ignore_a_stale_terminating_frame() -> anyhow::Result<()> {
-        // The terminating bit is not visible to the sequencer; the id alone decides. An id of
-        // `FrameId::MAX` is what the sequencer would otherwise end the sequence on.
-        let (out, dropped) = run_windowed(100, Duration::from_secs(30), vec![FrameId::MAX, 1, 2, 3]).await?;
-        assert_eq!(vec![1, 2, 3], out.into_iter().collect::<Result<Vec<_>, _>>()?);
-        assert_eq!(1, dropped);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_order_new_frames_interleaved_with_stale_ones() -> anyhow::Result<()> {
-        // Stale frames arrive before and between the new stream's frames, which are themselves out
-        // of order. The guard stays on after lock-on, so 9002 is dropped as well.
-        let mut seq = futures::stream::iter(vec![9000u32, 9001, 3, 9002, 1, 2, 4])
-            .sequencer_with(windowed(100, Duration::from_secs(30)));
-        let mut delivered = Vec::new();
-        for _ in 0..4 {
-            delivered.push(
-                seq.next()
-                    .timeout(futures_time::time::Duration::from_secs(5))
-                    .await?
-                    .expect("stream not ended")?,
-            );
-        }
-        assert_eq!(vec![1, 2, 3, 4], delivered);
-        assert_eq!(3, seq.stale_dropped);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_lock_on_via_a_later_in_window_frame() -> anyhow::Result<()> {
-        // Frames 1 and 2 are lost; 3 is within the window and locks on. The normal gap handling
-        // then reports 1 and 2 as discarded, with no stale frame counted as loss.
-        let (out, dropped) = run_windowed(100, Duration::from_millis(50), vec![9000, 3, 4, 5]).await?;
-        assert_eq!(1, dropped);
-        let discarded: Vec<_> = out
-            .iter()
-            .filter_map(|r| match r {
-                Err(SessionError::FrameDiscarded(id)) => Some(*id),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(vec![1, 2], discarded);
-        let delivered: Vec<_> = out.into_iter().filter_map(Result::ok).collect();
-        assert_eq!(vec![3, 4, 5], delivered);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_drop_stale_frames_arriving_after_lock_on() -> anyhow::Result<()> {
-        // The transport's gap bound: were 5000 admitted at next_id 4, the gap would be given up at once.
-        let mut cfg = windowed(256, Duration::from_secs(30));
-        cfg.max_frames_behind_gap = Some(256);
-        let (tx, rx) = futures::channel::mpsc::unbounded();
-        let mut seq = rx.sequencer_with(cfg);
-        for id in [1u32, 2, 3] {
-            tx.unbounded_send(id)?;
-            assert_eq!(Some(id), seq.try_next().await?);
-        }
-        tx.unbounded_send(5000)?;
-        tx.unbounded_send(4)?;
-        tx.unbounded_send(5)?;
-        assert_eq!(Some(4), seq.try_next().await?, "no gap give-up, the new stream goes on");
-        assert_eq!(Some(5), seq.try_next().await?);
-        assert_eq!(1, seq.stale_dropped);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_admit_everything_after_the_guard_period() -> anyhow::Result<()> {
-        let mut cfg = windowed(256, Duration::from_secs(30));
-        cfg.max_frames_behind_gap = Some(256);
-        cfg.successor_guard_period = Duration::from_millis(100);
-        let (tx, rx) = futures::channel::mpsc::unbounded();
-        let mut seq = rx.sequencer_with(cfg);
-        tx.unbounded_send(1u32)?;
-        assert_eq!(Some(1), seq.try_next().await?);
-        tokio::time::sleep(Duration::from_millis(150)).await;
-        // As without the option: the far-ahead frame is held, and the gap in front of it given up.
-        tx.unbounded_send(5000)?;
-        assert!(matches!(seq.try_next().await, Err(SessionError::FrameDiscarded(2))));
-        assert_eq!(0, seq.stale_dropped);
-        Ok(())
-    }
-
-    fn frame(id: FrameId, terminating: bool) -> crate::protocol::OrderedFrame {
-        crate::protocol::OrderedFrame(crate::protocol::Frame {
-            frame_id: id,
-            data: Box::new([]),
-            is_terminating: terminating,
-        })
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_drop_the_terminating_frame_of_a_short_old_stream() -> anyhow::Result<()> {
-        // The old stream's tail (data 85..90) is in flight with its FIN 91. The data passes the window
-        // and raises the highest admitted id, but cannot move the contiguous progress the FIN is judged by.
-        let stale_tail = || (85..=90).map(|id| frame(id, false)).chain([frame(91, true)]);
-        let mut input = vec![frame(1, false), frame(2, false)];
-        input.extend(stale_tail());
-        input.extend((3..=5).map(|id| frame(id, false)));
-        input.push(frame(91, true)); // and again, a little later
-        input.extend((6..=200).map(|id| frame(id, false)));
-        input.push(frame(201, true));
-        let mut seq = futures::stream::iter(input).sequencer_with(windowed(1024, Duration::from_secs(30)));
-        let mut items = Vec::new();
-        while let Some(item) = seq.next().timeout(futures_time::time::Duration::from_secs(5)).await? {
-            items.push(item?);
-        }
-        let ids: Vec<_> = items.iter().map(|f| f.0.frame_id).collect();
-        assert!(ids.windows(2).all(|w| w[0] < w[1]), "increasing ids: {ids:?}");
-        let (last, rest) = items.split_last().expect("frames");
-        assert!(rest.iter().all(|f| !f.0.is_terminating), "no early termination");
-        assert_eq!(201, last.0.frame_id);
-        assert!(last.0.is_terminating, "the end comes from the new stream's own FIN");
-        assert_eq!(2, seq.stale_dropped);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_honour_its_own_terminating_frame_ahead_within_the_slack() -> anyhow::Result<()>
-    {
-        // The FIN overtook its two preceding data frames.
-        let mut input: Vec<_> = (1..=197).map(|id| frame(id, false)).collect();
-        input.extend([frame(200, true), frame(198, false), frame(199, false)]);
-        let mut seq = futures::stream::iter(input).sequencer_with(windowed(1024, Duration::from_secs(30)));
-        let mut last = None;
-        while let Some(item) = seq.next().timeout(futures_time::time::Duration::from_secs(5)).await? {
-            last = Some(item?);
-        }
-        let last = last.expect("frames");
-        assert_eq!(200, last.0.frame_id);
-        assert!(last.0.is_terminating);
-        assert_eq!(0, seq.stale_dropped);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_honour_a_terminating_frame_after_the_guard_period() -> anyhow::Result<()> {
-        let mut cfg = windowed(1024, Duration::from_secs(30));
-        cfg.successor_guard_period = Duration::from_millis(100);
-        let (tx, rx) = futures::channel::mpsc::unbounded();
-        let mut seq = rx.sequencer_with(cfg);
-        tx.unbounded_send(frame(1, false))?;
-        assert_eq!(1, seq.try_next().await?.expect("frame").0.frame_id);
-        tokio::time::sleep(Duration::from_millis(150)).await;
-        tx.unbounded_send(frame(2, true))?;
-        assert!(seq.try_next().await?.expect("frame").0.is_terminating);
-        assert_eq!(0, seq.stale_dropped);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_should_honour_a_terminating_frame_within_the_window() -> anyhow::Result<()> {
-        // Frame 3 (in the window) is the new stream's last; the sequencer treats it as an ordinary
-        // frame, so the socket aborts on it. Here we check it is not dropped.
-        let (out, dropped) = run_windowed(3, Duration::from_secs(30), vec![9, 3, 2, 1]).await?;
-        assert_eq!(vec![1, 2, 3], out.into_iter().collect::<Result<Vec<_>, _>>()?);
-        assert_eq!(1, dropped);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn successor_sequencer_stale_frames_must_not_start_the_gap_timer() -> anyhow::Result<()> {
-        let (seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
-        let seq_stream = seq_stream.sequencer_with(windowed(100, Duration::from_millis(50)));
-        pin_mut!(seq_sink);
-        pin_mut!(seq_stream);
-
-        seq_sink.send(5000u32).await?;
-        // Well past `max_wait`: a held stale frame would have been skipped to by now.
-        assert!(
-            seq_stream
-                .try_next()
-                .timeout(futures_time::time::Duration::from_millis(200))
-                .await
-                .is_err(),
-            "a stale frame yields nothing"
-        );
-        assert_eq!(1, seq_stream.next_id, "a stale frame must not move the expected id");
-
-        seq_sink.send(1u32).await?;
-        assert_eq!(Some(1), seq_stream.try_next().await?);
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn sequencer_without_a_start_window_should_behave_as_before() -> anyhow::Result<()> {
-        // With `None`, a high id is held, waited for and then skipped to, and the new stream's
-        // low ids are then dropped as old: the very behaviour the window exists to avoid.
-        let mut seq = futures::stream::iter(vec![5u32, 1, 2]).sequencer_with(SequencerConfig {
-            max_wait: Duration::from_millis(20),
-            capacity: 4096,
-            max_item_age: None,
-            max_frames_behind_gap: None,
-            adapt_to_reordering: false,
-            successor_start_window: None,
-            successor_guard_period: Duration::ZERO,
-        });
-        let mut out = Vec::new();
-        while let Some(item) = seq.next().await {
-            out.push(item);
-        }
-        assert_eq!(0, seq.stale_dropped);
-        // 1 and 2 are delivered in order (they were buffered), then 3 and 4 are reported lost, and 5 is emitted.
-        let delivered: Vec<_> = out.iter().filter_map(|r| r.as_ref().ok().copied()).collect();
-        assert_eq!(vec![1, 2, 5], delivered);
-        assert_eq!(2, out.iter().filter(|r| r.is_err()).count());
-        Ok(())
-    }
-
     fn adaptive(max_wait: Duration) -> SequencerConfig {
         SequencerConfig {
             max_wait,
@@ -1417,8 +1034,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: None,
             adapt_to_reordering: true,
-            successor_start_window: None,
-            successor_guard_period: Duration::ZERO,
+            stream_base: None,
         }
     }
 
@@ -1535,6 +1151,73 @@ mod tests {
         let took = time_to_abandon(&mut sink, &mut seq, 5, 6).await?;
         assert!(took >= Duration::from_millis(1150), "{took:?}");
         assert!(took < Duration::from_secs(3), "{took:?}");
+        Ok(())
+    }
+
+    fn based(base: FrameId, max_wait: Duration) -> SequencerConfig {
+        SequencerConfig {
+            max_wait,
+            capacity: 4096,
+            max_item_age: None,
+            max_frames_behind_gap: Some(256),
+            adapt_to_reordering: false,
+            stream_base: Some(base),
+        }
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_with_a_stream_base_should_start_there_and_drop_everything_below() -> anyhow::Result<()> {
+        // Predecessor frames (900 and 6 are the reviewer's) before, between and after the new ones.
+        let out: Vec<u32> = futures::stream::iter(vec![900, 6, 1000, 999, 1002, 1, 1001, 5, 1003])
+            .sequencer_with(based(1000, Duration::from_secs(30)))
+            .try_collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
+        assert_eq!(vec![1000, 1001, 1002, 1003], out);
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_with_a_stream_base_should_not_let_a_predecessor_frame_discard_the_new_stream()
+    -> anyhow::Result<()> {
+        // Old frame 900 first, then 899 new frames: nothing may be reported discarded.
+        let frames: Vec<u32> = std::iter::once(900).chain(1000..1900).collect();
+        let out: Vec<Result<u32, SessionError>> = futures::stream::iter(frames)
+            .sequencer_with(based(1000, Duration::from_secs(30)))
+            .collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
+        assert_eq!(
+            (1000..1900).collect::<Vec<_>>(),
+            out.into_iter().collect::<Result<Vec<_>, _>>()?
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_with_a_stream_base_should_give_up_a_missing_first_frame_by_the_gap_rule() -> anyhow::Result<()> {
+        let mut cfg = based(50, Duration::from_secs(30));
+        cfg.max_frames_behind_gap = Some(2);
+        let out: Vec<Result<u32, SessionError>> = futures::stream::iter(vec![49, 51, 52, 53, 54])
+            .sequencer_with(cfg)
+            .collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
+        assert!(matches!(out[0], Err(SessionError::FrameDiscarded(50))));
+        let delivered: Vec<u32> = out.into_iter().filter_map(Result::ok).collect();
+        assert_eq!(vec![51, 52, 53, 54], delivered);
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_with_the_highest_stream_base_should_not_end_the_sequence() -> anyhow::Result<()> {
+        let base = crate::MAX_STREAM_BASE;
+        let out: Vec<u32> = futures::stream::iter(vec![base + 1, base - 1, base, base + 2])
+            .sequencer_with(based(base, Duration::from_secs(30)))
+            .try_collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
+        assert_eq!(vec![base, base + 1, base + 2], out);
         Ok(())
     }
 }
