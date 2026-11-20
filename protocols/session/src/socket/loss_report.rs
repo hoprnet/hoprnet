@@ -39,6 +39,8 @@ pub(crate) struct FrameLossSummary {
     pub not_reassembled: u64,
     /// Ignored segments whose frame ID is at or below the last frame passed to the reader.
     pub duplicates: u64,
+    /// Segments of a previous stream, dropped by a successor socket's start guard.
+    pub stale: u64,
     /// Time covered by these counts.
     pub window: Duration,
 }
@@ -56,6 +58,7 @@ impl FrameLossSummary {
             discarded = self.discarded,
             not_reassembled = self.not_reassembled,
             duplicates = self.duplicates,
+            stale = self.stale,
             window_s = self.window.as_secs(),
             "session frames dropped in the last window"
         );
@@ -75,6 +78,7 @@ pub(crate) struct FrameLossReport {
     discarded: AtomicU64,
     not_reassembled: AtomicU64,
     duplicates: AtomicU64,
+    stale: AtomicU64,
     window_start: parking_lot::Mutex<Instant>,
     /// Live loss, for a reader that has to react within seconds rather than within a window.
     ///
@@ -101,6 +105,7 @@ impl FrameLossReport {
             discarded: AtomicU64::new(0),
             not_reassembled: AtomicU64::new(0),
             duplicates: AtomicU64::new(0),
+            stale: AtomicU64::new(0),
             window_start: parking_lot::Mutex::new(Instant::now()),
             loss_signal,
         }
@@ -152,6 +157,12 @@ impl FrameLossReport {
         self.report_if_due();
     }
 
+    /// A segment of a previous stream was dropped by the start guard. Neither loss nor duplicate.
+    pub fn stale_segment(&self) {
+        self.stale.fetch_add(1, Ordering::Relaxed);
+        self.report_if_due();
+    }
+
     fn report_if_due(&self) {
         if let Some(summary) = self.close_window_if_due(Instant::now())
             && summary.has_loss()
@@ -180,6 +191,7 @@ impl FrameLossReport {
             discarded: self.discarded.swap(0, Ordering::Relaxed),
             not_reassembled: self.not_reassembled.swap(0, Ordering::Relaxed),
             duplicates: self.duplicates.swap(0, Ordering::Relaxed),
+            stale: self.stale.swap(0, Ordering::Relaxed),
             window,
         }
     }
@@ -233,6 +245,7 @@ mod tests {
                 discarded: 2,
                 not_reassembled: 1,
                 duplicates: 4,
+                stale: 0,
                 window: INTERVAL,
             }
         );
