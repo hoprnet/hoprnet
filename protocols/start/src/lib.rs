@@ -101,8 +101,10 @@ pub struct StartInitiation<T, C> {
     /// and the lower 32 bits of them are the SURB balancer target.
     ///
     /// The least significant 64 bits are reserved: the lowest 32 carry the sender's session idle timeout in
-    /// whole seconds (`0` if not announced), and the 32 above them are unused. Senders set unused bits to `0`
-    /// and receivers ignore them, so that they can be allocated later without breaking older decoders.
+    /// whole seconds (`0` if not announced), and the 32 above them are for extensions. Bit 32 announces that the
+    /// sender is resume-capable: it understands [`StartProtocol::SessionResumed`] and the stream base it carries.
+    /// Bits 33 to 63 stay reserved (for a resume MAC, see hoprnet#8723). Senders set unused bits to `0` and
+    /// receivers ignore them, so that they can be allocated later without breaking older decoders.
     pub additional_data: u128,
 }
 
@@ -116,6 +118,26 @@ pub struct StartEstablished<I> {
     pub orig_challenge: StartChallenge,
     /// Session ID that was selected by the recipient.
     pub session_id: I,
+}
+
+/// Message of the Start protocol that confirms a takeover of a Session the Exit still held.
+///
+/// It is sent by an Exit only to an Entry that announced resume capability in the
+/// [initiation](StartInitiation), in place of [`StartEstablished`], after the Exit took over a Session
+/// it was still holding for the same pseudonym. The Entry then keeps its accounting state for the
+/// pseudonym, numbers its stream from [`stream_base`](Self::stream_base) and expects the Exit's frames
+/// to be numbered from it, so that the predecessor's frames are all below the base.
+///
+/// ## Generic parameters
+/// `I` is for session identifier.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartResumed<I> {
+    /// Challenge that was used in the [initiation message](StartInitiation) to establish correspondence.
+    pub orig_challenge: StartChallenge,
+    /// Session ID that was selected by the recipient.
+    pub session_id: I,
+    /// First frame ID of the successor stream in both directions.
+    pub stream_base: u32,
 }
 
 #[cfg_attr(doc, aquamarine::aquamarine)]
@@ -137,6 +159,7 @@ pub struct StartEstablished<I> {
 ///      Note right of Exit: SessionID [Pseudonym, Tag]
 ///      Exit->>Entry: SessionEstablished (Challenge, SessionID)
 ///      Note left of Entry: SessionID [Pseudonym, Tag]
+///      Note over Entry,Exit: after a takeover of a held Session, to a resume-capable Entry only, SessionResumed (Challenge, SessionID, StreamBase) replaces SessionEstablished
 ///      Exit->>Entry: SsaRequest (SessionID, SsaIndex, ServerCommitments)
 ///      Entry->>Exit: SsaCommit (SessionID, SsaIndex, CoeffIndex, PolyCoeffs)
 ///      Entry->>Exit: KeepAlive (SessionID)
@@ -165,6 +188,12 @@ pub enum StartProtocol<I, T, C, G, K, D> {
     SessionError(StartErrorType<I>),
     /// A ping message to keep the session alive.
     KeepAlive(KeepAliveMessage<I>),
+    /// Confirmation that the counterparty took over a Session it still held (see [`StartResumed`]).
+    ///
+    /// Sent only to an Entry that announced resume capability, in place of
+    /// [`SessionEstablished`](StartProtocol::SessionEstablished). It is the last variant so that the
+    /// discriminants of all other messages stay unchanged.
+    SessionResumed(StartResumed<I>),
 }
 
 /// Filling up the Client's commitment to the Session Stealth Address (SSA).
@@ -633,6 +662,12 @@ where
                 let session_id = serde_cbor_2::to_vec(&est.session_id)?;
                 data.extend(session_id);
             }
+            StartProtocol::SessionResumed(res) => {
+                data.extend_from_slice(&res.orig_challenge.to_be_bytes());
+                data.extend_from_slice(&res.stream_base.to_be_bytes());
+                let session_id = serde_cbor_2::to_vec(&res.session_id)?;
+                data.extend(session_id);
+            }
             StartProtocol::SessionError(err) => {
                 match err.identifier {
                     ErrorIdentifier::Challenge(challenge) => {
@@ -928,6 +963,26 @@ where
                                 .map_err(|_| StartProtocolError::ParseError("est.challenge".into()))?,
                         ),
                         session_id: serde_cbor_2::from_slice(&body[size_of::<StartChallenge>()..])?,
+                    })
+                }
+                StartProtocolDiscriminants::SessionResumed => {
+                    if body.len() < size_of::<StartChallenge>() + size_of::<u32>() {
+                        return Err(StartProtocolError::InvalidLength);
+                    }
+                    let base_start = size_of::<StartChallenge>();
+                    let id_start = base_start + size_of::<u32>();
+                    StartProtocol::SessionResumed(StartResumed {
+                        orig_challenge: StartChallenge::from_be_bytes(
+                            body[..base_start]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("res.challenge".into()))?,
+                        ),
+                        stream_base: u32::from_be_bytes(
+                            body[base_start..id_start]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("res.stream_base".into()))?,
+                        ),
+                        session_id: serde_cbor_2::from_slice(&body[id_start..])?,
                     })
                 }
                 StartProtocolDiscriminants::SessionError => {
@@ -1319,6 +1374,52 @@ mod tests {
     /// A minimal deposit data *value* type for tests: `()` CBOR-encodes as a single byte, so a map of
     /// them costs only its keys, and an empty one costs a single byte in total.
     type MinimalDeposit = ();
+
+    #[test]
+    fn session_resumed_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let msg =
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionResumed(StartResumed {
+                orig_challenge: 0x0102_0304_0506_0708,
+                session_id: "session".to_string(),
+                stream_base: 0x0001_0000,
+            });
+        let (tag, data) = msg.clone().encode()?;
+        assert_eq!(StartProtocolDiscriminants::SessionResumed as u8, data[1]);
+        assert_eq!(&0x0102_0304_0506_0708u64.to_be_bytes(), &data[4..12]);
+        assert_eq!(&0x0001_0000u32.to_be_bytes(), &data[12..16]);
+        assert_eq!(msg, StartProtocol::decode(tag, &data)?);
+
+        // A truncated message is rejected
+        assert!(matches!(
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &data[..15]),
+            Err(StartProtocolError::InvalidLength)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_discriminants_should_stay_stable_and_resumed_should_be_last() -> anyhow::Result<()> {
+        assert_eq!(0, StartProtocolDiscriminants::StartSession as u8);
+        assert_eq!(1, StartProtocolDiscriminants::SessionEstablished as u8);
+        assert_eq!(2, StartProtocolDiscriminants::SsaCommit as u8);
+        assert_eq!(3, StartProtocolDiscriminants::SsaRequest as u8);
+        assert_eq!(4, StartProtocolDiscriminants::SessionError as u8);
+        assert_eq!(5, StartProtocolDiscriminants::KeepAlive as u8);
+        assert_eq!(6, StartProtocolDiscriminants::SessionResumed as u8);
+        assert_eq!(7, <StartProtocolDiscriminants as strum::EnumCount>::COUNT);
+
+        // A message of an existing kind, as an old peer encodes it, still decodes
+        let old = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionEstablished(
+            StartEstablished {
+                orig_challenge: 7,
+                session_id: "session".to_string(),
+            },
+        );
+        let (tag, data) = old.clone().encode()?;
+        assert_eq!(1, data[1]);
+        assert_eq!(old, StartProtocol::decode(tag, &data)?);
+        Ok(())
+    }
 
     #[test]
     fn start_protocol_start_session_message_should_encode_and_decode() -> anyhow::Result<()> {

@@ -25,8 +25,8 @@ use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, DEFAULT_SUCCESSOR_GUARD_PERIOD,
-    FrameLossSignal, ReliableSocket, SegmentRequest, SeqIndicator, SessionSocketConfig, UnreliableSocket,
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, FrameLossSignal, ReliableSocket,
+    SegmentRequest, SeqIndicator, SessionSocketConfig, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
@@ -609,18 +609,14 @@ pub struct HoprSessionConfig {
     /// may still arrive, this bounds how much already-received data is held while it waits. `None`
     /// keeps the timeout as the only rule.
     pub max_frames_behind_gap: Option<usize>,
-    /// Guards the socket against the stale frames of a previous Session under the same pseudonym;
-    /// see [`SessionSocketConfig::successor_start_window`].
+    /// First frame ID of the stream in both directions, set when this Session takes over a predecessor's;
+    /// see [`SessionSocketConfig::stream_base`].
     ///
-    /// Default is `None`: no guard. Not serialised: it is wiring set by the manager, not a Session property.
+    /// Only the stateless socket supports a base; the manager does not set one on a stateful Session.
+    /// Default is `None`: the stream starts at 1. Not serialised: it is wiring set by the manager from the
+    /// Exit's `SessionResumed` message, not a Session property.
     #[serde(skip_serializing)]
-    pub successor_start_window: Option<u32>,
-    /// How long the [`Self::successor_start_window`] guard lasts. No effect without a window.
-    ///
-    /// Default is [`DEFAULT_SUCCESSOR_GUARD_PERIOD`].
-    #[default(DEFAULT_SUCCESSOR_GUARD_PERIOD)]
-    #[serde(skip_serializing)]
-    pub successor_guard_period: Duration,
+    pub stream_base: Option<u32>,
 }
 
 /// Converts a transport sink error into an [`std::io::Error`], keeping an `io::Error` (and its kind) as is.
@@ -845,8 +841,7 @@ impl HoprSession {
                 // that is never coming and holds everything already received behind it. The
                 // sessions that need this bound most are exactly the ones flow control excludes.
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
-                successor_start_window: cfg.successor_start_window,
-                successor_guard_period: cfg.successor_guard_period,
+                stream_base: cfg.stream_base,
                 ..Default::default()
             };
 
