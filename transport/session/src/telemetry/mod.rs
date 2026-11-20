@@ -649,7 +649,7 @@ mod tests {
     /// A run of discarded frames is one update, however long it is: the counter grows by the length of the run, and
     /// the assembly gauge only by the frames that were being assembled.
     #[test]
-    fn a_run_of_discarded_frames_is_counted_by_its_length() {
+    fn a_run_of_discarded_frames_is_counted_by_its_length() -> anyhow::Result<()> {
         let id: SessionId = HoprPseudonym::random();
         initialize_session_metrics(id, HoprSessionConfig::default());
         let tracker = SessionIdWrapper::from(id);
@@ -666,7 +666,7 @@ mod tests {
             "the gauge does not go below zero"
         );
 
-        let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
+        let text = hopr_api::types::telemetry::gather_all_metrics().context("must gather metrics")?;
         let session_id: &str = id.as_ref();
         assert_eq!(
             Some(f64::from(1u32 << 31) + 3.0),
@@ -675,6 +675,7 @@ mod tests {
                 &format!("hopr_session_frame_discarded_total{{session_id=\"{session_id}\"}}")
             )
         );
+        Ok(())
     }
 
     #[test]

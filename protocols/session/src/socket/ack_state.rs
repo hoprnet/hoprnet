@@ -955,18 +955,12 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             .ok_or(SessionError::StateNotRunning)?;
 
         if self.cfg.mode.is_partial_ack_enabled() {
-            // No more requesting of segment retransmissions from frames that were discarded.
-            // Only the frames still being reassembled can have a retry to cancel: one that never had a
-            // segment has none, and one that has since expired or completed has no missing segments
-            // left, so its retry ends on its own. That bounds the work by what the reassembler holds,
-            // however many frame ids the run spans.
-            let incomplete = ctx.inspector.frame_ids_within(first..=last);
-            if !incomplete.is_empty()
-                && let Err(error) = ctx.incoming_frame_retries_tx.send_many(
-                    incomplete
-                        .into_iter()
-                        .map(|frame_id| (RetriedFrameId::no_retries(frame_id), Skip).into()),
-                )
+            // No more requesting of segment retransmissions from frames that were discarded. This
+            // cancels every pending retry of a frame in the run, as cancelling each id would, in one
+            // pass over the retry queue whatever the run's length.
+            if let Err(error) = ctx
+                .incoming_frame_retries_tx
+                .cancel_where(|retry| (first..=last).contains(&retry.frame_id))
             {
                 tracing::error!(%error, "failed to cancel retry of discarded frames");
             }

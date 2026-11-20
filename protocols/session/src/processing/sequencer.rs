@@ -122,8 +122,8 @@ impl<T: PartialOrd<FrameId>> PartialOrd<FrameId> for Buffered<T> {
 /// The `max_wait` indicates the maximum amount of time to wait for a certain `FrameId` to
 /// be yielded from the underlying stream. Each gap is timed from when the frame behind it was
 /// buffered, so gaps queued behind one another drain together rather than one `max_wait` each.
-/// If this does not happen, the Sequencer yields an error, indicating that the frames
-/// in the gap were discarded, all of them at once however many there are.
+/// If this does not happen, the Sequencer yields an error naming the run of frames it gave up on:
+/// one item per run, however long the run is. With `max_frames_behind_gap`, a gap can go in two runs.
 ///
 /// The `capacity` parameter sets the maximum number of buffered elements inside the Sequencer.
 /// If this value is reached, the Sequencer will stop polling the underlying stream, waiting for the

@@ -239,16 +239,30 @@ mod tests {
 
     #[test]
     fn a_state_without_its_own_run_handling_should_see_every_discarded_frame() {
+        let mut sequence = mockall::Sequence::new();
         let mut state = MockSockState::new();
-        state.expect_frame_discarded().times(3).returning(|id| match id {
-            2 => Err(SessionError::InvalidFrameId),
-            3 => Err(SessionError::StateNotRunning),
-            _ => Ok(()),
-        });
+        state
+            .expect_frame_discarded()
+            .once()
+            .in_sequence(&mut sequence)
+            .with(mockall::predicate::eq(1))
+            .returning(|_| Ok(()));
+        state
+            .expect_frame_discarded()
+            .once()
+            .in_sequence(&mut sequence)
+            .with(mockall::predicate::eq(2))
+            .returning(|_| Err(SessionError::InvalidFrameId));
+        state
+            .expect_frame_discarded()
+            .once()
+            .in_sequence(&mut sequence)
+            .with(mockall::predicate::eq(3))
+            .returning(|_| Err(SessionError::StateNotRunning));
 
         assert!(
             matches!(state.frames_discarded(1, 3), Err(SessionError::InvalidFrameId)),
-            "every frame is reported, and the first error is the one returned"
+            "every frame is reported in order, and the first error is the one returned"
         );
     }
 

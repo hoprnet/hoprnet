@@ -1,4 +1,4 @@
-use std::{ops::RangeInclusive, time::Instant};
+use std::time::Instant;
 
 use crate::{
     errors::SessionError,
@@ -123,23 +123,6 @@ impl FrameInspector {
     /// Returns a bitmap of missing segments in a frame.
     pub fn missing_segments(&self, frame_id: &FrameId) -> Option<MissingSegmentsBitmap> {
         self.0.0.get(frame_id).map(|f| f.as_missing())
-    }
-
-    /// Returns the ids of the incomplete frames that lie within `ids`.
-    ///
-    /// The ids are collected, so that nothing is locked once this returns. The cost is bounded by
-    /// the number of incomplete frames, not by the length of `ids`: a short range is probed id by id,
-    /// and a longer one is checked against the frames held.
-    pub(crate) fn frame_ids_within(&self, ids: RangeInclusive<FrameId>) -> Vec<FrameId> {
-        let map = &self.0.0;
-        if ids.end().saturating_sub(*ids.start()) as usize >= map.len() {
-            map.iter()
-                .map(|entry| *entry.key())
-                .filter(|id| ids.contains(id))
-                .collect()
-        } else {
-            ids.filter(|id| map.contains_key(id)).collect()
-        }
     }
 
     /// Number of incomplete frames.
@@ -408,40 +391,6 @@ mod tests {
         assert_eq!(1, reassembled.frame_id);
         assert_eq!(b"hello new world", reassembled.data.as_ref());
 
-        Ok(())
-    }
-
-    #[test]
-    fn frame_inspector_should_return_only_the_incomplete_frames_within_the_range() -> anyhow::Result<()> {
-        let mut inspector = FrameInspector::new(10);
-        for frame_id in [2, 5, 6, 9, FrameId::MAX] {
-            inspector
-                .0
-                .entry(frame_id)
-                .try_as_vacant()
-                .ok_or(anyhow::anyhow!("frame {frame_id} must be vacant"))?
-                .insert(FrameBuilder::from(Segment {
-                    frame_id,
-                    seq_idx: 0,
-                    seq_flags: 2.try_into()?,
-                    data: (*b"data").into(),
-                }));
-        }
-
-        let within = |ids: RangeInclusive<FrameId>| {
-            let mut found = inspector.frame_ids_within(ids);
-            found.sort_unstable();
-            found
-        };
-
-        // A range shorter than what is held is probed id by id ...
-        assert_eq!(vec![5, 6], within(4..=7));
-        assert!(within(7..=8).is_empty());
-        assert_eq!(vec![9], within(9..=9));
-        // ... and a longer one is checked against what is held, however long it is.
-        assert_eq!(vec![2, 5, 6, 9], within(1..=FrameId::MAX - 1));
-        assert_eq!(vec![2, 5, 6, 9, FrameId::MAX], within(1..=FrameId::MAX));
-        assert!(within(10..=FrameId::MAX - 1).is_empty());
         Ok(())
     }
 
