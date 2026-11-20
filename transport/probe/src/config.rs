@@ -40,6 +40,15 @@ pub struct ProbeConfig {
     #[default(default_probing_interval())]
     pub interval: std::time::Duration,
 
+    /// The spacing between generated probes at a dial of 1.0.
+    ///
+    /// The probe traffic generator yields a probe whenever it is pulled, so this is the only clock on probe
+    /// generation. A dial of `m` spaces probes `pace / m` apart, see [`ProbeControl`](crate::ProbeControl). Zero
+    /// removes the spacing, and probes then go out as fast as the parallel-probe limit and the probe lane allow.
+    #[serde(default = "default_probe_pace", with = "humantime_serde")]
+    #[default(default_probe_pace())]
+    pub pace: std::time::Duration,
+
     /// The time threshold after which it is reasonable to recheck the nearest neighbor
     #[serde(default = "default_recheck_threshold", with = "humantime_serde")]
     #[default(default_recheck_threshold())]
@@ -54,6 +63,9 @@ const DEFAULT_MAX_PARALLEL_PROBES: usize = 50;
 
 /// Delay before repeating probing rounds, must include enough time to traverse NATs
 const DEFAULT_REPEATED_PROBING_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Spacing between generated probes at a dial of 1.0: 20 probes per second.
+const DEFAULT_PROBE_PACE: std::time::Duration = std::time::Duration::from_millis(50);
 
 /// Time after which the availability of a node gets rechecked
 const DEFAULT_PROBE_RECHECK_THRESHOLD: std::time::Duration = std::time::Duration::from_secs(60);
@@ -71,6 +83,11 @@ const fn default_max_parallel_probes() -> usize {
 #[inline]
 const fn default_probing_interval() -> std::time::Duration {
     DEFAULT_REPEATED_PROBING_DELAY
+}
+
+#[inline]
+const fn default_probe_pace() -> std::time::Duration {
+    DEFAULT_PROBE_PACE
 }
 
 #[inline]

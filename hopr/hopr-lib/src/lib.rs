@@ -409,6 +409,13 @@ where
         self.transport_api.graph()
     }
 
+    /// The handle that sets the rate of generated probes while the node runs.
+    ///
+    /// `set_dial(None)` stops generated probing, and a [`Dial`](hopr_transport::Dial) scales its rate.
+    pub fn probe_control(&self) -> hopr_transport::ProbeControl {
+        self.transport_api.probe_control()
+    }
+
     #[cfg(feature = "session-client")]
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
         if HoprNodeOperations::status(self) == state {
