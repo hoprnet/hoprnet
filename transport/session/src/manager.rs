@@ -1122,8 +1122,10 @@ impl std::fmt::Display for SessionHandles {
 enum DepositObserverEnd {
     /// The supervisor stopped accepting events; nothing was reported about the channel.
     SupervisorGone,
-    /// The deposit channel ended; `DepositObserverClosed` was reported.
-    ChannelClosed,
+    /// The deposit channel ended after a non-zero confirmation was forwarded.
+    Funded,
+    /// The deposit channel ended without a non-zero confirmation being forwarded.
+    Unfunded,
 }
 
 /// Forwards confirmations while the deposit channel remains open.
@@ -1141,11 +1143,13 @@ where
     F: FnMut(SessionPixEvent) -> Fut,
     Fut: std::future::Future<Output = Result<(), ()>>,
 {
-    let confirmations = confirmations.filter(|(evt_id, _)| {
+    let filtered_confirmations = confirmations.filter(|(evt_id, _)| {
         futures::future::ready(evt_id.ssa_index() == ssa_id.ssa_index() && &evt_id.session_id() == ssa_id.pseudonym())
     });
-    futures::pin_mut!(confirmations);
-    while let Some((_, amount)) = confirmations.next().await {
+    futures::pin_mut!(filtered_confirmations);
+    let mut funded = false;
+    let mut confirmations = 0_u32;
+    while let Some((_, amount)) = filtered_confirmations.next().await {
         info!(%session_id, %ssa_id, %amount, "ssa deposit confirmed");
         if report(SessionPixEvent::DepositConfirmed { ssa_id, amount })
             .await
@@ -1153,12 +1157,20 @@ where
         {
             return DepositObserverEnd::SupervisorGone;
         }
+        funded |= amount != HoprBalance::zero();
+        confirmations = confirmations.saturating_add(1);
     }
-    // The upper layer dropped the sender without ever confirming, so no deposit is
-    // coming. Saying so is better than letting the supervisor wait out its deadline.
-    warn!(%session_id, %ssa_id, "deposit channel closed without confirmation");
+    let end = if funded {
+        debug!(%session_id, %ssa_id, confirmations, "deposit channel closed after confirmation");
+        DepositObserverEnd::Funded
+    } else {
+        warn!(%session_id, %ssa_id, confirmations, "deposit channel closed without confirmation");
+        DepositObserverEnd::Unfunded
+    };
+    // Always report the deposit channel ending: the supervisor decides whether the cycle is lost,
+    // and its phase guard makes this event a no-op for a funded cycle.
     let _ = report(SessionPixEvent::DepositObserverClosed(ssa_id)).await;
-    DepositObserverEnd::ChannelClosed
+    end
 }
 
 /// The PIX dimensions this Session negotiated, on the Exit side.
@@ -9619,7 +9631,7 @@ mod tests {
         })
         .await;
 
-        assert_eq!(end, DepositObserverEnd::ChannelClosed);
+        assert_eq!(end, DepositObserverEnd::Funded);
         assert!(matches!(
             events.lock().as_slice(),
             [
@@ -9633,7 +9645,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn deposit_observer_reports_a_channel_closed_without_confirmation() {
+    async fn deposit_observer_ends_unfunded_without_confirmation() {
         let session_id = HoprPseudonym::random();
         let ssa_id = SsaId::new(session_id, SsaIndex::MIN);
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
@@ -9644,10 +9656,67 @@ mod tests {
         })
         .await;
 
-        assert_eq!(end, DepositObserverEnd::ChannelClosed);
+        assert_eq!(end, DepositObserverEnd::Unfunded);
         assert!(matches!(
             events.lock().as_slice(),
             [SessionPixEvent::DepositObserverClosed(closed_id)] if *closed_id == ssa_id
+        ));
+    }
+
+    #[tokio::test]
+    async fn deposit_observer_ends_funded_after_a_confirmed_deposit() {
+        let session_id = HoprPseudonym::random();
+        let ssa_id = SsaId::new(session_id, SsaIndex::MIN);
+        let address_id = PixAddressId::new(&session_id, SsaIndex::MIN);
+        let amount = HoprBalance::new_base(1000);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+        let end = observe_deposits(
+            futures::stream::iter([(address_id, amount)]),
+            session_id,
+            ssa_id,
+            |event| {
+                events.lock().push(event);
+                futures::future::ready(Ok(()))
+            },
+        )
+        .await;
+
+        assert_eq!(end, DepositObserverEnd::Funded);
+        assert!(matches!(
+            events.lock().as_slice(),
+            [
+                SessionPixEvent::DepositConfirmed { ssa_id: reported_id, amount: reported_amount },
+                SessionPixEvent::DepositObserverClosed(closed_id),
+            ] if *reported_id == ssa_id && *closed_id == ssa_id && *reported_amount == amount
+        ));
+    }
+
+    #[tokio::test]
+    async fn deposit_observer_ends_unfunded_after_only_zero_confirmations() {
+        let session_id = HoprPseudonym::random();
+        let ssa_id = SsaId::new(session_id, SsaIndex::MIN);
+        let address_id = PixAddressId::new(&session_id, SsaIndex::MIN);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+        let end = observe_deposits(
+            futures::stream::iter([(address_id, HoprBalance::zero())]),
+            session_id,
+            ssa_id,
+            |event| {
+                events.lock().push(event);
+                futures::future::ready(Ok(()))
+            },
+        )
+        .await;
+
+        assert_eq!(end, DepositObserverEnd::Unfunded);
+        assert!(matches!(
+            events.lock().as_slice(),
+            [
+                SessionPixEvent::DepositConfirmed { ssa_id: reported_id, amount },
+                SessionPixEvent::DepositObserverClosed(closed_id),
+            ] if *reported_id == ssa_id && *closed_id == ssa_id && *amount == HoprBalance::zero()
         ));
     }
 
