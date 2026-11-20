@@ -137,6 +137,8 @@ pub(crate) enum ExitControlKind {
     RefusalLiveCycleCapacity,
     /// Refused: no Session slot.
     RefusalNoSessionSlot,
+    /// Refused: the pseudonym's held PIX Session may not be taken over by this request.
+    RefusalTakeoverIneligible,
     /// Refused: the node could not decide right now.
     RefusalBusy,
     /// Refused: the Entry asked to resume a Session this node cannot resume.
@@ -165,6 +167,7 @@ impl From<PixAdmissionRejection> for ExitControlKind {
             PixAdmissionRejection::TargetPolicy => Self::RefusalTargetPolicy,
             PixAdmissionRejection::LiveCycleCapacity => Self::RefusalLiveCycleCapacity,
             PixAdmissionRejection::NoSessionSlot => Self::RefusalNoSessionSlot,
+            PixAdmissionRejection::TakeoverIneligible => Self::RefusalTakeoverIneligible,
             PixAdmissionRejection::Busy => Self::RefusalBusy,
             PixAdmissionRejection::DirectReturnPath => Self::RefusalDirectReturnPath,
             PixAdmissionRejection::NotResumable => Self::RefusalNotResumable,
@@ -307,6 +310,7 @@ mod tests {
             PixAdmissionRejection::TargetPolicy,
             PixAdmissionRejection::LiveCycleCapacity,
             PixAdmissionRejection::NoSessionSlot,
+            PixAdmissionRejection::TakeoverIneligible,
             PixAdmissionRejection::Busy,
             PixAdmissionRejection::DirectReturnPath,
             PixAdmissionRejection::NotResumable,
