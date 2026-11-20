@@ -381,6 +381,9 @@ type HoprSessionManager = SessionManager<HoprMessageSender>;
 #[derive(Debug, Clone)]
 pub struct HoprSessionConfigurator {
     id: SessionId,
+    /// The slot instance of the Session this configurator was handed out with, so that
+    /// [`close`](Self::close) can never close a successor that has since taken the same pseudonym.
+    instance: Option<u64>,
     // Makes sure configurator does not extend lifetime of the SessionManager.
     smgr: std::sync::Weak<HoprSessionManager>,
 }
@@ -443,10 +446,14 @@ impl HoprSessionConfigurator {
     /// already gone (or the manager is dropped). Frees the per-session state
     /// (frame reassembly buffers, control channels, …) immediately rather than
     /// waiting for the manager's idle-timeout eviction.
+    ///
+    /// Closes only the Session this configurator belongs to: if its pseudonym has meanwhile been
+    /// taken by a successor Session, that one is left alone and `false` is returned.
     pub fn close(&self) -> bool {
-        match self.smgr.upgrade() {
-            Some(smgr) => smgr.close_session(&self.id),
-            None => false,
+        match (self.smgr.upgrade(), self.instance) {
+            (Some(smgr), Some(instance)) => smgr.close_session_instance(&self.id, instance),
+            (Some(smgr), None) => smgr.close_session(&self.id),
+            (None, _) => false,
         }
     }
 }
@@ -1489,10 +1496,12 @@ where
     ) -> errors::Result<(HoprSession, HoprSessionConfigurator)> {
         let session = self.smgr.new_session(destination, target, cfg).await?;
         let id = *session.id();
+        let instance = session.slot_instance();
         Ok((
             session,
             HoprSessionConfigurator {
                 id,
+                instance,
                 smgr: Arc::downgrade(&self.smgr),
             },
         ))
