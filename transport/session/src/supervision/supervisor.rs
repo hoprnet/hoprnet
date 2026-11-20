@@ -1380,8 +1380,8 @@ impl SessionPixSupervisor {
     /// Whether the unanswered batch `batch_id`, already re-sent `resends_done` times, can still be re-sent.
     ///
     /// A successor must be behind the front — an earlier generation is still being served, which is
-    /// what the Entry's gate is waiting on. The opening batch has nothing to be behind, so it is
-    /// bounded by [`max_opening_ssa_request_resends`](SupervisorConfig::max_opening_ssa_request_resends)
+    /// what the Entry's gate is waiting on. The opening batch has nothing to be behind, so only
+    /// it is bounded by [`max_opening_ssa_request_resends`](SupervisorConfig::max_opening_ssa_request_resends)
     /// instead. Either way the paid tail's hard deadline must not be within a delivery window. Every
     /// one of these is permanent: the front only advances, the tail's deadline never moves, and the
     /// count only grows, so where one fails the batch is treated exactly as one that has reached the
@@ -1389,9 +1389,14 @@ impl SessionPixSupervisor {
     /// deliberately not [`lost_cycle_ends_session_within`](Self::lost_cycle_ends_session_within), which
     /// can pass.
     fn resend_can_continue(&self, batch_id: u32, resends_done: u32, now: Instant) -> bool {
-        (self.batch_is_behind_front(batch_id)
-            || (Self::is_opening_batch(batch_id) && resends_done < self.cfg.max_opening_ssa_request_resends))
-            && !self.paid_tail_ends_within(now, self.delivery_window())
+        // The opening batch is judged by its cap alone: `batch_is_behind_front` is also true whenever a
+        // paid tail exists, whichever batch asks, and must not let it past an exhausted (or zero) cap.
+        let eligible = if Self::is_opening_batch(batch_id) {
+            resends_done < self.cfg.max_opening_ssa_request_resends
+        } else {
+            self.batch_is_behind_front(batch_id)
+        };
+        eligible && !self.paid_tail_ends_within(now, self.delivery_window())
     }
 
     /// The gap after which the re-send following `resends_done` earlier ones of `batch_id` is due.
@@ -1407,10 +1412,7 @@ impl SessionPixSupervisor {
         if !Self::is_opening_batch(batch_id) {
             return interval;
         }
-        interval
-            .saturating_mul(2u32.saturating_pow(resends_done))
-            .min(self.delivery_window().saturating_sub(interval))
-            .max(interval)
+        crate::supervision::opening_resend_gap(interval, self.delivery_window(), resends_done)
     }
 
     /// Whether the unanswered batch `batch_id`'s re-sends are paused at `now`: a lost cycle that would
@@ -7318,6 +7320,50 @@ mod tests {
 
         assert!(sup.resend.is_none());
         assert!(resends_in(&sup.handle_deadline(t0 + Duration::from_secs(9), 0)).is_empty());
+    }
+
+    /// A paid tail does not let the opening batch past its cap.
+    ///
+    /// The tail makes `batch_is_behind_front` true whichever batch asks. The opening batch's first
+    /// confirmation can reach the supervisor after member 1 has already recovered and left a tail, with
+    /// member 2 still silent; a cap of zero must still mean that nothing is re-sent.
+    #[test]
+    fn a_paid_tail_does_not_re_arm_an_opening_batch_with_no_resends() {
+        let t0 = Instant::now();
+        let cfg = SupervisorConfig {
+            ssas_per_request: 2,
+            ..default_cfg()
+        };
+        assert_eq!(0, cfg.max_opening_ssa_request_resends);
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, t0);
+        let (id1, id2) = (ssa_id(p, 1), ssa_id(p, 2));
+
+        // Member 1's observations overtake the confirmation of its request.
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), t0, 0);
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id1,
+                amount: sufficient_balance(),
+            },
+            t0,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(id1), t0, 0);
+        assert!(sup.paid_recovery_tail.is_some(), "the fixture needs a live paid tail");
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), t0, 0);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id2), t0, 0);
+        assert!(sup.resend.is_none(), "a zero cap arms nothing, tail or not");
+
+        let mut now = t0;
+        for _ in 0..4 {
+            now += RESEND;
+            assert!(
+                resends_in(&sup.handle_deadline(now, 0)).is_empty(),
+                "nothing is re-sent at {now:?}"
+            );
+        }
     }
 
     /// The first part of the Entry's commitment answers a batch of one.
