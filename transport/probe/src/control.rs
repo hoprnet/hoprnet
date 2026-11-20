@@ -86,26 +86,33 @@ impl ProbeControl {
     }
 }
 
+/// Longest wait between two probes. A near-zero dial would otherwise overflow `Duration` or `Instant`.
+const MAX_GAP: Duration = Duration::from_secs(24 * 60 * 60);
+
 /// Spaces the items of `inner` `pace / dial` apart.
 ///
 /// The first item is not delayed. Each later item waits until `pace / dial` after the previous one, and `inner` is
-/// polled only once that time is up, so the generator sees the graph as it is at release time. A dial change
-/// during a wait applies at once; a `None` dial holds the stream until a dial is set again.
+/// polled only once that time is up, so a generator that reads state on each pull sees it at release time. A dial
+/// change during a wait applies at once; a `None` dial holds the stream until a dial is set again.
 pub(crate) fn paced<S>(inner: S, control: &ProbeControl, pace: Duration) -> impl Stream<Item = S::Item> + use<S>
 where
     S: Stream + Unpin,
 {
     futures::stream::unfold(
-        (inner, control.subscribe(), None::<Instant>),
-        move |(mut inner, mut dial, last)| async move {
+        // The stream owns a handle: with every other handle dropped the dial keeps its last value, and probing
+        // must go on while that value is on.
+        (inner, control.subscribe(), control.clone(), None::<Instant>),
+        move |(mut inner, mut dial, control, last)| async move {
             loop {
                 let multiplier = match dial.wait_for(Option::is_some).await {
                     Ok(dial) => dial.map_or(Dial::HIGH.multiplier(), Dial::multiplier),
-                    // Every `ProbeControl` is gone, so nothing can switch probing on again.
+                    // Unreachable while `control` is held: the channel cannot close.
                     Err(_) => return None,
                 };
                 let Some(last) = last else { break };
-                let due = last + pace.div_f64(multiplier);
+                let gap = Duration::try_from_secs_f64(pace.as_secs_f64() / multiplier)
+                    .map_or(MAX_GAP, |gap| gap.min(MAX_GAP));
+                let due = last + gap;
                 // A deadline in the past still costs a timer tick (1 ms), which would cap a zero pace at 1000/s.
                 if Instant::now() >= due {
                     break;
@@ -118,7 +125,7 @@ where
             }
 
             let item = inner.next().await?;
-            Some((item, (inner, dial, Some(Instant::now()))))
+            Some((item, (inner, dial, control, Some(Instant::now()))))
         },
     )
 }

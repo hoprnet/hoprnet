@@ -1543,8 +1543,7 @@ where
 
     /// The handle that sets the rate of generated probes.
     ///
-    /// A change reaches the running probe process on its next pull. The handle stays valid across restarts of
-    /// the probe process.
+    /// A change reaches the running probe process on its next pull.
     pub fn probe_control(&self) -> ProbeControl {
         self.probe_control.clone()
     }
