@@ -119,6 +119,15 @@ impl ForwardReceipts {
         self.state.lock().count
     }
 
+    /// Judges `relayer` for `exit` as of `at`, for the tests of the reply rule.
+    #[cfg(test)]
+    pub(crate) fn judge_at(&self, exit: Key, relayer: Key, at: Instant) {
+        let mut state = self.state.lock();
+        state.verdicts.insert((exit, relayer), at);
+        state.changed = true;
+        state.publish(&self.excluded, &self.any_verdict);
+    }
+
     /// The relayers excluded from forward draws to `exit`; the only cost without verdicts is an atomic load.
     pub fn excluded_relayers(&self, exit: &Key) -> Vec<Key> {
         if !self.any_verdict.load(Ordering::Relaxed) {

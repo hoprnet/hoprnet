@@ -1975,6 +1975,8 @@ where
 {
     let health = &registry.relayer_health;
     if let Some(forward) = registry.forward() {
+        // Lifts the forward verdicts past their TTL first: only an active one lowers the reply threshold
+        forward.refresh();
         *health.forward_judged.write() = forward.judged_relayers();
     }
     let changed = health.refresh(memory);
@@ -2869,6 +2871,31 @@ mod tests {
             forward_judged(&health, &[]);
             assert_eq!(judged, !judged_dead(&health.refresh(4)).is_empty(), "{count} overdue");
         }
+    }
+
+    /// The flush lifts a forward verdict past its TTL before the reply rule reads it, so only an active one
+    /// makes one overdue reply enough.
+    #[tokio::test]
+    async fn an_expired_forward_verdict_should_not_lower_the_reply_threshold() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let [relayer] = peers[..] else {
+            anyhow::bail!("one peer asked for");
+        };
+        graph.add_edge(&me, &relayer)?;
+        for (age, judged) in [(Duration::from_secs(1), true), (Duration::from_secs(31), false)] {
+            let registry = SurbRoundTripRegistry::default().with_forward_receipts(true);
+            let health = registry.relayer_health();
+            settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
+            open_since(&health, relayer, 1, ago(Duration::from_secs(5))?);
+            health.record_reply();
+            registry
+                .forward()
+                .context("forward receipts on")?
+                .judge_at(key(), relayer, ago(age)?);
+            refresh_relayer_health(&registry, &graph, 4, 1.0, || async {}).await;
+            assert_eq!(judged, health.is_known_dead(&relayer), "a forward verdict {age:?} old");
+        }
+        Ok(())
     }
 
     /// Opens one overdue race per leg, each against a home leg through `healthy` alone.

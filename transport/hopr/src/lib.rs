@@ -1311,9 +1311,6 @@ where
                         || surb_flush_planner.refresh_cached_paths(),
                     )
                     .await;
-                    if let Some(forward) = surb_round_trips.forward() {
-                        forward.refresh();
-                    }
 
                     // The counterparty sees only the first hop of the SURBs it holds, so it cannot tell
                     // which of them run through the dead relayer, and a FIFO store would spend them into
