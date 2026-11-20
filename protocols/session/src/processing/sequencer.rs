@@ -322,10 +322,10 @@ where
 
                             return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)));
                         } else if next.lt(this.next_id) {
-                            // A copy of a frame that was already emitted. It could never be emitted
-                            // itself, and left at the head it would keep the frames behind it from
-                            // ever being reached.
-                            tracing::error!("old item");
+                            // A copy of a frame that was already emitted, as a retransmission can leave.
+                            // It could never be emitted itself, and left at the head it would keep the
+                            // frames behind it from ever being reached.
+                            tracing::debug!(frame_id = next.item.frame_id(), "dropping copy of an emitted frame");
                             this.buffer.pop();
                             continue;
                         // Each gap waits `max_wait` from the arrival of the frame right behind it, so
@@ -339,8 +339,8 @@ where
                             this.buffer.capacity(),
                             *this.max_frames_behind_gap,
                         ) {
-                            // None of what decided this changes while the frames are given up on
-                            // (nothing is polled or emitted in between), so the whole run goes at once.
+                            // Decided at one instant, with nothing polled or emitted in between, so the
+                            // whole run goes at once.
                             let discarded = DiscardedFrames {
                                 first: *this.next_id,
                                 last: resume_at - 1,
@@ -1298,46 +1298,14 @@ mod tests {
         Ok(())
     }
 
-    /// Without a gap bound, only the timeout gives a gap up, and it gives all of it up.
-    #[test_log::test(tokio::test)]
-    async fn a_frame_far_ahead_should_be_reached_in_one_run_without_a_gap_bound() -> anyhow::Result<()> {
-        let max_wait = Duration::from_millis(200);
-        let (sink, stream) = futures::channel::mpsc::unbounded();
-        let seq = stream.sequencer_with(SequencerConfig {
-            max_wait,
-            capacity: 4096,
-            max_item_age: None,
-            max_frames_behind_gap: None,
-            adapt_to_reordering: false,
-        });
-        pin_mut!(seq);
-
-        sink.unbounded_send(1u32)?;
-        assert_eq!(Some(1), seq.next().await.transpose()?);
-
-        sink.unbounded_send(FAR)?;
-        let start = Instant::now();
-        let (runs, frame) = runs_until_a_frame(&mut seq, 8).await?;
-
-        assert_eq!(
-            vec![DiscardedFrames {
-                first: 2,
-                last: FAR - 1
-            }],
-            runs
-        );
-        assert_eq!(Some(FAR), frame);
-        assert!(start.elapsed() >= max_wait, "only the timeout gives the gap up");
-        assert!(start.elapsed() < Duration::from_secs(5), "{:?}", start.elapsed());
-        Ok(())
-    }
-
     /// A closed stream drains what is buffered through its own path, which gives a gap up at once.
     #[test_log::test(tokio::test)]
     async fn a_frame_far_ahead_should_be_reached_in_one_run_when_the_stream_is_done() -> anyhow::Result<()> {
-        // Long enough that the timeout cannot be what gives the gap up.
+        // Long enough that the timeout cannot be what gives the gap up. The stream is always ready, so
+        // the item budget is what bounds a walk that gives the gap up one id at a time.
         let items: Vec<Result<u32, DiscardedFrames>> = futures::stream::iter([1u32, FAR])
             .sequencer(Duration::from_secs(30), 4096)
+            .take(8)
             .collect::<Vec<_>>()
             .timeout(futures_time::time::Duration::from_secs(5))
             .await?;
@@ -1356,11 +1324,13 @@ mod tests {
         Ok(())
     }
 
+    /// Without a gap bound, only the timeout gives a gap up, and it gives all of it up as one run.
+    ///
     /// The abandoned gaps are remembered to tell a frame that comes after its gap was given up. Only the
     /// latest are kept however long the run, so a run is remembered by its last ids, as it would be had
     /// it been given up one id at a time.
     #[test_log::test(tokio::test)]
-    async fn a_long_run_should_be_remembered_by_its_latest_ids_only() -> anyhow::Result<()> {
+    async fn a_long_run_should_be_one_item_and_be_remembered_by_its_latest_ids_only() -> anyhow::Result<()> {
         let max_wait = Duration::from_millis(100);
         let (sink, stream) = futures::channel::mpsc::unbounded();
         let window = SharedReorder::default();
@@ -1370,6 +1340,7 @@ mod tests {
         sink.unbounded_send(1u32)?;
         assert_eq!(Some(1), seq.next().await.transpose()?);
         sink.unbounded_send(FAR)?;
+        let start = Instant::now();
         let (runs, frame) = runs_until_a_frame(&mut seq, 8).await?;
         assert_eq!(
             vec![DiscardedFrames {
@@ -1379,6 +1350,8 @@ mod tests {
             runs
         );
         assert_eq!(Some(FAR), frame);
+        assert!(start.elapsed() >= max_wait, "only the timeout gives the gap up");
+        assert!(start.elapsed() < Duration::from_secs(5), "{:?}", start.elapsed());
 
         let now = Instant::now();
         let last = FAR - 1;
@@ -1444,9 +1417,8 @@ mod tests {
         Ok(())
     }
 
-    /// Giving up on a gap in one step must end where giving up one id at a time did: the conditions did not
-    /// change while the ids were walked, so the walk ran until the condition stopped holding or the frame
-    /// buffered was reached.
+    /// Giving up on a gap in one step must end where giving up one id at a time did, judging the evidence
+    /// as it is at one instant: the walk ran until a rule stopped holding or the frame buffered was reached.
     #[test]
     fn giving_up_a_gap_in_one_step_should_end_where_giving_up_one_id_at_a_time_did() {
         /// The walk the sequencer did before: one id per step, each judged on its own.

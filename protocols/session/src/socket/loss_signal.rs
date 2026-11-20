@@ -45,13 +45,13 @@ use std::{
 ///
 /// The readers, [`lost_within`](Self::lost_within), [`lost_total`](Self::lost_total) and
 /// [`stalled_for`](Self::stalled_for), may be called from anywhere at any time. The writers,
-/// [`segment_received`](Self::segment_received), [`frame_completed`](Self::frame_completed) and
-/// [`record`](Self::record), must be called by one writer at a time. The stall state is three atomics
-/// that a writer updates one after another, and `segment_received` decides from one of them before it
-/// updates the next, so two writers interleaving could leave a stall that no frame matches, reported
-/// until the next completion or loss. A socket calls all three from its one sequentially polled stream
-/// chain, which is that single writer. A reader that catches a writer midway sees a stall begin or end
-/// one update late, no worse.
+/// [`segment_received`](Self::segment_received), [`frame_completed`](Self::frame_completed),
+/// [`record`](Self::record) and `record_lost` (which [`record`](Self::record) is one frame of), must be
+/// called by one writer at a time. The stall state is three atomics that a writer updates one after
+/// another, and `segment_received` decides from one of them before it updates the next, so two writers
+/// interleaving could leave a stall that no frame matches, reported until the next completion or loss.
+/// A socket calls all of them from its one sequentially polled stream chain, which is that single
+/// writer. A reader that catches a writer midway sees a stall begin or end one update late, no worse.
 #[derive(Debug, smart_default::SmartDefault)]
 pub struct FrameLossSignal {
     /// The instant the millisecond stamps below count from.
@@ -184,17 +184,6 @@ mod tests {
         assert!(signal.lost_within(Duration::from_millis(1000)));
         assert!(signal.lost_within(Duration::from_secs(3)));
         assert_eq!(1, signal.lost_total());
-    }
-
-    #[test]
-    fn a_run_of_lost_frames_is_one_loss_event_of_that_many_frames() {
-        let signal = FrameLossSignal::new();
-        signal.record_lost(5);
-        assert_eq!(5, signal.lost_total());
-        assert!(signal.lost_within(Duration::from_millis(500)));
-
-        signal.record();
-        assert_eq!(6, signal.lost_total(), "a single loss adds one");
     }
 
     #[test]

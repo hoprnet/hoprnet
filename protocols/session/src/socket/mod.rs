@@ -1670,13 +1670,13 @@ mod tests {
         Ok(())
     }
 
-    /// A frame far ahead of the one due next is reached at once, not by giving up every id before it
-    /// one poll at a time, and all of those ids still count as lost.
+    /// A frame far ahead of the one due next is reached, and every id before it counts as lost, on both
+    /// socket kinds.
     ///
-    /// Frame 1 is delivered, then frame 2^31 arrives: ids `2..2^31` are the gap. Walking it id by id
-    /// takes minutes of a busy core on a single frame, which is why the read is bounded by a couple of
-    /// seconds. The reliable socket also cancels the retries of the ids it gives up, through
-    /// `AcknowledgementState::frames_discarded`.
+    /// Frame 1 is delivered, then frame 2^31 arrives: ids `2..2^31` are the gap. This checks the loss
+    /// accounting of the whole pipeline, including a reliable socket's state, end to end. It is not the
+    /// guard against walking the gap one id per poll: that walk spins inside one `poll_read`, which no
+    /// timeout of this test can interrupt, so the sequencer tests, which bound the items they take, are.
     #[test_log::test(tokio::test)]
     async fn a_frame_far_ahead_is_reached_without_walking_the_gap_on_both_socket_kinds() -> anyhow::Result<()> {
         use anyhow::Context as _;

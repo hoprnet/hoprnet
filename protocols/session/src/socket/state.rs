@@ -56,11 +56,16 @@ pub trait SocketState<const C: usize>: Send {
     /// Called when all the frames from `first` to `last`, both inclusive, could not be completed from the
     /// segments received from Downstream.
     ///
-    /// The Socket gives up on a whole gap in one step, and a gap can span up to 2^32 frame ids, so a
-    /// state should override this to handle them in one step as well. The default calls
-    /// [`frame_discarded`](Self::frame_discarded) for each frame, one by one, and stops at the first error.
+    /// The Socket reports each run of consecutive frame ids it gives up on in one call, and a run can
+    /// span nearly the whole [`FrameId`] range, so a state should override this to handle the run in one
+    /// step as well. The default calls [`frame_discarded`](Self::frame_discarded) for each frame, one by
+    /// one, and returns the first error it met.
     fn frames_discarded(&mut self, first: FrameId, last: FrameId) -> Result<(), SessionError> {
-        (first..=last).try_for_each(|id| self.frame_discarded(id))
+        let mut outcome = Ok(());
+        for id in first..=last {
+            outcome = outcome.and(self.frame_discarded(id));
+        }
+        outcome
     }
 
     /// Called when a segment of a Frame was sent to the Downstream.
@@ -230,6 +235,21 @@ mod tests {
             tracing::debug!(id = self.1, "segment_sent called");
             self.0.lock().unwrap().segment_sent(segment)
         }
+    }
+
+    #[test]
+    fn a_state_without_its_own_run_handling_should_see_every_discarded_frame() {
+        let mut state = MockSockState::new();
+        state.expect_frame_discarded().times(3).returning(|id| match id {
+            2 => Err(SessionError::InvalidFrameId),
+            3 => Err(SessionError::StateNotRunning),
+            _ => Ok(()),
+        });
+
+        assert!(
+            matches!(state.frames_discarded(1, 3), Err(SessionError::InvalidFrameId)),
+            "every frame is reported, and the first error is the one returned"
+        );
     }
 
     #[test_log::test(tokio::test)]

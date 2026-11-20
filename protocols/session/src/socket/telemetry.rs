@@ -11,9 +11,10 @@ pub trait SessionTelemetryTracker {
     fn frame_discarded(&self);
     /// Records `count` consecutive frames that have been discarded at once.
     ///
-    /// The Sequencer gives up on a whole gap in one step, and a gap can span up to 2^32 frame ids, so
-    /// an implementation should override this to account for them in one step as well. The default
-    /// records each frame with [`frame_discarded`](Self::frame_discarded), one by one.
+    /// Each run of consecutive frame ids the Sequencer gives up on is reported in one call, and a run
+    /// can span nearly the whole frame id range, so an implementation should override this to account
+    /// for the run in one step as well. The default records each frame with
+    /// [`frame_discarded`](Self::frame_discarded), one by one.
     fn frames_discarded(&self, count: u32) {
         for _ in 0..count {
             self.frame_discarded();
@@ -102,12 +103,8 @@ pub mod tests {
 
     impl TestTelemetryTracker {
         fn increment(&self, key: &str) {
-            self.increment_by(key, 1);
-        }
-
-        fn increment_by(&self, key: &str, by: usize) {
             let mut map = self.0.lock();
-            *map.entry(key.to_string()).or_insert(0) += by;
+            *map.entry(key.to_string()).or_insert(0) += 1;
         }
     }
 
@@ -122,10 +119,6 @@ pub mod tests {
 
         fn frame_discarded(&self) {
             self.increment("frames_discarded");
-        }
-
-        fn frames_discarded(&self, count: u32) {
-            self.increment_by("frames_discarded", count as usize);
         }
 
         fn incomplete_frame(&self) {
