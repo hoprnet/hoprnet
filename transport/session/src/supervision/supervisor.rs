@@ -326,6 +326,12 @@ pub struct SessionPixSupervisor {
     /// request already outstanding go on (they are what lets a returning Entry answer), and the
     /// deferred request is issued when the plane is attached again.
     data_plane_detached: bool,
+    /// The gate whose live flag [`data_plane_detached`](Self::data_plane_detached) mirrors, once the worker
+    /// has attached it (see [`attach_gate`](Self::attach_gate)).
+    ///
+    /// The mirrored level is synced before the worker acts on each command, but the slot can detach in the
+    /// time between that sync and the decision to ask for a successor; the decision reads the gate itself.
+    detach_gate: Option<std::sync::Arc<super::gate::ServiceGate>>,
     /// The successor batch that has been requested, has not been answered in full, and is being asked
     /// for again.
     ///
@@ -501,6 +507,7 @@ impl SessionPixSupervisor {
             paid_recovery_tail: None,
             successor_request_deferred: false,
             data_plane_detached: false,
+            detach_gate: None,
             resend: None,
             resend_decided_batch: None,
             ssas: Vec::with_capacity(2),
@@ -740,6 +747,16 @@ impl SessionPixSupervisor {
             .saturating_mul(crate::MAX_OVERLAPPING_BATCHES as usize)
     }
 
+    /// Gives the supervisor the gate whose detached flag the successor-request decision consults live.
+    pub fn attach_gate(&mut self, gate: std::sync::Arc<super::gate::ServiceGate>) {
+        self.detach_gate = Some(gate);
+    }
+
+    /// Whether the data plane is detached: what the supervisor was last told, or what the gate says now.
+    fn is_detached_now(&self) -> bool {
+        self.data_plane_detached || self.detach_gate.as_ref().is_some_and(|gate| gate.data_plane_detached())
+    }
+
     /// Whether `detached` differs from what this supervisor was last told, so a worker can skip the
     /// call on the common turn.
     pub fn detach_level_differs(&self, detached: bool) -> bool {
@@ -764,7 +781,7 @@ impl SessionPixSupervisor {
     }
 
     fn retry_deferred_successor_request(&mut self, now: Instant) -> Vec<SessionPixAction> {
-        if self.closed || self.data_plane_detached || !self.successor_request_deferred {
+        if self.closed || self.is_detached_now() || !self.successor_request_deferred {
             return Vec::new();
         }
 
@@ -2505,7 +2522,7 @@ impl SessionPixSupervisor {
 
         // Nor while the data plane is detached: see `data_plane_detached`. Deferred, so that the
         // request is issued when the plane is attached again.
-        if self.data_plane_detached {
+        if self.is_detached_now() {
             self.successor_request_deferred = true;
             tracing::debug!("deferring a successor SSA batch while the data plane is detached");
             return Vec::new();
