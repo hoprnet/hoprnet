@@ -161,8 +161,10 @@ pub struct SessionClientConfig {
     ///
     /// Only stateless Sessions (frame-based, no retransmission) can be resumed; the reconnect of a stateful one is
     /// refused with `NotResumable`. The Entry keeps a pseudonym's PIX accounting for 30 minutes after its Session
-    /// ends (a live Session never loses it), so a resume is possible only within that time. Who may take a Session
-    /// over is decided by the pseudonym alone; see hoprnet#8723 for binding it to a secret.
+    /// ends (a live Session never loses it), so a resume is possible only within that time. Its `StartSession`
+    /// challenges strictly increase, and an Exit takes a Session over only for a challenge greater than the one it
+    /// was established by, so a delayed attempt cannot take over a newer Session. Who may take a Session over is
+    /// decided by the pseudonym alone; see hoprnet#8723 for binding it to a secret.
     ///
     /// Reusing a pseudonym across process restarts is **not** supported: the share generator, the reply
     /// openers and the SURB generation are all held in memory.
