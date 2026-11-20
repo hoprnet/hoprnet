@@ -848,7 +848,9 @@ pub struct SupervisorConfig {
     /// The batch-scaled budget must be shorter than the reconstructor's `incomplete_commitment_lifetime`
     /// ([`validate_pix_supervision`] rejects it otherwise): a silent batch's pending registration is last
     /// refreshed by its last (re-)send, so a longer window lets the Entry answer in time but after the
-    /// registration is gone. At the defaults that rejects an `ssas_per_request` of 6 or more.
+    /// registration is gone. This holds for the initial request too: it refreshes the registration around its
+    /// send, so a slow deposit pool does not shorten it. At the defaults that rejects an `ssas_per_request` of 6 or
+    /// more.
     ///
     /// Default: 20 s.
     #[default(Duration::from_secs(20))]
@@ -2045,7 +2047,9 @@ pub fn validate_pix_supervision(
     // reported as that rather than as a window longer than the lifetime.
     // The last refresh of a silent batch's pending registration is its last (re-)send, and the
     // commitment deadline is one window after that send: the original request, the final opening
-    // re-send, or a successor whose re-sends stopped at the front. A window that is not shorter than
+    // re-send, or a successor whose re-sends stopped at the front. The original request refreshes the
+    // registration just before it goes out and again just before the deadline starts, so a slow
+    // deposit pool does not eat into it. A window that is not shorter than
     // the lifetime lets the Entry answer in time but after the registration is gone, which the Exit
     // rejects as a missing commitment and closes the Session, after the Entry was told to deposit.
     // Strict `<` suffices because the driver refreshes when it carries out the send, which is after
