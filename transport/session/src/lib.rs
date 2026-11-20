@@ -145,7 +145,20 @@ pub struct SessionClientConfig {
     /// Capabilities offered by the session.
     #[default(_code = "Capability::Segmentation.into()")]
     pub capabilities: Capabilities,
-    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    /// Optional pseudonym used for the session. Random when not given.
+    ///
+    /// Giving one is how a client reconnects under a pseudonym it used before in this process:
+    ///
+    /// * a live local Session under it is closed, and the new one takes its place;
+    /// * for a PIX Session the accounting continues where the previous Session left off (the commitments made and the
+    ///   packets served against them), as long as the Exit continues the same accounting. If the Exit started over,
+    ///   its opening request resets the Entry's side with it;
+    /// * the new socket ignores, for a short while, frames far ahead of its own stream, which can only be leftovers of
+    ///   the previous Session's.
+    ///
+    /// Reusing a pseudonym across process restarts is **not** supported: the share generator, the reply
+    /// openers and the SURB generation are all held in memory, and the Exit's SURB ring may treat the
+    /// restarted generation as older than the one it holds.
     #[default(None)]
     pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the Session.
