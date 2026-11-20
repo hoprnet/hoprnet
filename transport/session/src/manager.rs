@@ -4262,18 +4262,44 @@ where
 {
     let app_data: ApplicationData = data.try_into().map_err(SessionManagerError::other)?;
     let data = count_return_packet_surb(estimator, ApplicationDataOut::with_no_packet_info(app_data));
+    let refund = data.surb_refund.clone();
+    let started = std::time::Instant::now();
+    let timed_out = |_| {
+        error!("timeout sending {error_context}");
+        TransportSessionError::Timeout
+    };
+
+    // The SURB is given back only while the sink has not taken the packet: once it has, the packet may
+    // already be on its way and the debit stands. The one timeout covers readiness and the flush, so a
+    // sink that stays pending drops a packet it never accepted, and must not leave the estimate down.
+    futures::future::poll_fn(|cx| msg_sender.poll_ready_unpin(cx))
+        .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+        .await
+        .map_err(|error| {
+            refund.give_back();
+            timed_out(error)
+        })?
+        .map_err(|error| {
+            refund.give_back();
+            error!(%error, "failed to send {error_context}");
+            SessionManagerError::other(error)
+        })?;
+    msg_sender.start_send_unpin((routing, data)).map_err(|error| {
+        refund.give_back();
+        error!(%error, "failed to send {error_context}");
+        SessionManagerError::other(error)
+    })?;
     #[cfg(feature = "telemetry")]
     telemetry::record_session_surb_consumed(session_id, 1);
     #[cfg(not(feature = "telemetry"))]
     let _ = session_id;
-    msg_sender
-        .send((routing, data))
-        .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+
+    futures::future::poll_fn(|cx| msg_sender.poll_flush_unpin(cx))
+        .timeout(futures_time::time::Duration::from(
+            EXTERNAL_SEND_TIMEOUT.saturating_sub(started.elapsed()),
+        ))
         .await
-        .map_err(|_| {
-            error!("timeout sending {error_context}");
-            TransportSessionError::Timeout
-        })?
+        .map_err(timed_out)?
         .map_err(|error| {
             error!(%error, "failed to send {error_context}");
             SessionManagerError::other(error)
@@ -9864,6 +9890,142 @@ mod tests {
             .buffer_level
             .store(buffer_level, std::sync::atomic::Ordering::Relaxed);
         state
+    }
+
+    /// How a stand-in sink treats the one packet a control send hands it.
+    #[derive(Clone, Copy)]
+    enum SinkMode {
+        NeverReady,
+        StartSendFails,
+        FlushFails,
+        FlushNeverCompletes,
+        Accepts,
+    }
+
+    #[derive(Clone, Debug)]
+    struct StandInSinkError;
+
+    impl std::fmt::Display for StandInSinkError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("stand-in sink failure")
+        }
+    }
+
+    impl std::error::Error for StandInSinkError {}
+
+    struct StandInSink(SinkMode);
+
+    impl Sink<(DestinationRouting, ApplicationDataOut)> for StandInSink {
+        type Error = StandInSinkError;
+
+        fn poll_ready(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            match self.0 {
+                SinkMode::NeverReady => std::task::Poll::Pending,
+                _ => std::task::Poll::Ready(Ok(())),
+            }
+        }
+
+        fn start_send(
+            self: std::pin::Pin<&mut Self>,
+            _: (DestinationRouting, ApplicationDataOut),
+        ) -> Result<(), Self::Error> {
+            match self.0 {
+                SinkMode::StartSendFails => Err(StandInSinkError),
+                _ => Ok(()),
+            }
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            match self.0 {
+                SinkMode::FlushFails => std::task::Poll::Ready(Err(StandInSinkError)),
+                SinkMode::FlushNeverCompletes => std::task::Poll::Pending,
+                _ => std::task::Poll::Ready(Ok(())),
+            }
+        }
+
+        fn poll_close(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    /// Sends one counted control packet into a sink of `mode`, and returns the result with the estimator's
+    /// `(consumed, refunded)`.
+    async fn counted_control_send(mode: SinkMode) -> anyhow::Result<(errors::Result<()>, u64, u64)> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        let mut sink = StandInSink(mode);
+        let result = send_counted_via_msg_sender(
+            &mut sink,
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationData::new(SESSION_APPLICATION_TAG, b"short")?,
+            &estimator,
+            &HoprPseudonym::random(),
+            "test control message",
+        )
+        .await;
+        Ok((
+            result,
+            estimator.consumed.load(Relaxed),
+            estimator.refunded.load(Relaxed),
+        ))
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_control_send_into_a_sink_that_is_never_ready_gives_its_surb_back() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::NeverReady).await?;
+        assert!(matches!(result, Err(TransportSessionError::Timeout)), "got {result:?}");
+        assert_eq!(
+            (1, 1),
+            (consumed, refunded),
+            "the packet was never accepted, so the SURB is back"
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_control_send_the_sink_refuses_to_start_gives_its_surb_back() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::StartSendFails).await?;
+        assert!(result.is_err());
+        assert_eq!((1, 1), (consumed, refunded));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_control_send_whose_flush_fails_keeps_its_debit() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::FlushFails).await?;
+        assert!(result.is_err());
+        assert_eq!(
+            (1, 0),
+            (consumed, refunded),
+            "the sink took the packet, which may be on its way"
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_control_send_whose_flush_never_completes_keeps_its_debit() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::FlushNeverCompletes).await?;
+        assert!(matches!(result, Err(TransportSessionError::Timeout)), "got {result:?}");
+        assert_eq!((1, 0), (consumed, refunded));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_accepted_and_flushed_control_send_keeps_its_debit() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::Accepts).await?;
+        assert!(result.is_ok(), "got {result:?}");
+        assert_eq!((1, 0), (consumed, refunded));
+        Ok(())
     }
 
     /// A packet short enough to have room for a SURB. `max_surbs_with_message` is
