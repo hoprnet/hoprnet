@@ -127,7 +127,7 @@ pub use crate::{
 };
 use crate::{
     config::PixGlobalConfig,
-    constants::SESSION_INITIATION_TIMEOUT_BASE,
+    constants::{SESSION_INITIATION_MAX_RESENDS, SESSION_INITIATION_RESEND_INTERVAL, SESSION_INITIATION_TIMEOUT_BASE},
     errors::HoprTransportError,
     multiaddrs::strip_p2p_protocol,
     path::{HoprGraphPathSelector, PathPlanner},
@@ -628,6 +628,8 @@ where
                 .and_then(|s| s.parse::<usize>().ok())
                 .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
             initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+            initiation_resend_interval: SESSION_INITIATION_RESEND_INTERVAL,
+            max_initiation_resends: SESSION_INITIATION_MAX_RESENDS,
             idle_timeout: cfg.session.idle_timeout,
             balancer_sampling_interval: cfg.session.balancer_sampling_interval,
             initial_return_session_egress_rate: 10,
