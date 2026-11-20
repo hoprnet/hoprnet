@@ -1837,6 +1837,9 @@ async fn a_lost_opening_request_is_resent_and_the_session_commits() -> Result<()
     else {
         anyhow::bail!("expected DepositNeeded for the opening cycle");
     };
+    // Re-sends stop on the first `CommitmentProgress`, which precedes the verification that produced
+    // `DepositNeeded`, so at most one re-send already handed to the driver can still turn up after this.
+    let answered_at_count = opening_requests.lock().unwrap().len();
     assert_eq!(1, alice_ready.ssa_id.ssa_index().get());
     assert_eq!(alice_ready.ssa_id, bob_needs.ssa_id);
     assert_eq!(
@@ -1868,11 +1871,18 @@ async fn a_lost_opening_request_is_resent_and_the_session_commits() -> Result<()
             "every re-send is the dropped request again, byte for byte"
         );
     }
-    // The dropped one, the one that was admitted, and at most one that was already in flight when
-    // Alice answered. A fourth would mean Bob went on asking.
+    // The dropped one and at least one re-send; no more than one past what Bob had sent when the Entry's
+    // answer reached him; and never more than the cap allows. No assumption is made about how fast the
+    // answer arrives.
+    assert!(requests.len() >= 2, "bob must have re-sent the dropped request");
     assert!(
-        (2..=3).contains(&requests.len()),
-        "bob stops asking once the Entry has answered, but sent {} requests",
+        requests.len() <= answered_at_count + 1,
+        "bob kept asking after the Entry answered: {answered_at_count} requests when it did, {} after the quiet",
+        requests.len()
+    );
+    assert!(
+        requests.len() <= 1 + SupervisorConfig::default().max_opening_ssa_request_resends as usize,
+        "bob sent more requests than the cap allows: {}",
         requests.len()
     );
 
