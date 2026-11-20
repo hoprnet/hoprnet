@@ -12,13 +12,22 @@ pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Du
 /// machines with up to ~36 cores. Safe formula: `≤ 7 × available_parallelism()`.
 pub(crate) const MAXIMUM_MSG_OUTGOING_BUFFER_SIZE: usize = 256;
 
+/// Default number of probes buffered in the probe lane before the probe emitter observes
+/// backpressure. Operators set `output_priority.probe_lane_capacity` to change it.
+///
+/// The lane is small on purpose. `continuously_scan` records a probe in its timeout cache only once
+/// the send returns, so whatever a probe waits in this lane is already inside its 3 s timeout. A lane
+/// of 16 bounds that wait to 16 probes, at most 59 kB (16 × 3,669 B), and the back-pressure holds the
+/// emitter instead: the probe share is applied by the scheduler, which is where the pacing belongs.
+pub(crate) const MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE: usize = 16;
+
 /// Time within Start protocol must finish session initiation.
 /// This base value is always multiplied by the (max) number of hops, times 2 (for both-ways).
 pub(crate) const SESSION_INITIATION_TIMEOUT_BASE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
 mod tests {
-    use super::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
+    use super::{MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE};
 
     /// Guard against accidentally inflating `MAXIMUM_MSG_OUTGOING_BUFFER_SIZE` back to a large
     /// value that would overflow the Rayon encoding queue.
@@ -35,6 +44,24 @@ mod tests {
             MAXIMUM_MSG_OUTGOING_BUFFER_SIZE <= 256,
             "MAXIMUM_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_MSG_OUTGOING_BUFFER_SIZE} exceeds the safe threshold; tail \
              packets will exceed PACKET_ENCODING_TIMEOUT under burst writes"
+        );
+    }
+
+    /// Guard against growing the default probe lane. `continuously_scan` starts a probe's timeout
+    /// before the probe waits in this lane, so every queued slot is timeout budget a probe spends not
+    /// being sent. The lane stays small enough that the back-pressure, not the buffer, paces the
+    /// emitter, and `output_priority.probe_lane_capacity` accepts no larger value.
+    #[allow(clippy::assertions_on_constants)]
+    #[test]
+    fn probe_lane_stays_small_enough_to_keep_the_probe_timeout_honest() {
+        assert!(
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE > 0,
+            "a zero-sized probe lane would stall the emitter on every probe"
+        );
+        assert!(
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE <= 32,
+            "MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE} lets probes queue past \
+             the probe timeout they already started"
         );
     }
 
