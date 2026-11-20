@@ -640,28 +640,37 @@ impl SurbRoundTripRegistry {
                 }
             }
 
-            // The counterparty drops its whole stock on the first batch of the new generation, but it
-            // goes on spending that stock until the batch arrives. Taken out of `pending`, these SURBs
-            // cannot make a second relayer confirmed at a later flush look as if it still had a stock
-            // to wipe. Their legs are kept as written-off legs are, before they leave `pending`, so
-            // that a reply spent in the meantime still proves its relayers alive: it can revive one
-            // judged dead in this same flush, whose verdict is not confirmed yet. A second walk, but
-            // only when a session was reached, which is once per verdict.
-            let mut wiped: Vec<(HoprSurbId, ReturnRelayers, Instant)> = Vec::new();
-            self.pending.for_each(|id, pending| {
-                if reached.contains(&pending.pseudonym) {
-                    wiped.push((*id, pending.return_relayers, pending.minted_at));
-                }
-            });
-            for (id, return_relayers, minted_at) in wiped {
-                self.remember_written_off(id, return_relayers, minted_at);
-                if self.pending.remove(&id).is_none() {
-                    // Spent in between, as in the loop above: the counterparty no longer holds it.
-                    self.written_off_legs.remove(&id);
-                }
-            }
+            // The counterparty drops its whole stock on the first batch of the new generation; taking these
+            // SURBs out of `pending` keeps a later verdict from counting that stock again.
+            self.write_off_pending_where(|pseudonym, _| reached.contains(pseudonym));
         }
         reached
+    }
+
+    /// Writes off `pseudonym`'s pending SURBs minted before `minted_before`, the ones a new SURB generation wipes.
+    ///
+    /// Walks the whole pending map (some 10 ms at the default budget), so call it off the runtime worker.
+    pub fn write_off_pending(&self, pseudonym: &HoprPseudonym, minted_before: Instant) {
+        self.write_off_pending_where(|candidate, minted_at| candidate == pseudonym && minted_at < minted_before);
+    }
+
+    /// Writes off the pending SURBs of every pseudonym `wiped` accepts, in one walk.
+    ///
+    /// The legs are kept, so a reply spent in the meantime still proves its relayers alive.
+    fn write_off_pending_where(&self, wiped: impl Fn(&HoprPseudonym, Instant) -> bool) {
+        let mut doomed: Vec<(HoprSurbId, ReturnRelayers, Instant)> = Vec::new();
+        self.pending.for_each(|id, pending| {
+            if wiped(&pending.pseudonym, pending.minted_at) {
+                doomed.push((*id, pending.return_relayers, pending.minted_at));
+            }
+        });
+        for (id, return_relayers, minted_at) in doomed {
+            self.remember_written_off(id, return_relayers, minted_at);
+            if self.pending.remove(&id).is_none() {
+                // Spent in between: the counterparty no longer holds it.
+                self.written_off_legs.remove(&id);
+            }
+        }
     }
 
     /// Per session, how many SURBs held by the counterparty cannot bring a reply home, and their share
@@ -3901,6 +3910,61 @@ mod tests {
         assert!(
             registry.write_off_dead().is_empty(),
             "and so it is when it dies again there"
+        );
+        Ok(())
+    }
+
+    /// Writing off one pseudonym's pending SURBs leaves the others', and keeps the legs of what it takes.
+    #[test]
+    fn writing_off_pending_surbs_takes_only_that_pseudonyms_and_keeps_their_legs() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let relayer = key();
+        let other = HoprPseudonym::random();
+        registry.pending.insert(surb_id(1), pending_to(&[relayer], None, 0));
+        let mut elsewhere = pending_to(&[relayer], None, 0);
+        elsewhere.pseudonym = other;
+        registry.pending.insert(surb_id(2), elsewhere);
+
+        registry.write_off_pending(&SESSION, Instant::now() + Duration::from_secs(1));
+
+        assert!(
+            !registry.pending.contains_key(&surb_id(1)),
+            "the pseudonym's SURB is taken"
+        );
+        assert!(
+            registry.written_off_legs.contains_key(&surb_id(1)),
+            "its leg is kept, so a reply on it still proves the relayers alive"
+        );
+        assert!(
+            registry.pending.contains_key(&surb_id(2)),
+            "another pseudonym's SURB is left"
+        );
+        assert!(!registry.written_off_legs.contains_key(&surb_id(2)));
+        Ok(())
+    }
+
+    /// SURBs minted at or after the cutoff, the new generation's own, stay pending.
+    #[test]
+    fn writing_off_pending_surbs_leaves_those_minted_after_the_cutoff() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let relayer = key();
+        let cutoff = Instant::now();
+        let mut stale = pending_to(&[relayer], None, 0);
+        stale.minted_at = ago(Duration::from_secs(1))?;
+        registry.pending.insert(surb_id(1), stale);
+        let mut fresh = pending_to(&[relayer], None, 0);
+        fresh.minted_at = cutoff;
+        registry.pending.insert(surb_id(2), fresh);
+
+        registry.write_off_pending(&SESSION, cutoff);
+
+        assert!(
+            !registry.pending.contains_key(&surb_id(1)),
+            "the older SURB is written off"
+        );
+        assert!(
+            registry.pending.contains_key(&surb_id(2)),
+            "one minted at the cutoff stays"
         );
         Ok(())
     }

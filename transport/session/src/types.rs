@@ -565,6 +565,11 @@ pub trait SurbAdmissionControl: Send + Sync + 'static {
     ///
     /// Defaults to a no-op, for implementations that do not size a per-Session ring.
     fn raise_target(&self, _pseudonym: &SessionId, _token: AdmissionToken, _expected_surbs: usize) {}
+
+    /// Starts a new SURB generation for `pseudonym`, so the counterparty drops the SURBs it holds for it.
+    ///
+    /// Called by an Entry before it repeats a `StartSession`. Defaults to a no-op.
+    fn advance_generation(&self, _pseudonym: &SessionId) {}
 }
 
 /// Configures the Session protocol socket over HOPR.

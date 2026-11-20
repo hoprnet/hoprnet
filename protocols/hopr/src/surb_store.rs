@@ -4550,6 +4550,34 @@ mod tests {
         Ok(())
     }
 
+    /// A newer generation wipes the quarantined stock of an older one, so admission promotes only the newer SURBs.
+    #[test]
+    fn a_newer_generation_in_quarantine_leaves_only_its_own_surbs_to_admit() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        for i in 0..3 {
+            store.insert_surbs(pseudonym, vec![([i as u8; 8], surb_gen(relayer, DIRECT, 0)?)]);
+        }
+        for i in 10..12 {
+            store.insert_surbs(pseudonym, vec![([i as u8; 8], surb_gen(relayer, DIRECT, 1)?)]);
+        }
+
+        store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+
+        assert_eq!(
+            2,
+            store
+                .admitted_surbs_per_pseudonym
+                .get(&pseudonym)
+                .context("the admitted ring must exist after admission")?
+                .len(),
+            "only the newer generation's SURBs are admitted"
+        );
+        Ok(())
+    }
+
     /// Re-admitting a fixed pseudonym — a Session reopened on the same one — must not discard what
     /// the admitted ring already holds.
     #[test]
