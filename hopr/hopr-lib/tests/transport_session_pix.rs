@@ -2570,12 +2570,14 @@ async fn a_reconnect_under_the_same_pseudonym_takes_over_the_paid_session(
         "the first Session must carry traffic"
     );
     anyhow::ensure!(server.live() == 1, "the Exit holds one Session before the reconnect");
+    // For SSA 1 only: fill or the echoes below may legitimately make the Exit ask for SSA 2 meanwhile.
     let before = {
         let t = tally.lock().unwrap();
+        let ssa_1 = |indices: &[u32]| indices.iter().filter(|index| **index == 1).count();
         (
-            t.deposit_data_requests.len(),
-            t.exit_addresses.len(),
-            t.entry_deposits.len(),
+            ssa_1(&t.deposit_data_requests),
+            ssa_1(&t.exit_addresses),
+            ssa_1(&t.entry_deposits),
         )
     };
 
@@ -2610,13 +2612,22 @@ async fn a_reconnect_under_the_same_pseudonym_takes_over_the_paid_session(
     // Nothing was paid for twice.
     {
         let t = tally.lock().unwrap();
+        let ssa_1 = |indices: &[u32]| indices.iter().filter(|index| **index == 1).count();
         assert_eq!(
             before.0,
-            t.deposit_data_requests.len(),
-            "no further deposit-data request: {t:?}"
+            ssa_1(&t.deposit_data_requests),
+            "no further deposit-data request for SSA 1: {t:?}"
         );
-        assert_eq!(before.1, t.exit_addresses.len(), "no further deposit address: {t:?}");
-        assert_eq!(before.2, t.entry_deposits.len(), "no further Entry deposit: {t:?}");
+        assert_eq!(
+            before.1,
+            ssa_1(&t.exit_addresses),
+            "no further deposit address for SSA 1: {t:?}"
+        );
+        assert_eq!(
+            before.2,
+            ssa_1(&t.entry_deposits),
+            "no further Entry deposit for SSA 1: {t:?}"
+        );
     }
 
     // One Session on the Exit, and the first one ended.
@@ -2676,7 +2687,11 @@ async fn a_closed_session_that_never_returns_ends_at_the_window_and_funds_no_suc
     #[case] hops: usize,
 ) -> anyhow::Result<()> {
     use futures::AsyncWriteExt as _;
-    use hopr_lib::api::types::crypto_random::Randomizable as _;
+    use hopr_lib::{
+        api::types::crypto_random::Randomizable as _,
+        errors::{HoprLibError, HoprTransportError},
+        exports::transport::{StartErrorReason, TransportSessionError},
+    };
 
     const WINDOW: Duration = Duration::from_secs(3);
 
@@ -2727,6 +2742,18 @@ async fn a_closed_session_that_never_returns_ends_at_the_window_and_funds_no_suc
         );
         assert_eq!(before.1, t.exit_addresses.len(), "no successor deposit address: {t:?}");
         assert_eq!(before.2, t.entry_deposits.len(), "no successor Entry deposit: {t:?}");
+    }
+
+    // The Session was ended, not kept with its successor requests suppressed: a reconnect under the retained
+    // pseudonym is refused as not resumable.
+    let refused =
+        try_establish_pix_session_under_with(&cluster, hops, Some(pseudonym), Some(idle_surb_balancer()), true).await?;
+    match refused {
+        Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Rejected(
+            StartErrorReason::NotResumable,
+        )))) => {}
+        Err(other) => anyhow::bail!("expected Rejected(NotResumable), got {other:?}"),
+        Ok(_session) => anyhow::bail!("the reconnect under {pseudonym} after the window must be refused"),
     }
     driver.abort();
     Ok(())
