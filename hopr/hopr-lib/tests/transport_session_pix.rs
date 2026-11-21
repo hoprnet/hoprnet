@@ -135,6 +135,7 @@ async fn build_pix_cluster_with_entry_cap(
         idle_timeout,
         entry_max_ssas_per_request,
         hopr_lib::testing::dummies::EchoServer::new(),
+        None,
     )
     .await
 }
@@ -163,7 +164,7 @@ where
         + 'static,
 {
     let default_cap = hopr_lib::exports::transport::config::PixGlobalConfig::default().max_ssas_per_request;
-    build_pix_cluster_with(hops, exit_pix, idle_timeout, default_cap, exit_server).await
+    build_pix_cluster_with(hops, exit_pix, idle_timeout, default_cap, exit_server, None).await
 }
 
 /// The cluster the three builders above are all a special case of.
@@ -174,6 +175,7 @@ async fn build_pix_cluster_with<Srv>(
     idle_timeout: Duration,
     entry_max_ssas_per_request: usize,
     exit_server: Srv,
+    entry_establish_retry_timeout: Option<Duration>,
 ) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard>
 where
     Srv: hopr_api::node::HoprSessionServer<
@@ -195,6 +197,7 @@ where
                 ..Default::default()
             }),
             idle_timeout_ms: idle_timeout.as_millis() as u64,
+            establish_retry_timeout: entry_establish_retry_timeout,
             ..Default::default()
         },
         vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB); hops],
@@ -2248,7 +2251,8 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
 /// ## Steps
 /// 1. A Session is opened and its first deposit, `(p, 1)`, is signalled on the Exit.
 /// 2. The Session is dropped, and the Exit left to evict it on its short `idle_timeout`.
-/// 3. A Session is opened under `p`: it fails with `Rejected(NotResumable)` well within the connect retry delay.
+/// 3. A Session is opened under `p`: it fails with `Rejected(NotResumable)`. The Entry's retry delay is far beyond the
+///    connect timeout, so a retry would show as a timeout rather than as a slow success.
 /// 4. A Session under a fresh pseudonym `p'` is funded at `(p', 1)` and echoes.
 #[cfg(feature = "session-client")]
 #[rstest]
@@ -2268,7 +2272,16 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session
     const IDLE_TIMEOUT: Duration = Duration::from_secs(20);
 
     let exit_pix = fill_pix_config(Default::default());
-    let cluster = build_pix_cluster(hops, exit_pix, IDLE_TIMEOUT).await?;
+    let cluster = build_pix_cluster_with(
+        hops,
+        exit_pix,
+        IDLE_TIMEOUT,
+        hopr_lib::exports::transport::config::PixGlobalConfig::default().max_ssas_per_request,
+        hopr_lib::testing::dummies::EchoServer::new(),
+        // Far beyond the 120 s connect timeout: a retry after the refusal cannot succeed in time.
+        Some(Duration::from_secs(3600)),
+    )
+    .await?;
     let (_driver, mut milestones) = spawn_exit_pix_driver(&cluster);
 
     let funded = |seen: &[(PixMilestone, _)], pseudonym| {
@@ -2290,10 +2303,10 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session
     tokio::time::sleep(IDLE_TIMEOUT * 2).await;
     while milestones.try_recv().is_ok() {}
 
-    // Any retry adds at least the 2 s `establish_retry_timeout` default this cluster uses.
-    let started = std::time::Instant::now();
-    let refused = try_establish_pix_session_under(&cluster, hops, Some(pseudonym)).await?;
-    let elapsed = started.elapsed();
+    // A retry would wait out the one-hour retry delay, and so fail as a timeout here.
+    let refused = try_establish_pix_session_under(&cluster, hops, Some(pseudonym))
+        .await
+        .context("the refusal was retried instead of being final")?;
     match refused {
         Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Rejected(
             StartErrorReason::NotResumable,
@@ -2301,10 +2314,6 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session
         Err(other) => anyhow::bail!("expected Rejected(NotResumable), got {other:?}"),
         Ok(_session) => anyhow::bail!("the reconnect under {pseudonym} must be refused"),
     }
-    assert!(
-        elapsed < Duration::from_secs(2),
-        "a permanent rejection must not be retried, but took {elapsed:?}"
-    );
 
     let mut fresh = establish_pix_session_under(&cluster, hops, None).await?;
     let fresh_pseudonym = *fresh.id();
