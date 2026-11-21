@@ -2379,13 +2379,9 @@ impl SessionSlot {
         params: &PixParams,
         ssas_per_request: usize,
         capabilities: Capabilities,
-        resume_capable: bool,
     ) -> Option<TakeoverRefusal> {
         if !matches!(self.routing_opts, DestinationRouting::Return(_)) {
             return Some("not an Exit-side session");
-        }
-        if !resume_capable {
-            return Some("the requesting Entry does not announce resume capability");
         }
         if !self.instance.is_established() {
             return Some("not established");
@@ -9559,12 +9555,11 @@ where
     ///
     /// In order:
     ///
-    /// 1. The held slot must be eligible ([`SessionSlot::takeover_refusal`]): the Entry announced resume capability,
-    ///    the Session is a frame-based one on the stateless socket, and a stream base fits above its stream (see
-    ///    [`successor_stream_base`]). Else the request is refused with [`PixAdmissionRejection::TakeoverIneligible`],
-    ///    exactly as an occupied pseudonym always was on the wire (`NoSlotsAvailable`), and the slot is not touched.
-    ///    Eligibility is the pseudonym alone: whoever starts a Session under it, with a greater challenge, takes it
-    ///    over. See hoprnet#8723 for binding a takeover to a secret of the original Entry.
+    /// 1. The held slot must be eligible ([`SessionSlot::takeover_refusal`]): the Session is a frame-based one on the
+    ///    stateless socket, and a stream base fits above its stream (see [`successor_stream_base`]). Else the request
+    ///    is refused with [`PixAdmissionRejection::TakeoverIneligible`] (`NotResumable` on the wire), and the slot is
+    ///    not touched. Eligibility is the pseudonym alone: whoever starts a Session under it, with a greater challenge,
+    ///    takes it over. See hoprnet#8723 for binding a takeover to a secret of the original Entry.
     /// 2. The new data plane is built and **delivered to the session server before** the slot is touched. If that fails
     ///    the plane is dropped and the request refused: the old slot stays exactly as it was.
     /// 3. The swap is one compute on the slot: the slot must still be the instance that was judged, not draining and
@@ -9593,7 +9588,6 @@ where
             &client_params,
             ssas_per_request,
             session_req.capabilities.0,
-            announced_resume_capable(session_req.additional_data),
         ) {
             debug!(
                 challenge = session_req.challenge,
@@ -9755,7 +9749,13 @@ where
             }
             instance.supersede();
             return self
-                .refuse_takeover(session_req, reply_routing, "held session changed under the takeover")
+                .refuse_takeover_with(
+                    session_req,
+                    reply_routing,
+                    PixAdmissionRejection::Busy,
+                    StartErrorReason::Busy,
+                    "held session changed under the takeover",
+                )
                 .await;
         }
 
@@ -9821,7 +9821,7 @@ where
         Ok(())
     }
 
-    /// Refuses a takeover: `NoSlotsAvailable` on the wire, as an occupied pseudonym always was, and
+    /// Refuses a takeover of an ineligible held Session: `NotResumable` on the wire and
     /// [`PixAdmissionRejection::TakeoverIneligible`] in the metrics.
     async fn refuse_takeover(
         &self,
@@ -9829,16 +9829,29 @@ where
         reply_routing: DestinationRouting,
         error_context: &'static str,
     ) -> errors::Result<()> {
-        #[cfg(feature = "telemetry")]
-        telemetry::pix::record_resumption(telemetry::pix::PixResumption::Refused);
-        self.refuse_session_start(
-            reply_routing,
+        self.refuse_takeover_with(
             session_req,
+            reply_routing,
             PixAdmissionRejection::TakeoverIneligible,
-            StartErrorReason::NoSlotsAvailable,
+            StartErrorReason::NotResumable,
             error_context,
         )
         .await
+    }
+
+    /// Refuses a takeover of a held Session with the given metric label and wire reason, counting it as a refusal.
+    async fn refuse_takeover_with(
+        &self,
+        session_req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        reply_routing: DestinationRouting,
+        rejection: PixAdmissionRejection,
+        reason: StartErrorReason,
+        error_context: &'static str,
+    ) -> errors::Result<()> {
+        #[cfg(feature = "telemetry")]
+        telemetry::pix::record_resumption(telemetry::pix::PixResumption::Refused);
+        self.refuse_session_start(reply_routing, session_req, rejection, reason, error_context)
+            .await
     }
 
     #[tracing::instrument(level = "debug", skip(self, session_req))]
@@ -9902,22 +9915,35 @@ where
             }
         };
 
-        // This Exit cannot resume a Session: the Entry has to continue under a fresh pseudonym.
-        if resume_requested {
-            debug!(
-                challenge = session_req.challenge,
-                "client asked to resume a Session this node cannot resume"
-            );
-            return self
-                .refuse_session_start(
-                    reply_routing,
-                    &session_req,
-                    PixAdmissionRejection::NotResumable,
-                    StartErrorReason::NotResumable,
-                    "session error due to a resume request",
-                )
-                .await;
-        }
+        // A resume request is only for a held PIX Session, with takeover enabled: anything else is refused
+        // before anything is reserved, and the Entry continues under a fresh pseudonym.
+        let held = if resume_requested {
+            let held = (session_req.capabilities.0.contains(Capability::UsePIX)
+                && !self.cfg.pix_config.resume_window.is_zero())
+            .then(|| self.sessions.get(&pseudonym))
+            .flatten()
+            .filter(|held| {
+                matches!(held.routing_opts, DestinationRouting::Return(_)) && held.pix_supervisor.get().is_some()
+            });
+            if held.is_none() {
+                debug!(
+                    challenge = session_req.challenge,
+                    "client asked to resume a Session this node does not hold or cannot resume"
+                );
+                return self
+                    .refuse_session_start(
+                        reply_routing,
+                        &session_req,
+                        PixAdmissionRejection::NotResumable,
+                        StartErrorReason::NotResumable,
+                        "session error due to a resume request without a resumable session",
+                    )
+                    .await;
+            }
+            held
+        } else {
+            None
+        };
 
         let session_id: SessionId = pseudonym;
         let admission = match self.request_admission(session_id, &session_req, offered).await {
@@ -9966,23 +9992,13 @@ where
 
         info!(params = %client_params, ssas_per_request, "client offered acceptable PIX parameters");
 
-        // A PIX request for a pseudonym that already holds a Session may be a client coming back for
-        // the Session it paid for. Decided before anything is reserved, so that nothing is reserved
-        // twice: a takeover keeps the slot's cycle budget, and a refusal reserves nothing. A request
-        // by the very challenge that established the held slot is a duplicate and falls through to the
-        // ordinary refusal below.
-        //
-        // Not with the window at zero, which switches takeover off entirely, of a live Session as of a
-        // detached one; and only against a held PIX Session, so that any other occupied pseudonym keeps
-        // its ordinary refusal.
-        if session_req.capabilities.0.contains(Capability::UsePIX)
-            && !self.cfg.pix_config.resume_window.is_zero()
-            && let Some(held) = self.sessions.get(&session_id).filter(|held| {
-                matches!(held.routing_opts, DestinationRouting::Return(_))
-                    && held.pix_supervisor.get().is_some()
-                    // Equal: a duplicate of the request that established it, refused as before.
-                    && held.instance.challenge != session_req.challenge
-            })
+        // A flagged request for a held PIX Session is a client coming back for the Session it paid for.
+        // Decided before anything is reserved, so that nothing is reserved twice: a takeover keeps the
+        // slot's cycle budget, and a refusal reserves nothing. A request by the very challenge that
+        // established the held slot is a duplicate and falls through to the ordinary refusal below.
+        // An unflagged request never takes over.
+        if let Some(held) = held
+            && held.instance.challenge != session_req.challenge
         {
             return self
                 .take_over_session(session_id, &session_req, client_params, ssas_per_request, held)
@@ -20122,10 +20138,11 @@ mod tests {
         Ok(())
     }
 
-    /// An Exit cannot resume: a request marked as a resume attempt (bit 33) is refused with `NotResumable` before the
+    /// A resume attempt (bit 33) for a pseudonym that holds nothing is refused with `NotResumable` before the
     /// session server is asked, and no slot is created.
     #[test_log::test(tokio::test)]
-    async fn an_exit_refuses_a_resume_request_without_asking_the_session_server() -> anyhow::Result<()> {
+    async fn an_exit_refuses_a_resume_request_with_nothing_held_without_asking_the_session_server() -> anyhow::Result<()>
+    {
         let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let (admission, handler) = spawn_admission_handler({
             let asked = asked.clone();
@@ -32661,7 +32678,7 @@ mod tests {
         Ok(())
     }
 
-    /// An Exit that cannot resume refuses with `NotResumable`: the Entry forgets the pseudonym's PIX state,
+    /// An Exit that refuses a resume with `NotResumable`: the Entry forgets the pseudonym's PIX state,
     /// parks no ledger, and the next connect under it starts over.
     #[test_log::test(tokio::test)]
     async fn a_not_resumable_refusal_forgets_the_pseudonym() -> anyhow::Result<()> {
@@ -32669,6 +32686,7 @@ mod tests {
         let pseudonym = HoprPseudonym::random();
         let _first = rig.hold_state(pseudonym).await?;
         assert_eq!(1, rig.deposits().await);
+        let held_challenge = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.challenge;
 
         rig.reply_with(StubReply::Refused(StartErrorReason::NotResumable));
         let err = rig.connect_pix(Some(pseudonym)).await.expect_err("refused");
@@ -32687,9 +32705,19 @@ mod tests {
         assert!(rig.parked_ledger(&pseudonym).is_none(), "no ledger is parked");
         assert!(rig.mgr.sessions.get(&pseudonym).is_none());
 
+        // The challenge of the refused attempt is kept, so that challenges keep increasing.
+        rig.mgr.last_challenges.run_pending_tasks();
+        let kept = rig
+            .mgr
+            .last_challenges
+            .get(&pseudonym)
+            .context("the last challenge is kept")?;
+        assert!(kept > held_challenge, "{kept} must be above {held_challenge}");
+
         // The next connect is a first one: not an attempt, and its opening batch commits SSA 1.
         rig.reply_with(StubReply::Established);
         let _next = rig.connect_pix(Some(pseudonym)).await?;
+        assert!(rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.challenge > kept);
         assert!(!rig.last_attempt()?);
         assert_eq!(None, rig.watermark(&pseudonym));
         rig.request(pseudonym, 1).await?;
@@ -32706,6 +32734,7 @@ mod tests {
         let pseudonym = HoprPseudonym::random();
         let _first = rig.hold_state(pseudonym).await?;
         assert_eq!(1, rig.deposits().await);
+        let held_challenge = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.challenge;
 
         let (connected, concurrent) = tokio::join!(rig.connect_pix(Some(pseudonym)), rig.request(pseudonym, 1));
         let err = connected.expect_err("a fresh Session cannot answer a resume attempt");
@@ -32730,6 +32759,15 @@ mod tests {
         assert!(rig.generator.emission_progress(&pseudonym).is_none(), "state forgotten");
         assert!(rig.parked_ledger(&pseudonym).is_none());
         assert_eq!(0, rig.deposits().await, "the opening request deposited nothing");
+        rig.mgr.last_challenges.run_pending_tasks();
+        assert!(
+            rig.mgr
+                .last_challenges
+                .get(&pseudonym)
+                .context("the last challenge is kept")?
+                > held_challenge,
+            "the challenge of the defensive refusal is kept"
+        );
         Ok(())
     }
 
@@ -33326,7 +33364,11 @@ mod tests {
         };
         let mut first = None;
 
-        paid.reconnect(MIN_CHALLENGE).await?;
+        // The establishment is a fresh Session: not flagged.
+        let establishment = paid.request_with(MIN_CHALLENGE, paid.params, paid.capabilities, false)?;
+        paid.mgr
+            .handle_incoming_session_initiation(paid.pseudonym, establishment)
+            .await?;
         first.replace(paid.next_session().await?);
 
         let slot = paid.slot()?;
@@ -33403,12 +33445,12 @@ mod tests {
                 .context("a PIX session has a fill control")
         }
 
-        /// The `StartSession` of an Entry reconnecting (or connecting) under this pseudonym.
+        /// The `StartSession` of an Entry reconnecting under this pseudonym: it asks to resume.
         fn request(
             &self,
             challenge: StartChallenge,
         ) -> anyhow::Result<StartInitiation<SessionTarget, HoprSessionCapabilities>> {
-            self.request_with(challenge, self.params, self.capabilities)
+            self.request_with(challenge, self.params, self.capabilities, true)
         }
 
         fn request_with(
@@ -33416,7 +33458,13 @@ mod tests {
             challenge: StartChallenge,
             params: PixParams,
             capabilities: Capabilities,
+            resume: bool,
         ) -> anyhow::Result<StartInitiation<SessionTarget, HoprSessionCapabilities>> {
+            let capabilities = if resume {
+                capabilities | Capability::Resume
+            } else {
+                capabilities
+            };
             let mut additional_data = into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO);
             if !self.resume_capable {
                 additional_data &= !INITIATION_RESUME_CAPABLE;
@@ -33431,6 +33479,16 @@ mod tests {
 
         async fn reconnect(&self, challenge: StartChallenge) -> errors::Result<()> {
             let request = self.request(challenge).expect("the request builds");
+            self.mgr
+                .handle_incoming_session_initiation(self.pseudonym, request)
+                .await
+        }
+
+        /// An Entry connecting afresh under this pseudonym: not flagged, so never a takeover.
+        async fn start_fresh(&self, challenge: StartChallenge) -> errors::Result<()> {
+            let request = self
+                .request_with(challenge, self.params, self.capabilities, false)
+                .expect("the request builds");
             self.mgr
                 .handle_incoming_session_initiation(self.pseudonym, request)
                 .await
@@ -34071,8 +34129,9 @@ mod tests {
         Ok(())
     }
 
-    /// Each reason a held slot may not be taken over: the request is refused as an occupied
-    /// pseudonym was (`NoSlotsAvailable`), the held slot is untouched.
+    /// Each reason a held slot may not be taken over: a duplicate of the establishing request is refused as an
+    /// occupied pseudonym is (`NoSlotsAvailable`), any other failed resume as `NotResumable`; the held slot is
+    /// untouched.
     #[rstest]
     #[case::the_same_challenge(Refuse::SameChallenge)]
     #[case::other_dimensions(Refuse::OtherParams)]
@@ -34109,10 +34168,14 @@ mod tests {
                 MIN_CHALLENGE + 1,
                 PixParams::try_new(50, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?,
                 exit.capabilities,
+                true,
             )?,
-            Refuse::OtherCapabilities => {
-                exit.request_with(MIN_CHALLENGE + 1, exit.params, exit.capabilities | Capability::NoDelay)?
-            }
+            Refuse::OtherCapabilities => exit.request_with(
+                MIN_CHALLENGE + 1,
+                exit.params,
+                exit.capabilities | Capability::NoDelay,
+                true,
+            )?,
             _ => exit.request(MIN_CHALLENGE + 1)?,
         };
         exit.mgr
@@ -34120,7 +34183,12 @@ mod tests {
             .await?;
 
         let seen = exit.originated(Duration::from_millis(300)).await;
-        assert_eq!(vec![StartErrorReason::NoSlotsAvailable], seen.errors, "{seen:?}");
+        let expected = if matches!(why, Refuse::SameChallenge) {
+            StartErrorReason::NoSlotsAvailable
+        } else {
+            StartErrorReason::NotResumable
+        };
+        assert_eq!(vec![expected], seen.errors, "{seen:?}");
         assert_eq!(0, seen.established);
         assert!(
             exit.incoming.try_recv().is_err(),
@@ -34161,20 +34229,20 @@ mod tests {
 
         assert_eq!(
             None,
-            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps, true)
+            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps)
         );
         assert!(
-            slot.takeover_refusal(MIN_CHALLENGE, &exit.params, batch, caps, true)
+            slot.takeover_refusal(MIN_CHALLENGE, &exit.params, batch, caps)
                 .is_some(),
             "the same challenge"
         );
         assert!(
-            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch + 1, caps, true)
+            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch + 1, caps)
                 .is_some(),
             "another batch size"
         );
         assert!(
-            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps | Capability::NoDelay, true)
+            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps | Capability::NoDelay)
                 .is_some(),
             "other capabilities"
         );
@@ -34185,7 +34253,7 @@ mod tests {
         };
         assert!(
             unestablished
-                .takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps, true)
+                .takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps)
                 .is_some(),
             "not established"
         );
@@ -34201,7 +34269,7 @@ mod tests {
         };
         assert!(
             outgoing
-                .takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps, true)
+                .takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps)
                 .is_some(),
             "an Entry slot"
         );
@@ -34232,8 +34300,12 @@ mod tests {
             "a takeover is answered by SessionResumed: {seen:?}"
         );
         assert!(!seen.resumed.is_empty(), "{seen:?}");
+        // A request that lost the race inside the takeover is `Busy`; one that arrived after a higher challenge
+        // had taken over is an older attempt and `NotResumable`.
         assert!(
-            seen.errors.iter().all(|e| *e == StartErrorReason::NoSlotsAvailable),
+            seen.errors
+                .iter()
+                .all(|e| matches!(e, StartErrorReason::Busy | StartErrorReason::NotResumable)),
             "{seen:?}"
         );
         assert_eq!(1, exit.mgr.num_active_sessions());
@@ -34411,7 +34483,7 @@ mod tests {
         assert!(exit.end_data_plane(&instance, ClosureReason::EmptyRead));
         assert!(wait_for_no_active_sessions(&exit.mgr).await);
 
-        exit.reconnect(MIN_CHALLENGE + 1).await?;
+        exit.start_fresh(MIN_CHALLENGE + 1).await?;
         let _fresh = exit.next_session().await?;
         let slot = exit.slot()?;
         assert!(!Arc::ptr_eq(&old_plane, &slot.pix_supervisor), "a fresh control plane");
@@ -34605,31 +34677,18 @@ mod tests {
         Ok(())
     }
 
-    /// An Entry that does not announce resume capability is refused as an occupied pseudonym always was,
-    /// and the held Session is untouched.
+    /// A request that does not ask to resume never takes over: with a Session held it is refused as an
+    /// occupied pseudonym is, and the held Session is untouched.
     #[test_log::test(tokio::test)]
-    async fn a_reinitiation_by_an_entry_that_is_not_resume_capable_is_refused() -> anyhow::Result<()> {
-        let (mut exit, _first) = paid_exit(PaidExitOptions {
-            resume_capable: false,
-            ..Default::default()
-        })
-        .await?;
+    async fn an_unflagged_request_never_takes_over() -> anyhow::Result<()> {
+        let (mut exit, _first) = paid_exit(PaidExitOptions::default()).await?;
         let before = exit.instance()?;
-        assert!(!before.is_resume_capable());
-        assert!(
-            exit.slot()?
-                .takeover_refusal(
-                    MIN_CHALLENGE + 1,
-                    &exit.params,
-                    1,
-                    exit.capabilities,
-                    announced_resume_capable(exit.request(MIN_CHALLENGE + 1)?.additional_data)
-                )
-                .is_some()
-        );
         let _ = exit.originated(Duration::from_millis(50)).await;
 
-        exit.reconnect(MIN_CHALLENGE + 1).await?;
+        let request = exit.request_with(MIN_CHALLENGE + 1, exit.params, exit.capabilities, false)?;
+        exit.mgr
+            .handle_incoming_session_initiation(exit.pseudonym, request)
+            .await?;
         let seen = exit.originated(Duration::from_millis(300)).await;
         assert_eq!(vec![StartErrorReason::NoSlotsAvailable], seen.errors, "{seen:?}");
         assert_eq!(0, seen.established + seen.resumed.len(), "{seen:?}");
@@ -34639,6 +34698,76 @@ mod tests {
         );
         assert!(Arc::ptr_eq(&exit.slot()?.instance, &before));
         assert!(!before.is_superseded());
+        Ok(())
+    }
+
+    /// A Session established by an unflagged request is taken over: the stored terms carry no `Resume` flag, as
+    /// the request's stripped capabilities do not.
+    #[test_log::test(tokio::test)]
+    async fn a_session_established_unflagged_can_be_taken_over() -> anyhow::Result<()> {
+        let (mut exit, _first) = paid_exit(PaidExitOptions::default()).await?;
+        let slot = exit.slot()?;
+        let terms = slot.exit_resume.terms.get().context("terms")?;
+        assert!(!terms.capabilities.contains(Capability::Resume));
+        drop(slot);
+        let _ = exit.originated(Duration::from_millis(50)).await;
+
+        exit.reconnect(MIN_CHALLENGE + 1).await?;
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        assert_eq!(1, seen.resumed.len(), "{seen:?}");
+        assert!(seen.errors.is_empty(), "{seen:?}");
+        assert_eq!(MIN_CHALLENGE + 1, exit.instance()?.challenge);
+        Ok(())
+    }
+
+    /// A flagged request with nothing held, or with takeover switched off, is refused before anything is
+    /// allocated or reserved.
+    #[rstest]
+    #[case::nothing_held(false)]
+    #[case::window_zero(true)]
+    #[test_log::test(tokio::test)]
+    async fn a_resume_request_that_cannot_resume_allocates_nothing(#[case] window_zero: bool) -> anyhow::Result<()> {
+        let (mut exit, _first) = paid_exit(PaidExitOptions {
+            resume_window: if window_zero {
+                Duration::ZERO
+            } else {
+                Duration::from_secs(60)
+            },
+            ..Default::default()
+        })
+        .await?;
+        let _ = exit.originated(Duration::from_millis(50)).await;
+        // With the window at zero the request targets the held pseudonym; otherwise one that holds nothing.
+        let other = HoprPseudonym::random();
+        let target = if window_zero { exit.pseudonym } else { other };
+        let cycle_bytes = exit.mgr.live_cycle_bytes.load(Ordering::Relaxed);
+        let held_before = exit.mgr.sessions.get(&exit.pseudonym).map(|s| s.instance.clone());
+
+        let request = exit.request(MIN_CHALLENGE + 1)?;
+        exit.mgr.handle_incoming_session_initiation(target, request).await?;
+
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
+        assert_eq!(0, seen.established + seen.resumed.len(), "{seen:?}");
+        assert!(
+            exit.incoming.try_recv().is_err(),
+            "nothing is handed to the session server"
+        );
+        assert!(
+            exit.mgr.sessions.get(&other).is_none(),
+            "no slot for the unheld pseudonym"
+        );
+        assert_eq!(1, exit.mgr.num_active_sessions());
+        assert_eq!(
+            cycle_bytes,
+            exit.mgr.live_cycle_bytes.load(Ordering::Relaxed),
+            "nothing reserved"
+        );
+        let held_after = exit.mgr.sessions.get(&exit.pseudonym).map(|s| s.instance.clone());
+        assert!(match (held_before, held_after) {
+            (Some(a), Some(b)) => Arc::ptr_eq(&a, &b),
+            _ => false,
+        });
         Ok(())
     }
 
@@ -34665,7 +34794,7 @@ mod tests {
 
         exit.reconnect(MIN_CHALLENGE + 1).await?;
         let seen = exit.originated(Duration::from_millis(300)).await;
-        assert_eq!(vec![StartErrorReason::NoSlotsAvailable], seen.errors, "{seen:?}");
+        assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
         assert!(Arc::ptr_eq(&exit.slot()?.instance, &before));
 
         // Its data plane ending closes it, as it always did.
@@ -34712,7 +34841,7 @@ mod tests {
             assert_eq!(1, seen.resumed.len(), "{seen:?}");
             assert_eq!(MAX_STREAM_BASE, seen.resumed[0].stream_base);
         } else {
-            assert_eq!(vec![StartErrorReason::NoSlotsAvailable], seen.errors, "{seen:?}");
+            assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
             assert_eq!(0, seen.resumed.len());
             assert!(
                 exit.incoming.try_recv().is_err(),
@@ -34912,15 +35041,15 @@ mod tests {
             "everything else holds"
         );
         assert!(
-            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, 1, exit.capabilities, true)
+            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, 1, exit.capabilities)
                 .is_some(),
             "ineligible for takeover"
         );
 
-        // Refused as an occupied pseudonym, and the slot is untouched.
+        // Refused as not resumable, and the slot is untouched.
         exit.reconnect(MIN_CHALLENGE + 1).await?;
         let seen = exit.originated(Duration::from_millis(300)).await;
-        assert_eq!(vec![StartErrorReason::NoSlotsAvailable], seen.errors, "{seen:?}");
+        assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
         assert_eq!(0, seen.established);
         assert!(Arc::ptr_eq(&exit.slot()?.instance, &slot.instance));
 
@@ -34951,7 +35080,7 @@ mod tests {
         // The older attempt's StartSession arrives now.
         exit.reconnect(MIN_CHALLENGE + 2).await?;
         let seen = exit.originated(Duration::from_millis(300)).await;
-        assert_eq!(vec![StartErrorReason::NoSlotsAvailable], seen.errors, "{seen:?}");
+        assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
         assert_eq!(0, seen.established);
         assert!(
             Arc::ptr_eq(&exit.slot()?.instance, &current),
@@ -34971,7 +35100,7 @@ mod tests {
     }
 
     /// A higher challenge takes a live or a detached slot over; an equal one is a duplicate and is
-    /// refused as it always was; a lower one is an older attempt and is refused.
+    /// refused as it always was; a lower one is an older attempt, `NotResumable`.
     #[rstest]
     #[case::live(false)]
     #[case::detached(true)]
@@ -34989,7 +35118,11 @@ mod tests {
         // Lower than the holder's (a challenge of 0 is below any a Session was established by).
         exit.reconnect(original.challenge.saturating_sub(1)).await?;
         let seen = exit.originated(Duration::from_millis(300)).await;
-        assert_eq!(vec![StartErrorReason::NoSlotsAvailable; 2], seen.errors, "{seen:?}");
+        assert_eq!(
+            vec![StartErrorReason::NoSlotsAvailable, StartErrorReason::NotResumable],
+            seen.errors,
+            "{seen:?}"
+        );
         assert!(Arc::ptr_eq(&exit.slot()?.instance, &original));
 
         // Higher: taken over.
@@ -35001,7 +35134,7 @@ mod tests {
     }
 
     /// With the window at zero there is no takeover at all, of a live Session or of one flagged as
-    /// detached, and the refusal is the ordinary one.
+    /// detached: every resume request is `NotResumable`.
     #[rstest]
     #[case::live(false)]
     #[case::detached(true)]
@@ -35021,14 +35154,14 @@ mod tests {
         }
         exit.reconnect(MIN_CHALLENGE + 1).await?;
         let seen = exit.originated(Duration::from_millis(300)).await;
-        assert_eq!(vec![StartErrorReason::NoSlotsAvailable], seen.errors, "{seen:?}");
+        assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
         assert_eq!(0, seen.established);
         assert!(Arc::ptr_eq(&exit.slot()?.instance, &original));
 
-        // The duplicate keeps its refusal as well.
+        // So is a duplicate: the window check comes first.
         exit.reconnect(MIN_CHALLENGE).await?;
         assert_eq!(
-            vec![StartErrorReason::NoSlotsAvailable],
+            vec![StartErrorReason::NotResumable],
             exit.originated(Duration::from_millis(300)).await.errors
         );
         Ok(())
@@ -35204,7 +35337,7 @@ mod tests {
         );
         assert!(wait_for_no_active_sessions(&exit.mgr).await);
 
-        exit.reconnect(MIN_CHALLENGE + 1).await?;
+        exit.start_fresh(MIN_CHALLENGE + 1).await?;
         let _fresh = exit.next_session().await?;
         assert!(
             !Arc::ptr_eq(&old_plane, &exit.slot()?.pix_supervisor),
