@@ -341,8 +341,20 @@ async fn establish_pix_session_under(
     hops: usize,
     pseudonym: Option<hopr_lib::api::types::internal::protocol::HoprPseudonym>,
 ) -> anyhow::Result<hopr_lib::HoprSession> {
+    try_establish_pix_session_under(cluster, hops, pseudonym)
+        .await?
+        .context("session connection failed")
+}
+
+/// [`establish_pix_session_under`], keeping the library's own error (the outer error is a timeout).
+#[cfg(feature = "session-client")]
+async fn try_establish_pix_session_under(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+    hops: usize,
+    pseudonym: Option<hopr_lib::api::types::internal::protocol::HoprPseudonym>,
+) -> anyhow::Result<Result<hopr_lib::HoprSession, hopr_lib::errors::HoprLibError>> {
     let routing = hops.try_into()?;
-    let (session, _) = tokio::time::timeout(
+    let connected = tokio::time::timeout(
         Duration::from_secs(120),
         cluster.entry.inner().connect_to(
             cluster.exit.address(),
@@ -362,8 +374,8 @@ async fn establish_pix_session_under(
         ),
     )
     .await
-    .context("session connection timed out after 120s")??;
-    Ok(session)
+    .context("session connection timed out after 120s")?;
+    Ok(connected.map(|(session, _)| session))
 }
 
 /// The Exit-side PIX configuration the fill tests share.
@@ -2228,26 +2240,30 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
 }
 
 /// A client reconnecting under the pseudonym it used before, after the Exit has idle-evicted the old
-/// Session, starts over at SSA 1 and is served.
+/// Session, is refused as not resumable, without retries; a fresh pseudonym is served.
 ///
-/// The Entry keeps its PIX accounting for the pseudonym (the commitments made and the packets served
-/// against them), and the share generator its state, for half an hour. A fresh Exit opens with SSA 1,
-/// which the generator refuses to commit again: before the Entry reset on an opening request, the
-/// reconnect failed and the Session timed out on its commitment.
+/// The Entry still holds PIX state for the pseudonym and so asks to resume. An Exit that lost the
+/// Session cannot, and answers `NotResumable`, which `connect_to` does not retry.
 ///
 /// ## Steps
 /// 1. A Session is opened and its first deposit, `(p, 1)`, is signalled on the Exit.
 /// 2. The Session is dropped, and the Exit left to evict it on its short `idle_timeout`.
-/// 3. A Session is opened under `p`. The Exit signals a fresh `(p, 1)` and the Session echoes.
+/// 3. A Session is opened under `p`: it fails with `Rejected(NotResumable)` well within the connect retry delay.
+/// 4. A Session under a fresh pseudonym `p'` is funded at `(p', 1)` and echoes.
 #[cfg(feature = "session-client")]
 #[rstest]
 #[case(1)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session_starts_over(
+async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session_is_refused_as_not_resumable(
     #[case] hops: usize,
 ) -> anyhow::Result<()> {
+    use hopr_lib::{
+        errors::{HoprLibError, HoprTransportError},
+        exports::transport::{StartErrorReason, TransportSessionError},
+    };
+
     // Short, so that the Exit evicts the first Session within the test. Applies to both ends.
     const IDLE_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -2255,47 +2271,58 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session
     let cluster = build_pix_cluster(hops, exit_pix, IDLE_TIMEOUT).await?;
     let (_driver, mut milestones) = spawn_exit_pix_driver(&cluster);
 
+    let funded = |seen: &[(PixMilestone, _)], pseudonym| {
+        seen.iter().any(
+            |(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1),
+        )
+    };
+
     let first = establish_pix_session_under(&cluster, hops, None).await?;
     let pseudonym = *first.id();
-    let seen = await_milestones(&mut milestones, Duration::from_secs(60), |seen| {
-        seen.iter()
-            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1))
-    })
-    .await;
+    let seen = await_milestones(&mut milestones, Duration::from_secs(60), |seen| funded(seen, pseudonym)).await;
     anyhow::ensure!(
-        seen.iter()
-            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1)),
+        funded(&seen, pseudonym),
         "the first Session's deposit was never signalled: {seen:?}"
     );
 
     drop(first);
     tracing::info!(%pseudonym, "first Session dropped; waiting for the Exit to evict it");
     tokio::time::sleep(IDLE_TIMEOUT * 2).await;
-    // Whatever the first Session's wind-down reported, only what follows the reconnect counts.
     while milestones.try_recv().is_ok() {}
 
-    let mut second = establish_pix_session_under(&cluster, hops, Some(pseudonym)).await?;
-    assert_eq!(
-        pseudonym,
-        *second.id(),
-        "the reconnect must be under the same pseudonym"
+    // Any retry adds at least the 2 s `establish_retry_timeout` default this cluster uses.
+    let started = std::time::Instant::now();
+    let refused = try_establish_pix_session_under(&cluster, hops, Some(pseudonym)).await?;
+    let elapsed = started.elapsed();
+    match refused {
+        Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Rejected(
+            StartErrorReason::NotResumable,
+        )))) => {}
+        Err(other) => anyhow::bail!("expected Rejected(NotResumable), got {other:?}"),
+        Ok(_session) => anyhow::bail!("the reconnect under {pseudonym} must be refused"),
+    }
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "a permanent rejection must not be retried, but took {elapsed:?}"
     );
+
+    let mut fresh = establish_pix_session_under(&cluster, hops, None).await?;
+    let fresh_pseudonym = *fresh.id();
+    anyhow::ensure!(fresh_pseudonym != pseudonym, "the new Session needs a fresh pseudonym");
     let seen = await_milestones(&mut milestones, Duration::from_secs(60), |seen| {
-        seen.iter()
-            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1))
+        funded(seen, fresh_pseudonym)
     })
     .await;
     anyhow::ensure!(
-        seen.iter()
-            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1)),
-        "the reconnected Session got no fresh (p, 1) deposit: {seen:?}"
+        funded(&seen, fresh_pseudonym),
+        "the fresh Session got no (p', 1) deposit: {seen:?}"
     );
 
     const ECHOES: usize = 3;
-    let completed = echo_n(&mut second, ECHOES, Duration::from_millis(200)).await;
+    let completed = echo_n(&mut fresh, ECHOES, Duration::from_millis(200)).await;
     assert_eq!(
         ECHOES, completed,
-        "the reconnected Session must carry traffic, but only {completed} of {ECHOES} echo round trips finished"
+        "the fresh Session must carry traffic, but only {completed} of {ECHOES} echo round trips finished"
     );
     Ok(())
 }
