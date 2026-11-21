@@ -1710,6 +1710,8 @@ pub(crate) struct SlotInstance {
     ledger_home: OnceLock<LedgerHome>,
     /// Set by the first [`park_ledger`](Self::park_ledger): what the slot parks leaves it once.
     parked: std::sync::atomic::AtomicBool,
+    /// The reason the Exit gave for closing this Session while the Entry was still setting it up.
+    refusal: OnceLock<StartErrorReason>,
 }
 
 impl SlotInstance {
@@ -1724,7 +1726,18 @@ impl SlotInstance {
             last_refresh_ms: std::sync::atomic::AtomicU64::new(0),
             ledger_home: OnceLock::new(),
             parked: std::sync::atomic::AtomicBool::new(false),
+            refusal: OnceLock::new(),
         })
+    }
+
+    /// Records the Exit's reason for closing this Session, so a setup still in progress fails with it.
+    fn refuse(&self, reason: StartErrorReason) {
+        let _ = self.refusal.set(reason);
+    }
+
+    /// The Exit's reason for closing this Session during setup, if it did.
+    fn refusal(&self) -> Option<StartErrorReason> {
+        self.refusal.get().copied()
     }
 
     /// Counts an Entry data write as activity: reads the slot (which resets its `time_to_idle`), at
@@ -5701,11 +5714,12 @@ where
         }
     }
 
-    /// The established outgoing Session under `pseudonym` that the initiation `challenge` opened, if any.
+    /// The outgoing Session under `pseudonym` that the initiation `challenge` opened, if any, whether or
+    /// not its setup has finished.
     ///
-    /// What scopes a challenge-named post-establishment error: the pseudonym is reusable, so the challenge
+    /// What scopes a challenge-named error after the reply: the pseudonym is reusable, so the challenge
     /// is what tells the Session the error is about from its predecessors and successors.
-    fn established_forward_instance(
+    fn forward_instance_of_challenge(
         &self,
         pseudonym: &HoprPseudonym,
         challenge: StartChallenge,
@@ -5713,9 +5727,7 @@ where
         self.sessions
             .get(pseudonym)
             .filter(|slot| {
-                matches!(slot.routing_opts, DestinationRouting::Forward { .. })
-                    && slot.instance.challenge == challenge
-                    && slot.instance.is_established()
+                matches!(slot.routing_opts, DestinationRouting::Forward { .. }) && slot.instance.challenge == challenge
             })
             .map(|slot| slot.instance.clone())
     }
@@ -6030,6 +6042,15 @@ where
                     "started a new session"
                 );
 
+                // A Resumed reply names the Session the Entry asked about, nothing else.
+                if stream_base.is_some() && session_id != pseudonym {
+                    error!(%session_id, %pseudonym, "the Exit resumed a Session under another pseudonym");
+                    return Err(SessionManagerError::Unacceptable(
+                        "the Exit resumed a Session under a pseudonym this Entry did not ask about".into(),
+                    )
+                    .into());
+                }
+
                 // A base the Exit and this Entry cannot number a stream from fails the establishment;
                 // the ledger claim parks the ledger again on the way out.
                 if let Some(base) = stream_base {
@@ -6038,6 +6059,16 @@ where
                         return Err(SessionManagerError::Unacceptable(format!(
                             "the Exit resumed the Session with stream base {base}, outside of 1..={MAX_STREAM_BASE}"
                         ))
+                        .into());
+                    }
+                    // A raw Session has no frames to number.
+                    if !cfg.capabilities.contains(Capability::Segmentation) {
+                        error!(%session_id, base, "the Exit resumed a Session without segmentation");
+                        return Err(SessionManagerError::Unacceptable(
+                            "the Exit resumed a Session whose capabilities lack segmentation, which has no frame \
+                             numbering"
+                                .into(),
+                        )
                         .into());
                     }
                     // Only the stateless socket numbers its stream from a base.
@@ -6063,19 +6094,26 @@ where
                     .into());
                 }
 
-                // A fresh Session answering a resume attempt: the Exit lost the Session. Nothing is allocated; the
-                // state is forgotten first so the notice's SURBs carry no shares, and the Exit is told to close it.
-                if stream_base.is_none()
-                    && resuming
+                // A fresh Session answering a resume attempt, or a resumed one this Entry cannot continue (it needs
+                // both the ledger's watermark and the generator's emission progress): the Exit lost the Session, or
+                // this Entry lost half of its state. Nothing is allocated; the state is forgotten first so the
+                // notice's SURBs carry no shares, and the Exit is told to close it.
+                let both_halves = ledger_claim.as_ref().is_some_and(|claim| claim.ledger.has_watermark())
+                    && self
+                        .pix_toolbox
+                        .get()
+                        .is_some_and(|toolbox| toolbox.share_generator.emission_progress(&pseudonym).is_some());
+                if resuming
+                    && (stream_base.is_none() || !both_halves)
                     && let Some(claim) = ledger_claim.as_mut()
                 {
-                    warn!(%session_id, "the Exit started a fresh Session in answer to a resume attempt");
+                    warn!(%session_id, resumed = stream_base.is_some(), "the Exit's reply to a resume attempt cannot be honoured");
                     self.forget_pix_state(pseudonym, claim).await;
                     self.notify_session_error(
                         session_id,
                         forward_routing.clone(),
                         StartErrorReason::NotResumable,
-                        "fresh session answering a resume attempt",
+                        "reply to a resume attempt that cannot be honoured",
                     )
                     .await;
                     return Err(TransportSessionError::Rejected(StartErrorReason::NotResumable));
@@ -6287,6 +6325,9 @@ where
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
                         .await;
                     drop(slot_keepalive);
+                    if let Some(reason) = instance.refusal() {
+                        return Err(TransportSessionError::Rejected(reason));
+                    }
                     match wait_result {
                         Ok(Some(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
@@ -6353,6 +6394,9 @@ where
                     // the Session exists on our terms. `maximum_surb_buffer_size` is what this Entry
                     // announced as its target, so the store sizes the ring off the buffer we
                     // actually intend to fill.
+                    if let Some(reason) = instance.refusal() {
+                        return Err(TransportSessionError::Rejected(reason));
+                    }
                     commit_slot_guard(
                         &mut slot_guard,
                         &self.sessions,
@@ -6466,6 +6510,9 @@ where
                     // Same admission point as the balanced branch above, with the same announced
                     // target: a Session without SURB balancing still holds a return path worth
                     // protecting.
+                    if let Some(reason) = instance.refusal() {
+                        return Err(TransportSessionError::Rejected(reason));
+                    }
                     commit_slot_guard(
                         &mut slot_guard,
                         &self.sessions,
@@ -7969,11 +8016,11 @@ where
             HoprStartProtocol::SessionEstablished(est) => self.session_initiations.contains_key(&est.orig_challenge),
             HoprStartProtocol::SessionResumed(res) => self.session_initiations.contains_key(&res.orig_challenge),
             HoprStartProtocol::SessionError(err) => match err.identifier {
-                // A pending initiation, or an established Session of this node under the sender's
-                // pseudonym that this very challenge opened (a challenge-scoped post-establishment error).
+                // A pending initiation, or a Session of this node under the sender's pseudonym that this
+                // very challenge opened, set up or not (a challenge-scoped post-reply error).
                 ErrorIdentifier::Challenge(challenge) => {
                     self.session_initiations.contains_key(&challenge)
-                        || self.established_forward_instance(pseudonym, challenge).is_some()
+                        || self.forward_instance_of_challenge(pseudonym, challenge).is_some()
                 }
                 ErrorIdentifier::SessionId(id) => id == *pseudonym && self.sessions.contains_key(&id),
             },
@@ -9250,14 +9297,16 @@ where
                         return Err(SessionManagerError::other(error).into());
                     }
                     error!(%challenge, "session establishment error received");
-                } else if let Some(instance) = self.established_forward_instance(&pseudonym, challenge) {
-                    // A post-establishment error an Exit sends to a resume-capable Entry, scoped to the
+                } else if let Some(instance) = self.forward_instance_of_challenge(&pseudonym, challenge) {
+                    // An error an Exit sends to a resume-capable Entry after its reply, scoped to the
                     // Session instance this challenge opened: the pseudonym is reusable, so an error
-                    // that names a challenge of an earlier Session of it must not close this one.
+                    // that names a challenge of an earlier Session of it must not close this one. A
+                    // setup still in progress fails with the reason.
                     error!(
                         %pseudonym, %challenge, %reason,
                         "received post-establishment session error naming the challenge of this Session — closing it"
                     );
+                    instance.refuse(reason);
                     self.close_session_scoped(&pseudonym, ClosureReason::Eviction, CloseScope::Instance(&instance));
                 } else {
                     debug!(
@@ -9624,7 +9673,12 @@ where
     /// here with `pseudonym == session_id`, and relayers never see that pseudonym — a relayer can garble
     /// a packet in transit but not forge one for this Session — so only the Exit can produce one, and
     /// the Exit can already close the Session whenever it likes.
-    async fn refuse_ssa_request(&self, session_id: SessionId, routing: DestinationRouting) {
+    async fn refuse_ssa_request(
+        &self,
+        session_id: SessionId,
+        routing: DestinationRouting,
+        instance: &Arc<SlotInstance>,
+    ) {
         self.notify_session_error(
             session_id,
             routing,
@@ -9633,7 +9687,9 @@ where
         )
         .await;
 
-        if self.close_session(&session_id) {
+        // Only the Session the request was for: a successor installed under the pseudonym while the
+        // notice was in flight is not ours to close.
+        if self.close_session_scoped(&session_id, ClosureReason::Eviction, CloseScope::Instance(instance)) {
             error!(%session_id, "closed session after refusing the Exit's SSA request");
         }
     }
@@ -9906,8 +9962,12 @@ where
                 "Exit requested {} SSA commitments in a single request, at most {max_ssas_per_request} allowed",
                 msg.commitments.len()
             ));
-            self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
-                .await;
+            self.refuse_ssa_request(
+                msg.session_id,
+                session_slot.routing_opts.clone(),
+                &session_slot.instance,
+            )
+            .await;
             return Err(error.into());
         }
 
@@ -9940,8 +10000,12 @@ where
         let server_params = match msg.dimensions() {
             Ok(params) => params,
             Err(error) => {
-                self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
-                    .await;
+                self.refuse_ssa_request(
+                    msg.session_id,
+                    session_slot.routing_opts.clone(),
+                    &session_slot.instance,
+                )
+                .await;
                 return Err(
                     SessionManagerError::Unacceptable(format!("Exit sent malformed PIX parameters: {error}")).into(),
                 );
@@ -9951,8 +10015,12 @@ where
             let error = SessionManagerError::Unacceptable(format!(
                 "Exit sent unacceptable PIX parameters {server_params} (ours are {our_params})"
             ));
-            self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
-                .await;
+            self.refuse_ssa_request(
+                msg.session_id,
+                session_slot.routing_opts.clone(),
+                &session_slot.instance,
+            )
+            .await;
             return Err(error.into());
         }
         // A request naming missing commitment parts asks for nothing new — see
@@ -10038,8 +10106,12 @@ where
                  generator still holds state for {pseudonym}; the successor cannot be measured"
             ));
             warn!(session_id = %msg.session_id, %error, "refused a successor SSA request the Entry cannot judge");
-            self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
-                .await;
+            self.refuse_ssa_request(
+                msg.session_id,
+                session_slot.routing_opts.clone(),
+                &session_slot.instance,
+            )
+            .await;
             return Err(error.into());
         }
         if let Some(first) = first_asked
@@ -10190,8 +10262,12 @@ where
                         .and_then(SessionSsaState::committed_watermark)
                 ));
                 warn!(session_id = %msg.session_id, %error, "refused an SSA request against lost generator state");
-                self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
-                    .await;
+                self.refuse_ssa_request(
+                    msg.session_id,
+                    session_slot.routing_opts.clone(),
+                    &session_slot.instance,
+                )
+                .await;
                 return Err(error.into());
             }
             _ => {}
@@ -10345,7 +10421,7 @@ where
                     let error = SessionManagerError::Unacceptable(format!(
                         "Exit sent an undecodable SSA commitment for index {ssa_index}: {error}"
                     ));
-                    self.refuse_ssa_request(session_id, session_slot.routing_opts.clone())
+                    self.refuse_ssa_request(session_id, session_slot.routing_opts.clone(), &session_slot.instance)
                         .await;
                     return Err(error.into());
                 }
@@ -10443,7 +10519,7 @@ where
                     %session_id, %error,
                     "staging an admitted SSA batch failed after part of it was generated; it can never be committed"
                 );
-                self.refuse_ssa_request(session_id, session_slot.routing_opts.clone())
+                self.refuse_ssa_request(session_id, session_slot.routing_opts.clone(), &session_slot.instance)
                     .await;
             }
             return Err(error);
@@ -18794,7 +18870,10 @@ mod tests {
         let pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(pseudonym, offer).await?;
 
-        let err = err_rx.await.context("send_message was never called")?;
+        let err = timeout(Duration::from_secs(5), err_rx)
+            .await
+            .context("the refusal was not sent in time")?
+            .context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::NotResumable);
         assert_eq!(0, asked.load(Ordering::Relaxed), "the session server must not be asked");
         assert_eq!(0, mgr.num_active_sessions());
@@ -30451,6 +30530,8 @@ mod tests {
         Resumed(u32),
         /// A `SessionError` with the given reason, naming the initiation's challenge.
         Refused(StartErrorReason),
+        /// `SessionResumed` with the given stream base, naming a Session other than the requested one.
+        ResumedOther(u32),
     }
 
     /// An Entry whose generator and ledger are the manager's own, and whose Exit is a stub that
@@ -30468,6 +30549,8 @@ mod tests {
         capabilities: Arc<parking_lot::Mutex<Vec<Capabilities>>>,
         /// The `SessionError`s the Entry sent.
         session_errors: Arc<parking_lot::Mutex<Vec<StartErrorType<SessionId>>>>,
+        /// The frame ID of every Session segment the Entry sent.
+        session_frames: Arc<parking_lot::Mutex<Vec<u32>>>,
         _stub_exit: AbortOnDrop,
     }
 
@@ -30503,6 +30586,7 @@ mod tests {
         let initiations = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let capabilities = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let session_errors = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let session_frames = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let stub_exit = hopr_utils::runtime::prelude::spawn({
             let mgr = mgr.clone();
             let wire = wire.clone();
@@ -30510,10 +30594,19 @@ mod tests {
             let initiations = initiations.clone();
             let capabilities = capabilities.clone();
             let session_errors = session_errors.clone();
+            let session_frames = session_frames.clone();
             async move {
                 while let Some((routing, data)) = msg_rx.next().await {
                     let Ok(message) = HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
                     else {
+                        if let Some(segment) = hopr_protocol_session::types::SessionMessage::<
+                            { ApplicationData::PAYLOAD_SIZE },
+                        >::try_from(data.data.plain_text.as_ref())
+                        .ok()
+                        .and_then(|message| message.try_as_segment())
+                        {
+                            session_frames.lock().push(segment.frame_id);
+                        }
                         continue;
                     };
                     wire.sent.lock().push(StartProtocolDiscriminants::from(&message));
@@ -30533,6 +30626,11 @@ mod tests {
                             StubReply::Resumed(stream_base) => HoprStartProtocol::SessionResumed(StartResumed {
                                 orig_challenge: init.challenge,
                                 session_id: p,
+                                stream_base,
+                            }),
+                            StubReply::ResumedOther(stream_base) => HoprStartProtocol::SessionResumed(StartResumed {
+                                orig_challenge: init.challenge,
+                                session_id: HoprPseudonym::random(),
                                 stream_base,
                             }),
                             StubReply::Refused(reason) => HoprStartProtocol::SessionError(StartErrorType {
@@ -30557,6 +30655,7 @@ mod tests {
             initiations,
             capabilities,
             session_errors,
+            session_frames,
             _stub_exit: stub_exit.into(),
         })
     }
@@ -30602,7 +30701,8 @@ mod tests {
         }
 
         async fn connect_pix(&self, pseudonym: Option<HoprPseudonym>) -> anyhow::Result<HoprSession> {
-            self.connect(entry_cfg(Capability::UsePIX.into(), pseudonym)).await
+            self.connect(entry_cfg(Capability::UsePIX | Capability::Segmentation, pseudonym))
+                .await
         }
 
         /// The Exit asking for the SSA batch starting at `index`.
@@ -30736,8 +30836,24 @@ mod tests {
         let ledger = ledger.context("an Entry slot carries its ledger")?;
 
         rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
-        let second = rig.connect_pix(Some(pseudonym)).await?;
+        // Segmented and stateless, the one socket that numbers its frames from a base.
+        let mut second = rig.connect_pix(Some(pseudonym)).await?;
         assert_eq!(Some(TEST_STREAM_BASE), second.config().stream_base);
+        rig.session_frames.lock().clear();
+        second.write_all(b"first frame").await?;
+        second.flush().await?;
+        timeout(Duration::from_secs(5), async {
+            while rig.session_frames.lock().is_empty() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the first frame was not sent")?;
+        assert_eq!(
+            Some(TEST_STREAM_BASE),
+            rig.session_frames.lock().first().copied(),
+            "the first emitted frame carries the base"
+        );
         assert_eq!(Some(SsaIndex::MIN), rig.watermark(&pseudonym), "the ledger is kept");
         assert!(
             rig.generator.emission_progress(&pseudonym).is_some(),
@@ -30839,25 +30955,30 @@ mod tests {
         rig.mgr.pix_ledgers.invalidate(&pseudonym);
         rig.mgr.pix_ledgers.run_pending_tasks();
 
-        rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
-        let _second = rig.connect_pix(Some(pseudonym)).await?;
-        assert_eq!(None, rig.watermark(&pseudonym), "the fresh ledger has no watermark");
         assert!(
             rig.generator.emission_progress(&pseudonym).is_some(),
             "the generator remembers"
         );
+        rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
         let err = rig
-            .request(pseudonym, 2)
+            .connect(entry_cfg(
+                Capability::UsePIX | Capability::Segmentation,
+                Some(pseudonym),
+            ))
             .await
-            .expect_err("a successor the ledger cannot measure must be refused");
+            .expect_err("a successor the ledger cannot measure must be refused at connect time");
         assert!(
             matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+                err.downcast_ref::<TransportSessionError>(),
+                Some(TransportSessionError::Rejected(StartErrorReason::NotResumable))
             ),
-            "expected a terminal refusal, got {err:?}"
+            "expected NotResumable, got {err:?}"
         );
-        assert!(wait_for_no_active_sessions(&rig.mgr).await, "the Session is closed");
+        assert!(rig.mgr.active_sessions().is_empty(), "no slot is created");
+        assert!(
+            rig.generator.emission_progress(&pseudonym).is_none(),
+            "the PIX state is forgotten"
+        );
         assert_eq!(0, rig.deposits().await);
         Ok(())
     }
@@ -31052,6 +31173,11 @@ mod tests {
                 Capabilities::from(Capability::Segmentation),
             ),
             (
+                "a raw Session",
+                StubReply::Resumed(TEST_STREAM_BASE),
+                Capabilities::empty(),
+            ),
+            (
                 "a stateful socket",
                 StubReply::Resumed(TEST_STREAM_BASE),
                 Capabilities::from(Capability::RetransmissionAck),
@@ -31117,11 +31243,11 @@ mod tests {
         let _first = rig.connect_pix(Some(pseudonym)).await?;
         assert!(!rig.last_capabilities()?.contains(Capability::Resume), "first connect");
 
-        // A ledger watermark alone.
+        // A ledger watermark alone: offered, though the Entry cannot continue on half its state.
         rig.request(pseudonym, 1).await?;
         rig.generator.forget(&pseudonym);
         rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
-        let _second = rig.connect_pix(Some(pseudonym)).await?;
+        assert!(rig.connect_pix(Some(pseudonym)).await.is_err());
         assert!(
             rig.last_capabilities()?.contains(Capability::Resume),
             "ledger watermark"
@@ -31143,7 +31269,7 @@ mod tests {
         rig.mgr.pix_ledgers.insert(generator_only, fresh);
         assert!(rig.generator.emission_progress(&generator_only).is_some());
         rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
-        let _resumed = rig.connect_pix(Some(generator_only)).await?;
+        assert!(rig.connect_pix(Some(generator_only)).await.is_err());
         assert!(
             rig.last_capabilities()?.contains(Capability::Resume),
             "generator-only state"
@@ -31417,6 +31543,173 @@ mod tests {
             "the matching instance is closed"
         );
         assert!(second.is_superseded());
+        Ok(())
+    }
+
+    /// An Entry that balances SURBs, so that its setup outlasts the Exit's reply.
+    fn balanced_entry_cfg(pseudonym: HoprPseudonym) -> SessionClientConfig {
+        SessionClientConfig {
+            surb_management: Some(SurbBalancerConfig {
+                target_surb_buffer_size: 100,
+                max_surbs_per_sec: 100,
+                ..Default::default()
+            }),
+            ..entry_cfg(Capability::Segmentation.into(), Some(pseudonym))
+        }
+    }
+
+    /// The Session slot of `pseudonym` once it exists and its setup has not finished.
+    async fn slot_instance_in_setup(
+        mgr: &RecordingManager,
+        pseudonym: &HoprPseudonym,
+    ) -> anyhow::Result<Arc<SlotInstance>> {
+        timeout(Duration::from_secs(5), async {
+            loop {
+                if let Some(slot) = mgr.sessions.get(pseudonym)
+                    && !slot.instance.is_established()
+                {
+                    break slot.instance.clone();
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .context("the slot never appeared")
+    }
+
+    /// An error naming the challenge of a Session that is still being set up closes it and fails
+    /// `new_session` with the Exit's reason, instead of returning a socket for a closed Session.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_error_during_setup_fails_new_session_with_the_exits_reason() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+
+        let injector = async {
+            let instance = slot_instance_in_setup(&rig.mgr, &pseudonym).await?;
+            let dispatched = rig.mgr.dispatch_message(
+                pseudonym,
+                start_packet(HoprStartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(instance.challenge),
+                    reason: StartErrorReason::NotResumable,
+                }))?,
+            );
+            assert!(
+                matches!(dispatched, Ok(DispatchResult::Processed)),
+                "got {dispatched:?}"
+            );
+            Ok::<_, anyhow::Error>(instance)
+        };
+        let (connected, injected) = tokio::join!(rig.connect(balanced_entry_cfg(pseudonym)), injector);
+        let instance = injected?;
+        let err = connected.expect_err("the Exit closed the Session during its setup");
+        assert!(
+            matches!(
+                err.downcast_ref::<TransportSessionError>(),
+                Some(TransportSessionError::Rejected(StartErrorReason::NotResumable))
+            ),
+            "got {err:?}"
+        );
+        assert!(instance.is_superseded());
+        assert!(rig.mgr.sessions.get(&pseudonym).is_none(), "no slot is left");
+        assert!(wait_for_no_active_sessions(&rig.mgr).await);
+        Ok(())
+    }
+
+    /// An error naming a predecessor's challenge neither closes a Session being set up nor fails its setup.
+    #[test_log::test(tokio::test)]
+    async fn a_predecessors_error_during_setup_changes_nothing() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.connect(entry_cfg(Capabilities::empty(), Some(pseudonym))).await?;
+        let predecessor_challenge = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.challenge;
+
+        let injector = async {
+            let instance = slot_instance_in_setup(&rig.mgr, &pseudonym).await?;
+            assert_ne!(predecessor_challenge, instance.challenge);
+            rig.mgr
+                .handle_session_error(
+                    pseudonym,
+                    StartErrorType {
+                        identifier: ErrorIdentifier::Challenge(predecessor_challenge),
+                        reason: StartErrorReason::NotResumable,
+                    },
+                )
+                .await?;
+            assert!(instance.refusal().is_none());
+            assert!(!instance.is_superseded());
+            assert!(
+                rig.mgr
+                    .sessions
+                    .get(&pseudonym)
+                    .is_some_and(|slot| Arc::ptr_eq(&slot.instance, &instance))
+            );
+            Ok::<_, anyhow::Error>(())
+        };
+        let (connected, injected) = tokio::join!(
+            timeout(
+                Duration::from_secs(15),
+                rig.mgr.new_session(
+                    (&ChainKeypair::random()).into(),
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    balanced_entry_cfg(pseudonym),
+                )
+            ),
+            injector
+        );
+        injected?;
+        let _second = connected.context("the setup timed out")??;
+        Ok(())
+    }
+
+    /// Refusing an SSA request closes the Session the request was for, not a successor that took its pseudonym.
+    #[test_log::test(tokio::test)]
+    async fn refusing_an_ssa_request_leaves_a_successor_alone() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.connect_pix(Some(pseudonym)).await?;
+        let slot = rig.mgr.sessions.get(&pseudonym).context("slot")?;
+        let (routing, predecessor) = (slot.routing_opts.clone(), slot.instance.clone());
+
+        let _second = rig.connect_pix(Some(pseudonym)).await?;
+        let successor = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.clone();
+        assert!(!Arc::ptr_eq(&predecessor, &successor));
+
+        rig.mgr.refuse_ssa_request(pseudonym, routing, &predecessor).await;
+        assert!(
+            rig.mgr
+                .sessions
+                .get(&pseudonym)
+                .is_some_and(|slot| Arc::ptr_eq(&slot.instance, &successor)),
+            "the successor survives"
+        );
+        assert!(!successor.is_superseded());
+        Ok(())
+    }
+
+    /// A `SessionResumed` naming another Session is refused before anything is allocated.
+    #[test_log::test(tokio::test)]
+    async fn a_resumed_reply_naming_another_session_fails_the_establishment() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.hold_state(pseudonym).await?;
+        assert!(rig.mgr.close_session(&pseudonym));
+
+        rig.reply_with(StubReply::ResumedOther(TEST_STREAM_BASE));
+        let err = rig.connect_pix(Some(pseudonym)).await.expect_err("another Session");
+        assert!(rig.last_capabilities()?.contains(Capability::Resume));
+        assert!(
+            matches!(
+                err.downcast_ref::<TransportSessionError>(),
+                Some(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "got {err:?}"
+        );
+        assert!(rig.mgr.sessions.get(&pseudonym).is_none(), "no slot");
+        assert_eq!(0, rig.mgr.num_active_sessions());
+        assert!(
+            rig.parked_ledger(&pseudonym).is_some(),
+            "the ledger is parked for a retry"
+        );
         Ok(())
     }
 }
