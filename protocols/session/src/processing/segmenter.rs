@@ -62,7 +62,13 @@ where
     S: futures::Sink<Segment>,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    fn new(inner: S, frame_size: usize, send_terminating_segment: bool, datagram: bool) -> Self {
+    fn new(
+        inner: S,
+        frame_size: usize,
+        send_terminating_segment: bool,
+        datagram: bool,
+        first_frame_id: FrameId,
+    ) -> Self {
         // Clamp frame_size to [SESSION_MTU, SESSION_MTU * (SeqIndicator::MAX + 1)].
         // Minimum is SESSION_MTU so that a single frame fits in one
         // HOPR packet (1 segment). Maximum is bounded by SeqIndicator capacity.
@@ -83,7 +89,7 @@ where
             // latter under-counts whenever the MAX_SESSION_MTU cap binds.
             ready_segments: VecDeque::with_capacity(frame_size.div_ceil(session_socket_mtu::<C>())),
             frame_size,
-            frame_id: 1,
+            frame_id: first_frame_id,
             is_closed: false,
             send_terminating_segment,
             datagram,
@@ -246,7 +252,7 @@ pub trait SegmenterExt: futures::Sink<Segment> {
         Self: Sized,
         Self::Error: std::error::Error + Send + Sync + 'static,
     {
-        Segmenter::new(self, frame_size, false, false)
+        Segmenter::new(self, frame_size, false, false, 1)
     }
 
     /// Attaches a [`Segmenter`] to the underlying sink.
@@ -259,7 +265,23 @@ pub trait SegmenterExt: futures::Sink<Segment> {
         Self: Sized,
         Self::Error: std::error::Error + Send + Sync + 'static,
     {
-        Segmenter::new(self, frame_size, true, datagram)
+        Segmenter::new(self, frame_size, true, datagram, 1)
+    }
+
+    /// As [`SegmenterExt::segmenter_with_terminating_segment`], but the first frame sent gets
+    /// `first_frame_id` instead of 1 (see [`SessionSocketConfig::stream_base`](crate::SessionSocketConfig)).
+    /// The caller validates the id.
+    fn segmenter_with_terminating_segment_from<const C: usize>(
+        self,
+        frame_size: usize,
+        datagram: bool,
+        first_frame_id: FrameId,
+    ) -> Segmenter<C, Self>
+    where
+        Self: Sized,
+        Self::Error: std::error::Error + Send + Sync + 'static,
+    {
+        Segmenter::new(self, frame_size, true, datagram, first_frame_id)
     }
 }
 
