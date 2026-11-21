@@ -1568,6 +1568,10 @@ pub(crate) struct SlotInstance {
     /// Set once the slot's data plane is gone or replaced. A writer still holding the Session's sink
     /// must not send through it any more.
     superseded: std::sync::atomic::AtomicBool,
+    /// When this instance was created; the origin of `last_refresh_ms`.
+    created: std::time::Instant,
+    /// Milliseconds after `created` at which an Entry write last refreshed the slot's idle timer.
+    last_refresh_ms: std::sync::atomic::AtomicU64,
 }
 
 impl SlotInstance {
@@ -1578,7 +1582,31 @@ impl SlotInstance {
             challenge,
             established: std::sync::atomic::AtomicBool::new(false),
             superseded: std::sync::atomic::AtomicBool::new(false),
+            created: std::time::Instant::now(),
+            last_refresh_ms: std::sync::atomic::AtomicU64::new(0),
         })
+    }
+
+    /// Counts an Entry data write as activity: reads the slot (which resets its `time_to_idle`), at
+    /// most once per `period`. Call only after the `is_superseded` check, so the read can only reach
+    /// this instance's own slot: a successor under the same pseudonym exists only once this one is superseded.
+    fn touch_slot_on_write(
+        &self,
+        sessions: &moka::sync::Cache<SessionId, SessionSlot>,
+        id: &SessionId,
+        period: Duration,
+    ) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let now = self.created.elapsed().as_millis() as u64;
+        let last = self.last_refresh_ms.load(Relaxed);
+        if now.saturating_sub(last) >= period.as_millis() as u64
+            && self
+                .last_refresh_ms
+                .compare_exchange(last, now, Relaxed, Relaxed)
+                .is_ok()
+        {
+            let _ = sessions.get(id);
+        }
     }
 
     pub(crate) fn id(&self) -> u64 {
@@ -5672,6 +5700,8 @@ where
                     let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
                     let egress_instance = instance.clone();
+                    let egress_sessions = self.sessions.clone();
+                    let egress_touch_period = self.cfg.idle_timeout / 4;
                     let reduced_surb_scoring_sender = full_surb_scoring_sender
                         .clone()
                         .sink_map_err(std::io::Error::other)
@@ -5685,6 +5715,7 @@ where
                                 if egress_instance.is_superseded() {
                                     return futures::future::err(superseded_write_error());
                                 }
+                                egress_instance.touch_slot_on_write(&egress_sessions, &session_id, egress_touch_period);
                                 cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
                                 futures::future::ok::<_, std::io::Error>((routing, data))
                             },
@@ -5950,11 +5981,14 @@ where
                     let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
                     let egress_instance = instance.clone();
+                    let egress_sessions = self.sessions.clone();
+                    let egress_touch_period = self.cfg.idle_timeout / 4;
                     let reduced_surb_sender = msg_sender.sink_map_err(std::io::Error::other).with(
                         move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
                             if egress_instance.is_superseded() {
                                 return futures::future::err(superseded_write_error());
                             }
+                            egress_instance.touch_slot_on_write(&egress_sessions, &session_id, egress_touch_period);
                             cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
                             futures::future::ok::<_, std::io::Error>((routing, data))
                         },
@@ -29347,6 +29381,88 @@ mod tests {
                 .all(|(_, data)| data.data.application_tag != SESSION_APPLICATION_TAG),
             "no Session data may reach the sender after the teardown, got {} packet(s)",
             sent.len()
+        );
+        Ok(())
+    }
+
+    /// An Entry that only writes keeps its slot while it writes, and loses it once it stops.
+    #[test_log::test(tokio::test)]
+    async fn an_entry_session_that_keeps_writing_should_not_be_idle_evicted() -> anyhow::Result<()> {
+        let idle_timeout = Duration::from_millis(400);
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            idle_timeout,
+            ..Default::default()
+        });
+        let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let opening = tokio::spawn({
+            let mgr = mgr.clone();
+            async move {
+                mgr.new_session(
+                    (&ChainKeypair::random()).into(),
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    SessionClientConfig {
+                        capabilities: Capabilities::empty(),
+                        pseudonym: pseudonym.into(),
+                        surb_management: None,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(anyhow::Error::from)
+            }
+        });
+
+        let start = timeout(Duration::from_secs(2), msg_rx.next())
+            .await
+            .context("the Entry must send its StartSession")?
+            .context("the sender must stay open")?;
+        let Ok(StartProtocol::StartSession(initiation)) =
+            HoprStartProtocol::decode(start.1.data.application_tag, &start.1.data.plain_text)
+        else {
+            anyhow::bail!("the first message must be a StartSession");
+        };
+        mgr.dispatch_message(
+            pseudonym,
+            start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge: initiation.challenge,
+                session_id: pseudonym,
+            }))?,
+        )?;
+        let mut session = timeout(Duration::from_secs(5), opening)
+            .await
+            .context("the Entry must establish")???;
+
+        // Write for several idle timeouts; nothing is ever read back.
+        let until = tokio::time::Instant::now() + idle_timeout * 5;
+        while tokio::time::Instant::now() < until {
+            session.write_all(&[7u8; 600]).await?;
+            session.flush().await?;
+            // `contains_key` does not refresh the idle timer, so only the writes can keep the slot.
+            mgr.sessions.run_pending_tasks();
+            assert!(
+                mgr.sessions.contains_key(&pseudonym),
+                "a writing Entry must keep its slot"
+            );
+            tokio::time::sleep(idle_timeout / 20).await;
+        }
+
+        // Once it stops, the slot goes after the idle timeout.
+        let mut evicted = false;
+        for _ in 0..50 {
+            tokio::time::sleep(idle_timeout / 10).await;
+            mgr.sessions.run_pending_tasks();
+            if !mgr.sessions.contains_key(&pseudonym) {
+                evicted = true;
+                break;
+            }
+        }
+        assert!(
+            evicted,
+            "an Entry that stopped writing must be evicted after its idle timeout"
         );
         Ok(())
     }
