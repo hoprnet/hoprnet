@@ -256,6 +256,8 @@ pub struct SurbRoundTripRegistry {
     /// here has already settled what the counterparty held, so such an eviction is not counted in
     /// [`take_pending_lost`](Self::take_pending_lost).
     written_off_legs: Arc<RandomEvictionMap<(ReturnRelayers, Instant)>>,
+    /// Held across each write-off's snapshot and walk, so two walks cannot both settle one SURB.
+    write_off_walk: Arc<parking_lot::Mutex<()>>,
     /// Records `pending` could not hold and evicted before their reply came home, since the last
     /// [`take_pending_lost`](Self::take_pending_lost). An evicted record settles no race and is never
     /// written off, so its Session's SURBs through a dead relayer may go unnoticed. Zero in a
@@ -337,6 +339,7 @@ impl SurbRoundTripRegistry {
             written_off: Default::default(),
             bumped: Default::default(),
             written_off_legs: Arc::new(written_off_legs),
+            write_off_walk: Default::default(),
             pending_lost: Default::default(),
             forward: Default::default(),
         }
@@ -556,6 +559,12 @@ impl SurbRoundTripRegistry {
     /// Returns the sessions a dead verdict reached for the first time, see `write_off`.
     pub fn write_off_dead(&self) -> Vec<HoprPseudonym> {
         self.age_write_offs();
+        self.write_off_dead_stock()
+    }
+
+    /// Snapshots the stock through dead relayers and writes it off, holding `write_off_walk` throughout.
+    fn write_off_dead_stock(&self) -> Vec<HoprPseudonym> {
+        let _walk = self.write_off_walk.lock();
         self.write_off(self.dead_stock())
     }
 
@@ -681,6 +690,7 @@ impl SurbRoundTripRegistry {
     ///
     /// Walks the whole pending map (some 10 ms at the default budget), so call it off the runtime worker.
     pub fn write_off_pending(&self, pseudonym: &HoprPseudonym, minted_before: Instant) {
+        let _walk = self.write_off_walk.lock();
         self.write_off_pending_where(|candidate, minted_at| candidate == pseudonym && minted_at < minted_before);
     }
 
@@ -2098,15 +2108,12 @@ where
         return Vec::new();
     }
     let registry = registry.clone();
-    hopr_utils::parallelize::cpu::spawn_blocking(
-        move || registry.write_off(registry.dead_stock()),
-        "surb_write_off_dead",
-    )
-    .await
-    .unwrap_or_else(|error| {
-        tracing::warn!(%error, "SURB write-off deferred to the next flush");
-        Vec::new()
-    })
+    hopr_utils::parallelize::cpu::spawn_blocking(move || registry.write_off_dead_stock(), "surb_write_off_dead")
+        .await
+        .unwrap_or_else(|error| {
+            tracing::warn!(%error, "SURB write-off deferred to the next flush");
+            Vec::new()
+        })
 }
 
 /// The invalid SURBs to hand each session this tick: every current mark, re-applied so a session
@@ -4280,6 +4287,43 @@ mod tests {
             "another pseudonym's SURB is left"
         );
         assert!(!registry.written_off_legs.contains_key(&surb_id(2)));
+        Ok(())
+    }
+
+    /// A pending write-off waits for a walk already running, so two walks cannot both settle one SURB.
+    #[test]
+    fn writing_off_pending_surbs_waits_for_a_running_walk() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        registry.pending.insert(surb_id(1), pending_to(&[key()], None, 0));
+
+        let walk = registry.write_off_walk.lock();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let worker = {
+            let registry = registry.clone();
+            std::thread::spawn(move || {
+                let _ = started_tx.send(());
+                registry.write_off_pending(&SESSION, Instant::now() + Duration::from_secs(1));
+            })
+        };
+        started_rx.recv().context("the write-off thread never started")?;
+        // The thread is blocked on the lock, or about to be: either way it cannot have walked yet.
+        assert!(
+            registry.pending.contains_key(&surb_id(1)),
+            "nothing is written off while the walk runs"
+        );
+
+        drop(walk);
+        worker
+            .join()
+            .map_err(|_| anyhow::anyhow!("the write-off thread panicked"))?;
+        assert!(
+            !registry.pending.contains_key(&surb_id(1)),
+            "written off once the walk is done"
+        );
+        assert!(
+            registry.written_off_legs.contains_key(&surb_id(1)),
+            "and its leg is kept"
+        );
         Ok(())
     }
 
