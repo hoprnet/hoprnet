@@ -1198,12 +1198,19 @@ mod tests {
     async fn sequencer_with_a_stream_base_should_give_up_a_missing_first_frame_by_the_gap_rule() -> anyhow::Result<()> {
         let mut cfg = based(50, Duration::from_secs(30));
         cfg.max_frames_behind_gap = Some(2);
-        let out: Vec<Result<u32, SessionError>> = futures::stream::iter(vec![49, 51, 52, 53, 54])
+        // The input stays open (the sender lives to the end of the test), so neither the end of the stream nor
+        // the 30 s wait can give frame 50 up within the deadline: only the gap rule can.
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+        for frame in [49, 51, 52, 53, 54] {
+            tx.unbounded_send(frame)?;
+        }
+        let out: Vec<Result<u32, SessionError>> = rx
             .sequencer_with(cfg)
+            .take(5)
             .collect()
             .timeout(futures_time::time::Duration::from_secs(5))
             .await?;
-        assert!(matches!(out[0], Err(SessionError::FrameDiscarded(50))));
+        assert!(matches!(out[0], Err(SessionError::FrameDiscarded(50))), "{out:?}");
         let delivered: Vec<u32> = out.into_iter().filter_map(Result::ok).collect();
         assert_eq!(vec![51, 52, 53, 54], delivered);
         Ok(())
