@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use hopr_api::{
     node::PixAddressId,
@@ -2002,6 +2002,197 @@ async fn lost_opening_request_scenario(start_surbs: usize, keep_alive: bool) -> 
     alice_handle.await??;
     bob_handle.await??;
 
+    Ok(())
+}
+
+/// The Exit's first `SessionEstablished` is lost on the way back, and the Entry's repeated `StartSession` recovers the
+/// Session instead of a new attempt under a new pseudonym (#8728).
+///
+/// ## Steps
+/// 1. Bob's transport drops the first `SessionEstablished`. Alice repeats her `StartSession` every 200 ms or so, and
+///    waits far longer than that.
+/// 2. `new_session` succeeds under the first pseudonym. Bob answered the repeat with `SessionEstablished` alone: he
+///    holds exactly one Session, Alice got one `ReadyToDeposit` and Bob one `DepositNeeded`, and no `SessionError` was
+///    sent.
+#[test(tokio::test)]
+async fn a_lost_session_established_is_recovered_by_repeating_the_start_session() -> Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let ssa_gen_config = SsaGeneratorConfig {
+        polynomials_per_ssa: 64,
+        threshold: 16,
+        surplus_shares: 4,
+    };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+
+    let alice_mgr = SessionManager::new(SessionManagerConfig {
+        initiation_timeout_base: Duration::from_secs(5),
+        initiation_resend_interval: Duration::from_millis(200),
+        ..Default::default()
+    });
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=cycle_quota(&params),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let established_sent = Arc::new(AtomicUsize::new(0));
+    let session_errors = Arc::new(AtomicUsize::new(0));
+
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    let session_errors_alice = session_errors.clone();
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let msg = HoprStartProtocol::try_from(data.data.clone());
+            if matches!(msg, Ok(HoprStartProtocol::SessionError(_))) {
+                session_errors_alice.fetch_add(1, Ordering::Relaxed);
+            }
+            // Each StartSession, repeats included, brings the SURBs the Exit answers over.
+            let saved = if matches!(msg, Ok(HoprStartProtocol::StartSession(_))) {
+                2
+            } else {
+                0
+            };
+            let bob_mgr = bob_mgr_relay.clone();
+            Box::pin(async move {
+                let mut incoming = ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                };
+                incoming.packet_info.num_saved_surbs = saved;
+                let _ = bob_mgr.dispatch_message(alice_pseudonym, incoming);
+                Ok(())
+            })
+        });
+
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    let established_relay = established_sent.clone();
+    let session_errors_bob = session_errors.clone();
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let mut dropped = false;
+            match HoprStartProtocol::try_from(data.data.clone()) {
+                // Only the first one is lost.
+                Ok(HoprStartProtocol::SessionEstablished(_)) => {
+                    dropped = established_relay.fetch_add(1, Ordering::Relaxed) == 0;
+                }
+                Ok(HoprStartProtocol::SessionError(_)) => {
+                    session_errors_bob.fetch_add(1, Ordering::Relaxed);
+                }
+                _ => {}
+            }
+            let alice_mgr = alice_mgr_relay.clone();
+            Box::pin(async move {
+                if !dropped {
+                    let _ = alice_mgr.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    );
+                }
+                Ok(())
+            })
+        });
+
+    let ssa_rec_config = SsaReconstructorConfig::default();
+    let (pix_toolbox_alice, pix_alice_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let pix_bob_rx = answering_deposit_pool(pix_bob_rx, |_| Vec::new());
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
+
+    let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio_time::timeout(
+        DEADLINE,
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                    surb_management: None,
+                    return_path_options: RoutingOptions::Hops(1.try_into()?),
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout establishing the session: {e}"))?;
+    let alice_session = alice_session.context("the repeated StartSession must recover the Session")?;
+    let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+
+    pin_mut!(pix_alice_rx);
+    pin_mut!(pix_bob_rx);
+    let HoprSessionOutPixEvent::ReadyToDeposit(_) = tokio_time::timeout(DEADLINE, pix_alice_rx.next())
+        .await
+        .context("timeout waiting for alice's ReadyToDeposit")?
+        .ok_or(anyhow::anyhow!("alice must get a pix event"))?
+    else {
+        anyhow::bail!("expected ReadyToDeposit for the opening cycle");
+    };
+    let HoprSessionOutPixEvent::DepositNeeded(_, _observer) = tokio_time::timeout(DEADLINE, pix_bob_rx.next())
+        .await
+        .context("timeout waiting for bob's DepositNeeded")?
+        .ok_or(anyhow::anyhow!("bob must get a pix event"))?
+    else {
+        anyhow::bail!("expected DepositNeeded for the opening cycle");
+    };
+
+    assert!(
+        established_sent.load(Ordering::Relaxed) >= 2,
+        "the first answer was lost and one more sent"
+    );
+    assert_eq!(
+        vec![alice_pseudonym],
+        bob_mgr.active_sessions(),
+        "bob holds the one Session"
+    );
+    assert!(alice_mgr.active_sessions().contains(&alice_pseudonym));
+    assert_eq!(0, session_errors.load(Ordering::Relaxed));
+
+    for ah in ahs {
+        ah.abort();
+    }
+    drop(alice_session);
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
     Ok(())
 }
 

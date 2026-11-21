@@ -145,6 +145,8 @@ pub(crate) enum ExitControlKind {
     PixFill,
     /// The `SessionEstablished` answering an admitted `StartSession`.
     SessionEstablished,
+    /// The `SessionEstablished` answering a repeated `StartSession`.
+    SessionEstablishedReplay,
     /// The request for the Entry's SSA commitments.
     SsaRequest,
     /// The SSA request, re-sent for want of an answer.
