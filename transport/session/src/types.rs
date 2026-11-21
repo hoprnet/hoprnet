@@ -923,7 +923,10 @@ impl HoprSession {
                 };
                 debug!(?socket_cfg, "opening new stateless session socket");
 
-                let progress = StreamProgress::default();
+                // Seeded from the stream base, so that a successor's base is never below this stream's own.
+                let progress = socket_cfg
+                    .stream_base
+                    .map_or_else(StreamProgress::default, |base| StreamProgress::starting_at(base, base));
                 stream_progress = Some(progress.clone());
                 Box::new(
                     UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless_tracked(

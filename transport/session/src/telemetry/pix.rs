@@ -50,8 +50,7 @@
 //! A *detached* Session (see `hopr_pix_resumptions_total`) is still a live PIX Session: its supervisor
 //! and cycles carry on, so `hopr_pix_sessions_active` and `hopr_pix_cycles_active` count it for the
 //! whole resume window, and its per-Session lifecycle state stays `Active` rather than `Closing`
-//! until the window ends. `detached` minus `taken_over` minus `window_expired` is roughly the number
-//! detached right now.
+//! until the window ends.
 //!
 //! The last three are per-Session events rather than node aggregates, but they belong on this prefix
 //! because neither is labelled by a Session. Their per-Session siblings
@@ -389,7 +388,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_PIX_RESUMPTIONS_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_pix_resumptions_total",
-        "PIX Sessions detached when their data plane ended, taken over by a reconnecting Entry, or expired from the resume window, by event",
+        "PIX Sessions detached when their data plane ended, taken over by a reconnecting Entry, expired from the resume window, or refused a takeover, by event",
         &["event"]
     ).unwrap();
 }
