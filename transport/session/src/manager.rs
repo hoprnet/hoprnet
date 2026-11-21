@@ -4237,6 +4237,19 @@ struct InFlightOpening {
     pending: parking_lot::Mutex<Option<SurbsStored>>,
 }
 
+/// Books to `slot` what dispatch left of a replayed repeat plus what repeats carried onto its claim meanwhile.
+fn book_replay_surbs(opening: &InFlightOpening, slot: &SessionSlot, pseudonym: &SessionId, stored: SurbsStored) {
+    // Taken, so later repeats on this claim book to the slot directly.
+    let carried = opening.pending.lock().take().unwrap_or_default();
+    let total = SurbsStored {
+        saved: stored.saved + carried.saved,
+        evicted: stored.evicted + carried.evicted,
+    };
+    if total != SurbsStored::default() {
+        let _ = book_start_message_surbs(slot, pseudonym, total);
+    }
+}
+
 /// Releases an Exit's claim on a pseudonym's opening in `incoming_openings` when the handler is done.
 struct IncomingOpeningGuard {
     openings: moka::sync::Cache<HoprPseudonym, Arc<InFlightOpening>>,
@@ -5146,18 +5159,7 @@ where
                                     // Before any refusal or admission work: a repeat must not be admitted again.
                                     let _opening_guard = match myself.claim_opening(pseudonym, session_req.challenge) {
                                         OpeningClaim::InFlightRepeat(opening) => {
-                                            // Dispatch found no slot to book to: the original books it, or we do.
-                                            match &mut *opening.pending.lock() {
-                                                Some(carried) => {
-                                                    carried.saved += stored.saved;
-                                                    carried.evicted += stored.evicted;
-                                                }
-                                                None => {
-                                                    if let Some(slot) = myself.sessions.get(&pseudonym) {
-                                                        let _ = book_start_message_surbs(&slot, &pseudonym, stored);
-                                                    }
-                                                }
-                                            }
+                                            myself.carry_or_book_repeat_surbs(&opening, &pseudonym, stored);
                                             crate::counters::START_SESSION_REPEATS_RECEIVED
                                                 .fetch_add(1, Ordering::Relaxed);
                                             debug!(
@@ -5168,10 +5170,7 @@ where
                                             return;
                                         }
                                         OpeningClaim::EstablishedRepeat(slot, guard) => {
-                                            // Non-zero only when dispatch saw no slot.
-                                            if stored != SurbsStored::default() {
-                                                let _ = book_start_message_surbs(&slot, &pseudonym, stored);
-                                            }
+                                            book_replay_surbs(&guard.opening, &slot, &pseudonym, stored);
                                             let result =
                                                 myself.answer_repeated_opening(pseudonym, &session_req, &slot).await;
                                             drop(guard);
@@ -6080,6 +6079,21 @@ where
                 OpeningClaim::InFlightRepeat(entry.into_value())
             }
             _ => OpeningClaim::New(None),
+        }
+    }
+
+    /// Adds a repeat's unbooked SURBs to the original's claim, or books them to the slot once the original has.
+    fn carry_or_book_repeat_surbs(&self, opening: &InFlightOpening, pseudonym: &SessionId, stored: SurbsStored) {
+        match &mut *opening.pending.lock() {
+            Some(carried) => {
+                carried.saved += stored.saved;
+                carried.evicted += stored.evicted;
+            }
+            None => {
+                if let Some(slot) = self.sessions.get(pseudonym) {
+                    let _ = book_start_message_surbs(&slot, pseudonym, stored);
+                }
+            }
         }
     }
 
@@ -21476,6 +21490,43 @@ mod tests {
         .await
         .context("the repeat's SURBs were never booked")?;
         assert_eq!(1, slot.surb_estimator.evicted.load(Ordering::Relaxed));
+        Ok(())
+    }
+
+    /// SURBs a repeat carries onto a replay's claim are booked with the replay's, and later ones go straight to the
+    /// slot.
+    #[test_log::test(tokio::test)]
+    async fn surbs_carried_onto_a_replays_claim_are_booked_with_it() -> anyhow::Result<()> {
+        let (mgr, mut sent, _incoming) = exit_answering_repeats(None)?;
+        let pseudonym = HoprPseudonym::random();
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
+        opening_released(&mgr, pseudonym).await?;
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        let estimator = &slot.surb_estimator;
+        let booked = || {
+            (
+                estimator.produced.load(Ordering::Relaxed),
+                estimator.evicted.load(Ordering::Relaxed),
+            )
+        };
+        let (produced, evicted) = booked();
+        let claim = InFlightOpening {
+            challenge: MIN_CHALLENGE,
+            pending: parking_lot::Mutex::new(Some(SurbsStored::default())),
+        };
+
+        // A second repeat lands on the replay's claim while the replay is in flight: carried, not booked.
+        mgr.carry_or_book_repeat_surbs(&claim, &pseudonym, SurbsStored { saved: 3, evicted: 1 });
+        assert_eq!((produced, evicted), booked());
+
+        // The replay books its own and the carried counts together.
+        book_replay_surbs(&claim, &slot, &pseudonym, SurbsStored { saved: 2, evicted: 0 });
+        assert_eq!((produced + 5, evicted + 1), booked());
+
+        // Once drained, a later repeat books directly.
+        mgr.carry_or_book_repeat_surbs(&claim, &pseudonym, SurbsStored { saved: 4, evicted: 0 });
+        assert_eq!((produced + 9, evicted + 1), booked());
         Ok(())
     }
 
