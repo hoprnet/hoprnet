@@ -288,6 +288,8 @@ pub enum PixAdmissionRejection {
     /// The initiation packet carried a SURB with a direct (0-hop) return path, over which no PIX
     /// share can be delivered.
     DirectReturnPath,
+    /// The peer asked to resume a Session this node cannot resume.
+    NotResumable,
 }
 
 impl PixAdmissionRejection {
@@ -1388,6 +1390,7 @@ mod tests {
             "direct_return_path",
             PixAdmissionRejection::DirectReturnPath.to_string()
         );
+        assert_eq!("not_resumable", PixAdmissionRejection::NotResumable.to_string());
     }
 
     /// A refusal is only a PIX admission refusal if the peer was asking for PIX.
@@ -1409,6 +1412,7 @@ mod tests {
             PixAdmissionRejection::NoSessionSlot,
             PixAdmissionRejection::Busy,
             PixAdmissionRejection::DirectReturnPath,
+            PixAdmissionRejection::NotResumable,
         ] {
             assert!(reason.record_if_pix(pix), "{reason} refused a PIX offer");
             assert!(

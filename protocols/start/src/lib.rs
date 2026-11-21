@@ -49,6 +49,19 @@ pub enum StartErrorReason {
     /// will not be served by this recipient however the request is phrased. Distinct from
     /// [`Busy`](Self::Busy) because that one is transient and worth retrying.
     TargetNotAdmitted = 4,
+    /// The recipient cannot resume the Session under this pseudonym; open a new one under a fresh
+    /// pseudonym.
+    NotResumable = 5,
+}
+
+impl StartErrorReason {
+    /// Whether repeating the same request cannot succeed.
+    pub fn is_permanent(&self) -> bool {
+        matches!(
+            self,
+            Self::NotResumable | Self::UnacceptablePixParams | Self::TargetNotAdmitted
+        )
+    }
 }
 
 /// Identifies which entity a [`StartErrorType`] refers to.
@@ -1516,6 +1529,7 @@ mod tests {
             StartErrorReason::Busy,
             StartErrorReason::UnacceptablePixParams,
             StartErrorReason::TargetNotAdmitted,
+            StartErrorReason::NotResumable,
         ] {
             let sent = StartProtocol::SessionError(StartErrorType {
                 identifier: ErrorIdentifier::Challenge(10),
@@ -1529,6 +1543,26 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn not_resumable_has_a_stable_wire_value_and_is_permanent() {
+        assert_eq!(StartErrorReason::NotResumable as u8, 5);
+        assert_eq!(StartErrorReason::from_repr(5), Some(StartErrorReason::NotResumable));
+        for reason in [
+            StartErrorReason::NotResumable,
+            StartErrorReason::UnacceptablePixParams,
+            StartErrorReason::TargetNotAdmitted,
+        ] {
+            assert!(reason.is_permanent(), "{reason}");
+        }
+        for reason in [
+            StartErrorReason::Unknown,
+            StartErrorReason::NoSlotsAvailable,
+            StartErrorReason::Busy,
+        ] {
+            assert!(!reason.is_permanent(), "{reason}");
+        }
     }
 
     /// A reason byte this build does not know must still decode, as `Unknown`.

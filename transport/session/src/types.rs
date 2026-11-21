@@ -1330,6 +1330,15 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn byte_capabilities_resume_round_trip() -> anyhow::Result<()> {
+        let caps: Capabilities = Capability::UsePIX | Capability::Resume;
+        let byte_val: u8 = HoprSessionCapabilities::from(caps).into();
+        assert_eq!(byte_val, 0b0110_0000);
+        assert_eq!(*HoprSessionCapabilities::try_from(byte_val)?.as_ref(), caps);
+        Ok(())
+    }
+
     // --- caps_to_ack_mode tests ---
 
     #[test]
