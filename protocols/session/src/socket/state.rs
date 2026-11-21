@@ -53,6 +53,21 @@ pub trait SocketState<const C: usize>: Send {
     /// Called when a frame could not be completed from the segments received from Downstream.
     fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError>;
 
+    /// Called when all the frames from `first` to `last`, both inclusive, could not be completed from the
+    /// segments received from Downstream.
+    ///
+    /// The Socket reports each run of consecutive frame ids it gives up on in one call, and a run can
+    /// span nearly the whole [`FrameId`] range, so a state should override this to handle the run in one
+    /// step as well. The default calls [`frame_discarded`](Self::frame_discarded) for each frame, one by
+    /// one, and returns the first error it met.
+    fn frames_discarded(&mut self, first: FrameId, last: FrameId) -> Result<(), SessionError> {
+        let mut outcome = Ok(());
+        for id in first..=last {
+            outcome = outcome.and(self.frame_discarded(id));
+        }
+        outcome
+    }
+
     /// Called when a segment of a Frame was sent to the Downstream.
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
 
@@ -112,6 +127,10 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
     }
 
     fn frame_discarded(&mut self, _: FrameId) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn frames_discarded(&mut self, _: FrameId, _: FrameId) -> Result<(), SessionError> {
         Ok(())
     }
 
@@ -216,6 +235,35 @@ mod tests {
             tracing::debug!(id = self.1, "segment_sent called");
             self.0.lock().unwrap().segment_sent(segment)
         }
+    }
+
+    #[test]
+    fn a_state_without_its_own_run_handling_should_see_every_discarded_frame() {
+        let mut sequence = mockall::Sequence::new();
+        let mut state = MockSockState::new();
+        state
+            .expect_frame_discarded()
+            .once()
+            .in_sequence(&mut sequence)
+            .with(mockall::predicate::eq(1))
+            .returning(|_| Ok(()));
+        state
+            .expect_frame_discarded()
+            .once()
+            .in_sequence(&mut sequence)
+            .with(mockall::predicate::eq(2))
+            .returning(|_| Err(SessionError::InvalidFrameId));
+        state
+            .expect_frame_discarded()
+            .once()
+            .in_sequence(&mut sequence)
+            .with(mockall::predicate::eq(3))
+            .returning(|_| Err(SessionError::StateNotRunning));
+
+        assert!(
+            matches!(state.frames_discarded(1, 3), Err(SessionError::InvalidFrameId)),
+            "every frame is reported in order, and the first error is the one returned"
+        );
     }
 
     #[test_log::test(tokio::test)]

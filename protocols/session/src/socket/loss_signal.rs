@@ -45,13 +45,13 @@ use std::{
 ///
 /// The readers, [`lost_within`](Self::lost_within), [`lost_total`](Self::lost_total) and
 /// [`stalled_for`](Self::stalled_for), may be called from anywhere at any time. The writers,
-/// [`segment_received`](Self::segment_received), [`frame_completed`](Self::frame_completed) and
-/// [`record`](Self::record), must be called by one writer at a time. The stall state is three atomics
-/// that a writer updates one after another, and `segment_received` decides from one of them before it
-/// updates the next, so two writers interleaving could leave a stall that no frame matches, reported
-/// until the next completion or loss. A socket calls all three from its one sequentially polled stream
-/// chain, which is that single writer. A reader that catches a writer midway sees a stall begin or end
-/// one update late, no worse.
+/// [`segment_received`](Self::segment_received), [`frame_completed`](Self::frame_completed),
+/// [`record`](Self::record) and `record_lost` (which [`record`](Self::record) is one frame of), must be
+/// called by one writer at a time. The stall state is three atomics that a writer updates one after
+/// another, and `segment_received` decides from one of them before it updates the next, so two writers
+/// interleaving could leave a stall that no frame matches, reported until the next completion or loss.
+/// A socket calls all of them from its one sequentially polled stream chain, which is that single
+/// writer. A reader that catches a writer midway sees a stall begin or end one update late, no worse.
 #[derive(Debug, smart_default::SmartDefault)]
 pub struct FrameLossSignal {
     /// The instant the millisecond stamps below count from.
@@ -88,12 +88,20 @@ impl FrameLossSignal {
     ///
     /// A duplicate segment is not loss: the frame it belongs to was delivered.
     pub fn record(&self) {
+        self.record_lost(1);
+    }
+
+    /// Records that `frames` consecutive frames were lost at once, as one loss event.
+    ///
+    /// The same as [`record`](Self::record) called `frames` times, for the cost of one: the sequencer
+    /// gives up a run of any length in a single step, and a run is a single instant for the reader.
+    pub(crate) fn record_lost(&self, frames: u64) {
         let elapsed = u64::try_from(self.origin.elapsed().as_millis()).unwrap_or(u64::MAX - 1);
         // The previous stamp may be newer than this one when two loss events race; `fetch_max` keeps
         // the most recent instant, which is the one an observer is asking about.
         self.last_loss_ms
             .fetch_max(elapsed.saturating_add(1), Ordering::Relaxed);
-        self.lost_total.fetch_add(1, Ordering::Relaxed);
+        self.lost_total.fetch_add(frames, Ordering::Relaxed);
         self.end_stall();
     }
 
