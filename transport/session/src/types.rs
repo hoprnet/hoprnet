@@ -601,6 +601,14 @@ pub struct HoprSessionConfig {
     /// may still arrive, this bounds how much already-received data is held while it waits. `None`
     /// keeps the timeout as the only rule.
     pub max_frames_behind_gap: Option<usize>,
+    /// First frame ID of the stream in both directions, set when this Session takes over a predecessor's;
+    /// see [`SessionSocketConfig::stream_base`].
+    ///
+    /// Only the stateless socket supports a base; the manager does not set one on a stateful Session.
+    /// Default is `None`: the stream starts at 1. Not serialised: it is wiring set by the manager from the
+    /// Exit's `SessionResumed` message, not a Session property.
+    #[serde(skip_serializing)]
+    pub stream_base: Option<u32>,
 }
 
 /// A write sink that stays failed once it has failed.
@@ -816,6 +824,7 @@ impl HoprSession {
                 // that is never coming and holds everything already received behind it. The
                 // sessions that need this bound most are exactly the ones flow control excludes.
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
+                stream_base: cfg.stream_base,
                 ..Default::default()
             };
 
@@ -1318,6 +1327,15 @@ mod tests {
         let byte_val: u8 = byte_caps.into();
         let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(*restored.as_ref(), caps);
+        Ok(())
+    }
+
+    #[test]
+    fn byte_capabilities_resume_round_trip() -> anyhow::Result<()> {
+        let caps: Capabilities = Capability::UsePIX | Capability::Resume;
+        let byte_val: u8 = HoprSessionCapabilities::from(caps).into();
+        assert_eq!(byte_val, 0b0110_0000);
+        assert_eq!(*HoprSessionCapabilities::try_from(byte_val)?.as_ref(), caps);
         Ok(())
     }
 
