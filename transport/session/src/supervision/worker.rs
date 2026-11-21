@@ -50,6 +50,22 @@ pub struct SessionPixSupervisorHandle {
 }
 
 impl SessionPixSupervisorHandle {
+    /// A handle whose commands land in the returned receiver instead of a worker.
+    #[cfg(test)]
+    pub(crate) fn observable() -> (Self, CmdRx) {
+        let (cmd_tx, cmd_rx) = crossfire::mpsc::bounded_async::<WorkerCommand>(64);
+        let gate = ServiceGate::new(1, 256);
+        let telemetry = Arc::new(PixSessionTelemetry::new(gate.clone()));
+        (
+            Self {
+                cmd_tx,
+                gate,
+                telemetry,
+            },
+            cmd_rx,
+        )
+    }
+
     /// Send a PIX event to the supervisor, awaiting capacity if the channel is
     /// full.
     ///

@@ -213,7 +213,12 @@ fn acquire_egress_permit_for(
         futures::future::Either::Right(parked) => {
             let instance = instance.clone();
             futures::future::Either::Right(Box::pin(async move {
-                let (routing, data) = parked.await?;
+                let (routing, data) = match parked.await {
+                    Ok(admitted) => admitted,
+                    // A teardown poisons the gate; the writer still learns it was superseded.
+                    Err(_) if instance.is_superseded() => return Err(superseded_write_error()),
+                    Err(error) => return Err(error),
+                };
                 if instance.is_superseded() {
                     data.surb_refund.give_back();
                     return Err(superseded_write_error());
@@ -688,8 +693,10 @@ fn release_session_slot(
         remove_session_metrics_state(&session_id, session_data.pix_egress_gate.get().is_some(), owner);
     }
 
-    // The data plane is gone: a `HoprSession` still held for it must not send any more.
+    // The data plane is gone: a `HoprSession` still held for it must not send any more. Idempotent
+    // with `remove_slot_if`; this is the path of idle and size evictions.
     session_data.instance.supersede();
+    session_data.pix_supervisor.mark_torn_down();
 
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
@@ -1588,8 +1595,8 @@ impl SlotInstance {
     }
 
     /// Counts an Entry data write as activity: reads the slot (which resets its `time_to_idle`), at
-    /// most once per `period`. Call only after the `is_superseded` check, so the read can only reach
-    /// this instance's own slot: a successor under the same pseudonym exists only once this one is superseded.
+    /// most once per `period`. Call only after the `is_superseded` check: removal supersedes inside the
+    /// compute, so a successor under the same pseudonym exists only once this instance is superseded.
     fn touch_slot_on_write(
         &self,
         sessions: &moka::sync::Cache<SessionId, SessionSlot>,
@@ -1656,7 +1663,34 @@ fn superseded_write_error() -> std::io::Error {
 /// cache, in the guard and in the action driver. A driver that looks its Session up by pseudonym acts
 /// on the slot found only if it carries this very cell, so a lingering driver of a torn-down Session
 /// can never touch a fresh one under the same pseudonym.
-type PixControlPlane = Arc<OnceLock<SessionPixSupervisorHandle>>;
+type PixControlPlane = Arc<PixPlane>;
+
+/// The shared state of a [`PixControlPlane`]: the supervisor handle and whether its slot is gone.
+#[derive(Default)]
+pub(crate) struct PixPlane {
+    supervisor: OnceLock<SessionPixSupervisorHandle>,
+    /// Set when the slot is removed or evicted, never by a mere change of instance. Lets a lingering
+    /// driver check ownership without a cache lookup, which would refresh a successor's idle timer.
+    torn_down: std::sync::atomic::AtomicBool,
+}
+
+impl PixPlane {
+    fn mark_torn_down(&self) {
+        self.torn_down.store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    fn is_torn_down(&self) -> bool {
+        self.torn_down.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+impl std::ops::Deref for PixPlane {
+    type Target = OnceLock<SessionPixSupervisorHandle>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.supervisor
+    }
+}
 
 /// Which slot a close is allowed to act on.
 #[derive(Clone, Copy)]
@@ -1708,7 +1742,12 @@ fn remove_slot_if(
     match sessions
         .entry(*id)
         .and_compute_with(|entry: Option<moka::Entry<SessionId, SessionSlot>>| match entry {
-            Some(entry) if pred(entry.value()) => moka::ops::compute::Op::Remove,
+            Some(entry) if pred(entry.value()) => {
+                // Inside the removal, so no writer or driver of this slot outlives it into a successor.
+                entry.value().instance.supersede();
+                entry.value().pix_supervisor.mark_torn_down();
+                moka::ops::compute::Op::Remove
+            }
             _ => moka::ops::compute::Op::Nop,
         }) {
         moka::ops::compute::CompResult::Removed(entry) => Some(entry.into_value()),
@@ -6246,7 +6285,7 @@ where
                             myself
                                 .report_ssa_request(
                                     &session_id,
-                                    None,
+                                    &control_plane,
                                     SessionPixAction::RequestSsa { ssa_ids, params },
                                     false,
                                 )
@@ -6353,7 +6392,8 @@ where
                         // timer: a Session that is otherwise dead would then be kept alive by its own
                         // re-sends for as long as the predecessor's clocks run. The routing needs no
                         // slot — it is the reply routing this driver was spawned with.
-                        if !myself.sessions.contains_key(&session_id) {
+                        // A torn-down plane is checked first: `contains_key` is true for a successor.
+                        if control_plane.is_torn_down() || !myself.sessions.contains_key(&session_id) {
                             continue;
                         }
 
@@ -6760,8 +6800,12 @@ where
 
     /// The slot under `session_id`, if it is driven by `control_plane` (see [`PixControlPlane`]).
     ///
-    /// A lookup that refreshes the slot's idle timer, like any `get`.
+    /// A lookup that refreshes the slot's idle timer, like any `get`; skipped once the plane is torn
+    /// down, so a stale driver cannot refresh a successor's timer.
     fn slot_of_control_plane(&self, session_id: &SessionId, control_plane: &PixControlPlane) -> Option<SessionSlot> {
+        if control_plane.is_torn_down() {
+            return None;
+        }
         self.sessions
             .get(session_id)
             .filter(|slot| Arc::ptr_eq(&slot.pix_supervisor, control_plane))
@@ -6785,20 +6829,17 @@ where
         }
     }
 
-    /// Reports an action outcome to a Session's supervisor, if it still has one.
+    /// Reports an action outcome to the supervisor of `control_plane`, if it has one.
+    ///
+    /// Never looked up by pseudonym, which could find a successor Session's supervisor.
     async fn report_ssa_request(
         &self,
         session_id: &SessionId,
-        slot: Option<&SessionSlot>,
+        control_plane: &PixControlPlane,
         action: SessionPixAction,
         ok: bool,
     ) {
-        let slot = match slot {
-            Some(slot) => Some(slot.clone()),
-            None => self.sessions.get(session_id),
-        };
-        if let Some(slot) = slot
-            && let Some(supervisor) = slot.pix_supervisor.get()
+        if let Some(supervisor) = control_plane.get()
             && supervisor.send_action_result(action, ok).await.is_err()
         {
             error!(%session_id, "pix supervisor stopped accepting results");
@@ -8678,24 +8719,31 @@ where
             .await,
         )?;
 
+        // The slot may have been torn down while the send was pending: its teardown has already
+        // aborted the handles, and initialising metrics would overwrite a successor's owner.
         #[cfg(feature = "telemetry")]
-        initialize_session_telemetry(
-            session_id,
-            &self.cfg,
-            session_req.capabilities.0,
-            Some(&slot.surb_estimator),
-            Some(&slot.surb_mgmt),
-            instance.id(),
-        );
+        if !instance.is_superseded() {
+            initialize_session_telemetry(
+                session_id,
+                &self.cfg,
+                session_req.capabilities.0,
+                Some(&slot.surb_estimator),
+                Some(&slot.surb_mgmt),
+                instance.id(),
+            );
+        }
 
         // The session is published, so the supervisor's actions can now be carried out. The first of
         // them is the initial `RequestSsa`, which is why this runs after `SessionEstablished` has
         // gone out: the Entry must see the two in that order.
         if let Some(action_rx) = pix {
-            let driver = self.spawn_pix_action_driver(session_id, &slot, action_rx, reply_routing.clone());
-            slot.abort_handles
-                .lock()
-                .insert(SessionHandles::PixActionDriver, driver);
+            // Checked under the handles' lock: teardown supersedes before it takes the lock to abort,
+            // so a driver inserted here is never missed by it.
+            let mut handles = slot.abort_handles.lock();
+            if !instance.is_superseded() {
+                let driver = self.spawn_pix_action_driver(session_id, &slot, action_rx, reply_routing.clone());
+                handles.insert(SessionHandles::PixActionDriver, driver);
+            }
         }
 
         #[cfg(all(feature = "telemetry", not(test)))]
@@ -29540,13 +29588,15 @@ mod tests {
                 session.flush().await
             }
             .await;
-            assert!(
-                outcome.is_err(),
-                "an Entry write after the teardown must fail (round {round}), got {outcome:?}"
+            assert_eq!(
+                Some(std::io::ErrorKind::BrokenPipe),
+                outcome.as_ref().err().map(std::io::Error::kind),
+                "an Entry write after the teardown must fail with BrokenPipe (round {round}), got {outcome:?}"
             );
-            assert!(
-                session.flush().await.is_err(),
-                "a flush after a failed write must keep failing (round {round})"
+            assert_eq!(
+                Some(std::io::ErrorKind::BrokenPipe),
+                session.flush().await.err().map(|e| e.kind()),
+                "a flush after a failed write must keep failing with BrokenPipe (round {round})"
             );
         }
         let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
@@ -29578,16 +29628,23 @@ mod tests {
             instance.clone(),
         ));
 
-        // Parked on the exhausted budget; superseded while it waits; then funded.
-        let parked = tokio::spawn(async move { sink.send(data_packet()?).await.map_err(anyhow::Error::from) });
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Parked on the exhausted budget: the SURB is counted while the send waits.
+        let mut parked = Box::pin(sink.send(data_packet()?));
+        assert!(
+            futures::poll!(parked.as_mut()).is_pending(),
+            "the exhausted gate must park the write"
+        );
+        assert_eq!(39, estimator.saturating_diff(), "the parked packet's SURB is counted");
+
+        // Superseded while it waits; then funded.
         instance.supersede();
         gate.release_service();
         let outcome = timeout(Duration::from_secs(5), parked)
             .await
-            .context("the parked write must resolve")??;
-        assert!(
-            outcome.is_err(),
+            .context("the parked write must resolve")?;
+        assert_eq!(
+            Some(std::io::ErrorKind::BrokenPipe),
+            outcome.as_ref().err().map(std::io::Error::kind),
             "a permit granted to a superseded instance must not let the packet through"
         );
         assert!(forwarded.try_recv().is_err(), "nothing may be forwarded");
@@ -29742,6 +29799,134 @@ mod tests {
             ClosureReason::MissingDepositData,
             CloseScope::ControlPlane(&fresh.pix_supervisor)
         ));
+        Ok(())
+    }
+
+    /// A slot removed through `remove_slot_if` is superseded, and its control plane torn down, by the
+    /// time the removal returns.
+    #[test_log::test(tokio::test)]
+    async fn a_slot_removed_by_remove_slot_if_is_already_superseded() -> anyhow::Result<()> {
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+        let slot = unregistered_slot(session_id);
+        let _guard = mgr
+            .allocate_session_slot(session_id, slot.clone())
+            .context("the slot must be allocated")?;
+
+        // A refused predicate leaves everything as it was.
+        assert!(remove_slot_if(&mgr.sessions, &session_id, |_| false).is_none());
+        assert!(!slot.instance.is_superseded());
+        assert!(!slot.pix_supervisor.is_torn_down());
+
+        let removed = remove_slot_if(&mgr.sessions, &session_id, |_| true).context("the slot must be removed")?;
+        assert!(Arc::ptr_eq(&removed.instance, &slot.instance));
+        assert!(slot.instance.is_superseded(), "superseded inside the removal");
+        assert!(slot.pix_supervisor.is_torn_down(), "the control plane is flagged too");
+        Ok(())
+    }
+
+    /// A PIX driver of a torn-down Session reports nothing to, and re-sends nothing into, a successor
+    /// under the same pseudonym.
+    #[test_log::test(tokio::test)]
+    async fn a_stale_pix_driver_reports_and_resends_nothing_for_a_successor() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            None,
+            crate::supervision::PixFillConfig::default(),
+            None,
+        )
+        .await?;
+        // The fixture's own Session is replaced by a stand-in "old" one with its own control plane and a
+        // supervisor this test owns, so the driver's events do not reach the fixture's real supervisor.
+        let real = mgr.sessions.get(&pseudonym).context("the first slot must exist")?;
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+        let mut old = real.clone();
+        old.pix_supervisor = Default::default();
+        let (old_handle, _old_commands) = SessionPixSupervisorHandle::observable();
+        let _ = old.pix_supervisor.set(old_handle);
+        old.abort_handles = Default::default();
+        old.admission_token = Default::default();
+        old.instance = SlotInstance::new(1);
+        let mut old_guard = mgr
+            .allocate_session_slot(pseudonym, old.clone())
+            .context("the old slot must be allocated")?;
+        old_guard.commit(None, None, 0);
+        let ssa_requests = |sent: &[(DestinationRouting, ApplicationDataOut)]| {
+            sent.iter()
+                .filter(|(_, data)| {
+                    matches!(
+                        HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text),
+                        Ok(StartProtocol::SsaRequest(_))
+                    )
+                })
+                .count()
+        };
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(200)).await;
+
+        // A driver on the old slot that is not among its handles, so the teardown leaves it lingering.
+        // While the Session is live its request goes out, giving the driver something to re-send.
+        let (action_tx, action_rx) = crossfire::mpsc::bounded_async::<SessionPixAction>(8);
+        let _driver = mgr.spawn_pix_action_driver(
+            pseudonym,
+            &old,
+            action_rx,
+            DestinationRouting::Return(SurbMatcher::Pseudonym(pseudonym)),
+        );
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::new(2).context("index two is non-zero")?);
+        action_tx
+            .send(SessionPixAction::RequestSsa {
+                ssa_ids: vec![ssa_id],
+                params: fill_pix_params(),
+            })
+            .await
+            .map_err(|_| anyhow!("the driver must accept the action"))?;
+        let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        assert_eq!(
+            1,
+            ssa_requests(&sent),
+            "the live driver sends its request, got {sent:?}"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+        assert!(
+            old.pix_supervisor.is_torn_down(),
+            "the teardown flags the control plane"
+        );
+
+        // The successor has a supervisor handle whose commands this test can see.
+        let mut successor = unregistered_slot(pseudonym);
+        let (handle, successor_commands) = SessionPixSupervisorHandle::observable();
+        let _ = successor.pix_supervisor.set(handle);
+        successor.instance = SlotInstance::new(2);
+        mgr.sessions.insert(pseudonym, successor);
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(100)).await;
+
+        // Its own slot gone, the driver's failure goes nowhere near the successor; nor does a re-send.
+        let ssa_id_3 = SsaId::new(pseudonym, SsaIndex::new(3).context("index three is non-zero")?);
+        action_tx
+            .send(SessionPixAction::RequestSsa {
+                ssa_ids: vec![ssa_id_3],
+                params: fill_pix_params(),
+            })
+            .await
+            .map_err(|_| anyhow!("the driver must accept the action"))?;
+        action_tx
+            .send(SessionPixAction::ResendSsaRequest { ssa_ids: vec![ssa_id] })
+            .await
+            .map_err(|_| anyhow!("the driver must accept the action"))?;
+
+        let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        assert!(
+            sent.is_empty(),
+            "no SSA request may be sent for the successor, got {sent:?}"
+        );
+        assert!(
+            successor_commands.try_recv().is_err(),
+            "the successor's supervisor must hear nothing from the stale driver"
+        );
+        assert!(mgr.sessions.get(&pseudonym).is_some(), "the successor must survive");
         Ok(())
     }
 }

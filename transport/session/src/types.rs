@@ -603,6 +603,15 @@ pub struct HoprSessionConfig {
     pub max_frames_behind_gap: Option<usize>,
 }
 
+/// Converts a transport sink error into an [`std::io::Error`], keeping an `io::Error` (and its kind) as is.
+fn into_io_error<E: std::error::Error + Send + Sync + 'static>(error: E) -> std::io::Error {
+    let boxed: Box<dyn std::error::Error + Send + Sync> = Box::new(error);
+    match boxed.downcast::<std::io::Error>() {
+        Ok(io) => *io,
+        Err(other) => std::io::Error::other(other),
+    }
+}
+
 /// A write sink that stays failed once it has failed.
 ///
 /// futures-util's `SinkExt::with` (`With::poll`, 0.3.34) drives its pending future with
@@ -718,7 +727,7 @@ impl HoprSession {
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
-        Tx::Error: std::error::Error + Send + Sync,
+        Tx::Error: std::error::Error + Send + Sync + 'static,
     {
         Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None)
     }
@@ -746,7 +755,7 @@ impl HoprSession {
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
-        Tx::Error: std::error::Error + Send + Sync,
+        Tx::Error: std::error::Error + Send + Sync + 'static,
     {
         // Keep the same parent for socket workers and every later IO poll.
         let span = tracing::debug_span!("session", session_id = %id);
@@ -770,7 +779,7 @@ impl HoprSession {
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(FailedStaysFailed::new(
-                hopr.0.sink_map_err(std::io::Error::other).with(move |buf: Box<[u8]>| {
+                hopr.0.sink_map_err(into_io_error).with(move |buf: Box<[u8]>| {
                     #[cfg(feature = "telemetry")]
                     crate::telemetry::record_session_write(&session_id_write, buf.len());
                     // The Session protocol does not set any packet info on outgoing packets.
