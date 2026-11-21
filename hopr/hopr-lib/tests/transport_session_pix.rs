@@ -2770,3 +2770,115 @@ impl hopr_api::node::HoprSessionServer for CaptureThenEchoServer {
         Ok(())
     }
 }
+
+/// Whether the Exit signalled `milestone`-kind progress for `(pseudonym, index)`: the deposit (`recovered` false) or
+/// the recovery of the cycle's key (`recovered` true).
+#[cfg(feature = "session-client")]
+fn cycle_signalled(
+    seen: &[(PixMilestone, std::time::Instant)],
+    recovered: bool,
+    pseudonym: hopr_lib::api::types::internal::protocol::HoprPseudonym,
+    index: u32,
+) -> bool {
+    seen.iter().any(|(milestone, _)| match milestone {
+        PixMilestone::Funded(id) if !recovered => id.session_id() == pseudonym && id.ssa_index().get() == index,
+        PixMilestone::Recovered(id) if recovered => id.session_id() == pseudonym && id.ssa_index().get() == index,
+        _ => false,
+    })
+}
+
+/// After the Exit has closed a Session, a reconnect under its pseudonym is refused, and a Session under a fresh
+/// pseudonym runs a clean cycle that recovers, however long the Entry waited. The Entry used to reuse `(p, 1)` and
+/// its late replies carried shares of the closed Session's cycle, which failed as `unverifiable_shares`.
+///
+/// ## Steps
+/// 1. A Session is opened, echoes a few times and is closed by the client; with no resume window and no drain the Exit
+///    closes its side.
+/// 2. After the gap (shorter and longer than the 7 s SURB-retire grace) a Session under `p` is refused with
+///    `Rejected(NotResumable)`.
+/// 3. A Session under a fresh pseudonym `p'` is funded at `(p', 1)`, and echo traffic drives it until `(p', 1)`
+///    recovers.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1, 2)]
+#[case(1, 12)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn a_fresh_pseudonym_after_a_closed_session_recovers_its_first_cycle(
+    #[case] hops: usize,
+    #[case] gap_secs: u64,
+) -> anyhow::Result<()> {
+    use hopr_lib::{
+        errors::{HoprLibError, HoprTransportError},
+        exports::transport::{StartErrorReason, TransportSessionError},
+    };
+
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+    const FIRST_LEG_ECHOES: usize = 4;
+
+    // No resume window and no drain: a clean client close ends the Exit's Session at once.
+    let mut exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
+        drain_after_close: false,
+        ..Default::default()
+    });
+    exit_pix.resume_window = Duration::ZERO;
+    let cluster =
+        build_pix_cluster_with_exit_server(hops, exit_pix, IDLE_TIMEOUT, TrackingEchoServer::default()).await?;
+    let (_driver, mut milestones) = spawn_exit_pix_driver(&cluster);
+
+    let mut first = establish_pix_session_under(&cluster, hops, None).await?;
+    let pseudonym = *first.id();
+    let seen = await_milestones(&mut milestones, Duration::from_secs(60), |seen| {
+        cycle_signalled(seen, false, pseudonym, 1)
+    })
+    .await;
+    anyhow::ensure!(
+        cycle_signalled(&seen, false, pseudonym, 1),
+        "the first (p, 1) was never funded: {seen:?}"
+    );
+    let completed = echo_n(&mut first, FIRST_LEG_ECHOES, Duration::from_millis(300)).await;
+    anyhow::ensure!(
+        completed == FIRST_LEG_ECHOES,
+        "only {completed} echoes of the first Session finished"
+    );
+    first.close().await.context("closing the first Session")?;
+    drop(first);
+    tokio::time::sleep(Duration::from_secs(gap_secs)).await;
+
+    match try_establish_pix_session_under_with(&cluster, hops, Some(pseudonym), None, false).await? {
+        Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Rejected(
+            StartErrorReason::NotResumable,
+        )))) => {}
+        Err(other) => anyhow::bail!("expected Rejected(NotResumable), got {other:?}"),
+        Ok(_session) => anyhow::bail!("the reconnect under {pseudonym} must be refused"),
+    }
+
+    // Only what follows counts.
+    while milestones.try_recv().is_ok() {}
+    let second = establish_pix_session_under(&cluster, hops, None).await?;
+    let fresh = *second.id();
+    anyhow::ensure!(fresh != pseudonym, "the new Session needs a fresh pseudonym");
+    let seen = await_milestones(&mut milestones, Duration::from_secs(60), |seen| {
+        cycle_signalled(seen, false, fresh, 1)
+    })
+    .await;
+    anyhow::ensure!(
+        cycle_signalled(&seen, false, fresh, 1),
+        "the fresh Session got no (p', 1) deposit: {seen:?}"
+    );
+
+    let stopped = EchoStopCell::default();
+    let echo = spawn_echo_task(second, stopped.clone(), Duration::from_secs(20));
+    let seen = await_milestones(&mut milestones, Duration::from_secs(90), |seen| {
+        cycle_signalled(seen, true, fresh, 1)
+    })
+    .await;
+    let stop = stopped.get().map(|(stop, _)| stop);
+    echo.abort();
+    anyhow::ensure!(
+        cycle_signalled(&seen, true, fresh, 1),
+        "the fresh (p', 1) never recovered (echo stop: {stop:?}): {seen:?}"
+    );
+    Ok(())
+}
