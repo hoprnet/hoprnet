@@ -80,6 +80,9 @@ pub const SURB_SIZE: usize = hopr_crypto_packet::HoprSurb::SIZE;
 
 flagset::flags! {
     /// Individual capabilities of a Session.
+    ///
+    /// A recipient ignores capability bits it does not know, so a capability added later must be safe to ignore.
+    /// A capability that the recipient must understand needs a Start protocol version bump.
     #[repr(u8)]
     #[derive(PartialOrd, Ord, strum::EnumString, strum::Display, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
     pub enum Capability : u8 {
@@ -209,6 +212,28 @@ mod tests {
     fn test_session_mtu() {
         assert_eq!(SESSION_MTU, session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>());
         assert_eq!(1452, SESSION_MTU); // Needs to be changed when the Session MTU cap changes
+    }
+
+    #[test]
+    fn start_session_with_unknown_capability_bits_decodes_with_them_dropped() -> anyhow::Result<()> {
+        let init = StartInitiation {
+            challenge: 0x0102_0304_0506_0708,
+            target: SessionTarget::TcpStream(SealedHost::Plain("example.com:80".parse()?)),
+            capabilities: HoprSessionCapabilities::from(Capability::Segmentation | Capability::UsePIX),
+            additional_data: 0xdead_beef_u128,
+        };
+        let known_byte = u8::from(init.capabilities);
+
+        let (tag, mut bytes) = HoprStartProtocol::StartSession(init.clone()).encode()?;
+
+        // Header (version, discriminant, u16 length) is followed by the challenge, then the capability byte
+        let offset = 4 + size_of::<StartChallenge>();
+        assert_eq!(bytes[offset], known_byte);
+
+        bytes[offset] |= 0b1100_0000;
+        let decoded = HoprStartProtocol::decode(tag, &bytes)?;
+        assert_eq!(decoded, HoprStartProtocol::StartSession(init));
+        Ok(())
     }
 
     #[test]
