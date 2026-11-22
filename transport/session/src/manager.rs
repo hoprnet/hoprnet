@@ -516,6 +516,7 @@ fn hold_for_surb_reserve(
     estimator: &AtomicSurbFlowEstimator,
     balancer: &Arc<BalancerStateValues>,
     pix: bool,
+    instance: &Arc<SlotInstance>,
 ) -> Option<futures::future::BoxFuture<'static, ()>> {
     if !balancer.counterparty_refills() {
         return None;
@@ -528,7 +529,7 @@ fn hold_for_surb_reserve(
     }
 
     debug!(%session_id, stock, reserve, "holding data back: the SURB stock is down to its keep-alive reserve");
-    let (estimator, balancer) = (estimator.clone(), balancer.clone());
+    let (estimator, balancer, instance) = (estimator.clone(), balancer.clone(), instance.clone());
 
     // The episode begins here, before the future's first poll, and is carried into it by value so
     // that its `Drop` closes it however the hold ends: the stock rises and the future resolves, the
@@ -546,7 +547,8 @@ fn hold_for_surb_reserve(
         // cancellation, or when the future is dropped unpolled — is what records the duration.
         let _episode = episode;
         let held_since = Instant::now();
-        while estimator.saturating_diff() <= current_keep_alive_surb_reserve(&balancer) {
+        // Also ends once `instance` is superseded: the caller then fails the write instead of leaving it parked.
+        while estimator.saturating_diff() <= current_keep_alive_surb_reserve(&balancer) && !instance.is_superseded() {
             hopr_utils::runtime::prelude::sleep(SURB_RESERVE_POLL).await;
         }
         tracing::debug!(
@@ -599,7 +601,7 @@ where
             count_return_packet_surb(estimator, data)
         };
         let held = keeps_alive
-            .then(|| hold_for_surb_reserve(session_id, &estimator, &balancer, gate.is_some()))
+            .then(|| hold_for_surb_reserve(session_id, &estimator, &balancer, gate.is_some(), &instance))
             .flatten();
         match held {
             None => acquire_egress_permit_for(&instance, gate.clone(), routing, book_consumed(&estimator, data)),
@@ -30581,6 +30583,42 @@ mod tests {
         Ok(())
     }
 
+    /// A write parked in the SURB-reserve hold fails once its instance is superseded, while the stock stays low.
+    #[tokio::test]
+    async fn a_held_write_fails_once_its_instance_is_superseded() -> anyhow::Result<()> {
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator
+            .produced
+            .store(current_keep_alive_surb_reserve(&balancer), Ordering::Relaxed);
+        let instance = SlotInstance::new(0);
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer,
+            None,
+            true,
+            instance.clone(),
+        ));
+        let item = data_packet()?;
+        let sending = tokio::spawn(async move { sink.send(item).await });
+
+        tokio::time::sleep(3 * SURB_RESERVE_POLL).await;
+        assert!(!sending.is_finished(), "the write is parked in the hold");
+
+        instance.supersede();
+        let result = timeout(Duration::from_secs(5), sending)
+            .await
+            .context("a superseded write must not stay parked")??;
+        assert!(result.is_err(), "the superseded write fails");
+        assert!(forwarded.try_recv().is_err(), "nothing was forwarded");
+        assert_eq!(0, estimator.estimate_surbs_consumed());
+        Ok(())
+    }
+
     /// The common case: above the reserve nothing waits, and the packet is booked as it was.
     #[tokio::test]
     async fn data_should_pass_straight_through_above_the_keep_alive_reserve() -> anyhow::Result<()> {
@@ -30591,7 +30629,7 @@ mod tests {
         let session_id = HoprPseudonym::random();
         let balancer = balancer_with_target(3_200);
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_none(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false, &SlotInstance::new(0)).is_none(),
             "no hold, no allocation"
         );
 
@@ -30684,7 +30722,7 @@ mod tests {
         let balancer = balancer_with_target(3_200);
         let session_id = HoprPseudonym::random();
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_some(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false, &SlotInstance::new(0)).is_some(),
             "with a keep-alive stream, a stock at the reserve would hold data"
         );
 
@@ -30750,7 +30788,7 @@ mod tests {
 
         balancer.note_counterparty_refills();
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_some(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false, &SlotInstance::new(0)).is_some(),
             "once the Entry refills, a stock at the reserve holds data again"
         );
         Ok(())
@@ -30849,10 +30887,22 @@ mod tests {
         estimator.produced.store(1, Ordering::Relaxed);
 
         // The flag is all that distinguishes them here: the hold itself does not depend on the gate.
-        let pix = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, true)
-            .context("the stock is below the reserve")?;
-        let plain = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
-            .context("the stock is below the reserve")?;
+        let pix = hold_for_surb_reserve(
+            HoprPseudonym::random(),
+            &estimator,
+            &balancer,
+            true,
+            &SlotInstance::new(0),
+        )
+        .context("the stock is below the reserve")?;
+        let plain = hold_for_surb_reserve(
+            HoprPseudonym::random(),
+            &estimator,
+            &balancer,
+            false,
+            &SlotInstance::new(0),
+        )
+        .context("the stock is below the reserve")?;
         drop((pix, plain));
 
         assert_eq!(
@@ -30941,8 +30991,14 @@ mod tests {
             .produced
             .store(current_keep_alive_surb_reserve(&balancer), Ordering::Relaxed);
 
-        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
-            .context("a stock at the reserve must hold the packet")?;
+        let mut hold = hold_for_surb_reserve(
+            HoprPseudonym::random(),
+            &estimator,
+            &balancer,
+            false,
+            &SlotInstance::new(0),
+        )
+        .context("a stock at the reserve must hold the packet")?;
         assert_eq!(
             1,
             probe::get("surb_reserve_holds/episodes/false"),
@@ -30999,8 +31055,14 @@ mod tests {
         let balancer = balancer_with_target(3_200);
         estimator.produced.store(1, Ordering::Relaxed);
 
-        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
-            .context("the stock is below the reserve")?;
+        let mut hold = hold_for_surb_reserve(
+            HoprPseudonym::random(),
+            &estimator,
+            &balancer,
+            false,
+            &SlotInstance::new(0),
+        )
+        .context("the stock is below the reserve")?;
         assert_eq!(1, probe::get("surb_reserve_holds/episodes/false"));
         assert!(
             timeout(
@@ -31038,8 +31100,14 @@ mod tests {
         let balancer = balancer_with_target(3_200);
         estimator.produced.store(1, Ordering::Relaxed);
 
-        let hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
-            .context("the stock is below the reserve")?;
+        let hold = hold_for_surb_reserve(
+            HoprPseudonym::random(),
+            &estimator,
+            &balancer,
+            false,
+            &SlotInstance::new(0),
+        )
+        .context("the stock is below the reserve")?;
         assert_eq!(
             1,
             probe::get("surb_reserve_holds/episodes/false"),
@@ -31068,8 +31136,14 @@ mod tests {
         let balancer = balancer_with_target(3_200);
         estimator.produced.store(1, Ordering::Relaxed);
 
-        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
-            .context("the stock is below the reserve")?;
+        let mut hold = hold_for_surb_reserve(
+            HoprPseudonym::random(),
+            &estimator,
+            &balancer,
+            false,
+            &SlotInstance::new(0),
+        )
+        .context("the stock is below the reserve")?;
 
         // Three polling intervals, timed here as well as inside the episode.
         let began = Instant::now();
@@ -31116,8 +31190,14 @@ mod tests {
 
         // One hold episode on the SURB reserve.
         drop(
-            hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
-                .context("the stock is below the reserve")?,
+            hold_for_surb_reserve(
+                HoprPseudonym::random(),
+                &estimator,
+                &balancer,
+                false,
+                &SlotInstance::new(0),
+            )
+            .context("the stock is below the reserve")?,
         );
 
         // One gate-block episode on a strict-prepay gate, released so it closes too.
