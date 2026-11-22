@@ -249,7 +249,9 @@ mod tests {
         let offset = 4 + size_of::<StartChallenge>();
         assert_eq!(bytes[offset], known_byte);
 
-        bytes[offset] |= 0b1100_0000;
+        let unknown = !Capabilities::full().bits();
+        assert_ne!(unknown, 0, "all capability bits are now in use; revisit this test");
+        bytes[offset] |= unknown;
         let decoded = HoprStartProtocol::decode(tag, &bytes)?;
         assert_eq!(decoded, HoprStartProtocol::StartSession(init));
         Ok(())

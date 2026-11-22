@@ -1324,9 +1324,21 @@ mod tests {
         Ok(())
     }
 
+    /// Bits of the capability byte that no known flag uses. Non-zero while the byte has spare bits.
+    fn unknown_capability_bits() -> u8 {
+        let unknown = !Capabilities::full().bits();
+        assert_ne!(
+            unknown, 0,
+            "all capability bits are now in use; revisit the unknown-bit tests"
+        );
+        unknown
+    }
+
     #[test]
     fn byte_capabilities_unknown_bits_alone_are_empty() -> anyhow::Result<()> {
-        for bits in [0b0100_0000_u8, 0b1000_0000, 0b1100_0000] {
+        let unknown = unknown_capability_bits();
+        let single_bits = (0..u8::BITS).map(|i| 1_u8 << i).filter(|b| b & unknown != 0);
+        for bits in single_bits.chain([unknown]) {
             assert_eq!(HoprSessionCapabilities::try_from(bits)?.0, Capabilities::empty());
         }
         Ok(())
@@ -1335,14 +1347,17 @@ mod tests {
     #[test]
     fn byte_capabilities_unknown_bits_are_dropped_from_known_flags() -> anyhow::Result<()> {
         let known: Capabilities = Capability::Segmentation | Capability::UsePIX;
-        let bits = u8::from(HoprSessionCapabilities::from(known)) | 0b1000_0000;
+        let bits = u8::from(HoprSessionCapabilities::from(known)) | unknown_capability_bits();
         assert_eq!(HoprSessionCapabilities::try_from(bits)?.0, known);
         Ok(())
     }
 
     #[test]
     fn byte_capabilities_all_bits_set_is_full() -> anyhow::Result<()> {
-        assert_eq!(HoprSessionCapabilities::try_from(0xFF_u8)?.0, Capabilities::full());
+        assert_eq!(
+            HoprSessionCapabilities::try_from(Capabilities::full().bits() | unknown_capability_bits())?.0,
+            Capabilities::full()
+        );
         Ok(())
     }
 
