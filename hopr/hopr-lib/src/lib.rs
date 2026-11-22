@@ -162,15 +162,18 @@ pub struct HoprSessionClientConfig {
     /// Sets the maximum number of SURBs sent with session data packets.
     ///
     /// Higher values add CPU strain, but reduce the workload of the SURB balancer (if configured).
-    /// The value is bounded by the packet size and will saturate there.
-    /// Every finite value follows the balancer's target: packets carry this many SURBs while the
-    /// counterparty is below its target and none once it is at or above it, so a value greater than `1`
-    /// cannot keep the counterparty more than one packet's SURBs above its target. Only `usize::MAX` is
-    /// not gated.
-    /// Setting to 0 will leave all the work to SURB balancer. If in that case no SURB balancer is
-    /// configured, there will be no SURBs produced at all, making the traffic only possible in
-    /// one direction.
-    #[default(1)]
+    /// The value is bounded by the remaining payload space of the packet beside the application
+    /// data and will saturate there.
+    /// Every finite value follows the balancer's target: packets carry no SURBs once the
+    /// counterparty is estimated to be at or above its target, and up to
+    /// `min(max_surbs_per_data_packet, remaining_deficit)` while below target, counted down per
+    /// packet within each balancer tick so bursts cannot overflow the counterparty's store. Only
+    /// `usize::MAX` is not gated.
+    /// Setting to 0 leaves all SURB production to the SURB balancer. If in that case no SURB
+    /// balancer is configured, no SURBs are produced, making traffic possible only in one direction.
+    /// Default matches [`hopr_transport::SessionClientConfig::default`] (up to packet SURB
+    /// capacity, clamped by the balancer's remaining SURB deficit).
+    #[default(hopr_transport::SessionClientConfig::default().max_surbs_per_data_packet)]
     pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
     /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
@@ -228,7 +231,7 @@ impl Default for HoprSessionClientExplicitPathConfig {
             capabilities: SessionCapability::Segmentation.into(),
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
-            max_surbs_per_data_packet: 1,
+            max_surbs_per_data_packet: hopr_transport::SessionClientConfig::default().max_surbs_per_data_packet,
             flow_control: None,
             max_frames_behind_gap: None,
         }

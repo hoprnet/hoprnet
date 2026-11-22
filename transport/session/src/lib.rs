@@ -158,17 +158,19 @@ pub struct SessionClientConfig {
     /// pressure on the local node as it will generate the given number of SURBs for each data packet.
     ///
     /// Every finite value follows the balancer's target: data packets carry no SURBs while the
-    /// counterparty is estimated to have a full buffer, and this many while it is below its target.
-    /// A value greater than `1` therefore only saves the balancer work while the counterparty is
-    /// short; it cannot keep the counterparty more than one packet's SURBs above its target. Use it only if the
-    /// underlying traffic is highly asymmetric. Setting this to `0` leaves all SURB production to the SURB
-    /// balancer (if configured). `usize::MAX` is the one value that is not gated: every packet
-    /// carries as many SURBs as fit, whatever the balancer estimates.
+    /// counterparty is estimated to have a full buffer, and up to `min(max_surbs_per_data_packet,
+    /// remaining_deficit)` while it is below its target, counted down per packet within each
+    /// balancer tick so bursts cannot overflow the counterparty's store. Setting this to `0`
+    /// leaves all SURB production to the SURB balancer (if configured). `usize::MAX` is the one
+    /// value that is not gated: every packet carries as many SURBs as fit, whatever the balancer
+    /// estimates.
     ///
-    /// The maximum number is naturally limited by the maximum payload size of a HOPR packet.
+    /// The maximum number is naturally limited by the remaining payload space of the HOPR packet
+    /// beside the packet's own application data.
     ///
-    /// Default is `1`.
-    #[default(1)]
+    /// Default is [`HoprPacket::MAX_SURBS_IN_PACKET`](hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET)
+    /// (8).
+    #[default(hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET)]
     pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session.
     ///

@@ -4012,20 +4012,14 @@ fn initialize_session_telemetry(
 
 /// Caps how many SURBs an outgoing Session data packet may carry, per the SURB balancer.
 ///
-/// Every finite `max_surbs` is gated by the balancer's target: the packet carries the client's number
-/// of SURBs while the counterparty is estimated to be below its target, and none once it is at or above
-/// it. The default of `1` is the plain case. A larger client value, which exists to save the balancer
-/// work on highly asymmetric traffic, is gated the same way, so no setting but `usize::MAX` can hold
-/// the counterparty more than one packet's SURBs above the target. An explicit `0` always wins, whatever
-/// the estimate. `usize::MAX` leaves the packet's existing limit untouched and is the one way to opt out
-/// of the gate.
-///
-/// The gate is [`BalancerStateValues::organic_surbs_per_packet`], which yields `0` once the
-/// counterparty is estimated to be at its target. That zero is the whole point of the function:
-/// without it, the balancer can silence its keep-alives and still have organic SURBs pouring into a
-/// full buffer, where each one evicts an older SURB and destroys the PIX share it carried. It also
-/// bounds the stock the counterparty holds, which is what lets a SURB generation change wipe it at a
-/// cost the PIX surplus can absorb.
+/// Every finite `max_surbs` is gated by the balancer's target via
+/// [`BalancerStateValues::claim_organic_surbs`]: each packet claims at most
+/// `min(max_surbs, fittable_surbs, remaining_deficit)` while the counterparty is estimated to be
+/// below its target, and none once the per-tick grant accumulator reaches target. Because the
+/// remaining deficit is counted down per packet within each balancer tick, even a burst of data
+/// packets cannot overflow the counterparty's SURB store (where evictions destroy PIX shares).
+/// When the balancer is disabled or the counterparty signalled distress, the gate falls back to
+/// `min(max_surbs, 1)`. An explicit `0` always wins; `usize::MAX` opts out of the gate.
 ///
 /// One exception: while data goes out into a silence (see [`BalancerStateValues::silence_sustain`]),
 /// a closed gate gives exactly one SURB per packet, whatever the client asked for. The estimate that
@@ -4046,12 +4040,16 @@ fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt:
     surb_mgmt.note_sent();
     let cap = if max_surbs == 0 {
         0
-    } else if surb_mgmt.organic_surbs_per_packet() > 0 {
-        max_surbs
-    } else if surb_mgmt.silence_sustain() {
-        1
     } else {
-        0
+        let fittable = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(data.data.total_len());
+        let claimed = surb_mgmt.claim_organic_surbs(max_surbs.min(fittable));
+        if claimed > 0 {
+            claimed
+        } else if surb_mgmt.silence_sustain() {
+            1
+        } else {
+            0
+        }
     };
     data.packet_info.get_or_insert_default().max_surbs_in_packet = cap;
 }
@@ -9914,12 +9912,88 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn cap_organic_surbs_clamps_to_exact_deficit_without_overshooting() -> anyhow::Result<()> {
+        assert_eq!(
+            hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET,
+            crate::SessionClientConfig::default().max_surbs_per_data_packet,
+            "default SessionClientConfig must piggyback up to packet SURB capacity when below target"
+        );
+
+        for (buffer_level, expected) in [(50, 8), (97, 3), (99, 1), (100, 0), (150, 0)] {
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 8, &gate_state(100, buffer_level));
+            assert_eq!(
+                Some(expected),
+                data.packet_info.map(|info| info.max_surbs_in_packet),
+                "level {buffer_level} against target 100"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cap_organic_surbs_counts_down_across_burst_within_one_tick() -> anyhow::Result<()> {
+        // Deficit is 15 within a single balancer tick (before `update()` refreshes `buffer_level`).
+        // Five consecutive small packets must grant 8 + 7 + 0 + 0 + 0 = 15 (never 5 × 8 = 40).
+        let state = gate_state(100, 85);
+        let mut grants = Vec::new();
+        for _ in 0..5 {
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 8, &state);
+            grants.push(data.packet_info.map(|info| info.max_surbs_in_packet).unwrap_or(0));
+        }
+        assert_eq!(vec![8, 7, 0, 0, 0], grants);
+        assert_eq!(0, state.organic_surbs_deficit());
+
+        // Full-MTU datagrams only debit what physically fits beside their payload (4 SURBs beside
+        // 1,462 B), so 10 SURBs of deficit span 4 + 4 + 2 + 0 across four full-MTU packets.
+        let mtu_state = gate_state(100, 90);
+        let mut mtu_grants = Vec::new();
+        for _ in 0..4 {
+            let mut data = ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+                SESSION_APPLICATION_TAG,
+                vec![0u8; 1462],
+            )?);
+            cap_organic_surbs(&mut data, 8, &mtu_state);
+            mtu_grants.push(data.packet_info.map(|info| info.max_surbs_in_packet).unwrap_or(0));
+        }
+        assert_eq!(vec![4, 4, 2, 0], mtu_grants);
+
+        // Releasing only the pre-snapshot portion preserves concurrent post-snapshot claims.
+        let pre_snapshot = mtu_state.snapshot_organic_surbs_granted_in_tick();
+        assert_eq!(10, pre_snapshot);
+        // Simulate 4 pre-snapshot grants absorbed while 6 remain in-flight after snapshot.
+        mtu_state.release_organic_surbs_granted_in_tick(4);
+        assert_eq!(4, mtu_state.organic_surbs_deficit());
+        mtu_state.release_organic_surbs_granted_in_tick(6);
+        assert_eq!(10, mtu_state.organic_surbs_deficit());
+        Ok(())
+    }
+
+    #[test]
+    fn cap_organic_surbs_falls_back_to_one_when_disabled_or_in_distress() -> anyhow::Result<()> {
+        let disabled = BalancerStateValues::default();
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 8, &disabled);
+        assert_eq!(Some(1), data.packet_info.map(|info| info.max_surbs_in_packet));
+
+        let distressed = gate_state(100, 100);
+        distressed
+            .counterparty_in_surb_distress
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 8, &distressed);
+        assert_eq!(Some(1), data.packet_info.map(|info| info.max_surbs_in_packet));
+        Ok(())
+    }
+
     /// A client that asks for more than one SURB per packet gets them only while the counterparty is
     /// below its target; at or above it the packet carries none, like the default. Otherwise the
     /// counterparty's stock is unbounded by the target, and so is what a generation wipe costs.
     #[test]
     fn a_larger_explicit_limit_should_be_gated_like_the_default_one() -> anyhow::Result<()> {
-        for (buffer_level, expected) in [(10, 2), (99, 2), (100, 0), (200, 0)] {
+        for (buffer_level, expected) in [(10, 2), (98, 2), (99, 1), (100, 0), (200, 0)] {
             let mut data = small_outgoing_packet()?;
             cap_organic_surbs(&mut data, 2, &gate_state(100, buffer_level));
 

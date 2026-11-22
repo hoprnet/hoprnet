@@ -219,6 +219,14 @@ pub struct BalancerStateValues {
     /// Exit-side: whether the Entry has shown that it refills this side's SURB stock. See
     /// [`counterparty_refills`](Self::counterparty_refills).
     counterparty_refills: AtomicBool,
+    /// Entry-side: organic SURBs already claimed by outgoing data packets since the last
+    /// [`SurbBalancer::update`] refreshed [`buffer_level`](Self::buffer_level).
+    ///
+    /// Subtracted from the remaining deficit in [`claim_organic_surbs`](Self::claim_organic_surbs)
+    /// so a burst of packets within one balancer tick cannot collectively overshoot the target and
+    /// overflow the counterparty's SURB store. Reset to `0` whenever `update()` absorbs the tick's
+    /// estimator delta into `buffer_level`.
+    organic_surbs_granted_in_tick: AtomicU64,
 }
 
 /// The instant the activity stamps of a [`BalancerStateValues`] count from: when it was made.
@@ -504,36 +512,98 @@ impl BalancerStateValues {
     /// This uses the usable level: SURBs the counterparty holds through a relayer judged dead do not
     /// hold the gate shut.
     pub fn organic_surbs_per_packet(&self) -> usize {
-        // Not defensive boilerplate: nothing rejects a `SurbBalancerConfig` with a zero target, and
-        // without this branch `level >= 0` would hold forever and shut organic production off
-        // permanently — while a PID with a zero output limit produces nothing either.
-        if self.is_disabled() {
-            return 1;
-        }
+        usize::from(self.organic_surbs_deficit() > 0)
+    }
 
-        if self
-            .counterparty_in_surb_distress
-            .load(std::sync::atomic::Ordering::Relaxed)
-        {
-            return 1;
-        }
-
-        // Stop at the counterparty's real capacity when it is known to be smaller than the target:
-        // filling past a store that cannot grow only evicts, which under PIX destroys SSA shares.
+    fn effective_target(&self) -> u64 {
         let target = self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed);
-        let effective_target = match self
+        match self
             .observed_counterparty_capacity
             .load(std::sync::atomic::Ordering::Relaxed)
         {
             0 => target,
             capacity => target.min(capacity),
-        };
-
-        if self.usable_level(self.buffer_level()) >= effective_target {
-            0
-        } else {
-            1
         }
+    }
+
+    /// Remaining number of SURBs outgoing Session data packets may piggyback during the current
+    /// balancer tick without pushing the estimated counterparty stock above its effective target.
+    ///
+    /// Returns `1` while the balancer is disabled or the counterparty signalled distress (matching
+    /// the single-SURB fallback invariant), `0` once the usable level plus SURBs already claimed
+    /// in this tick reaches the effective target, and the exact remaining shortfall otherwise.
+    pub fn organic_surbs_deficit(&self) -> usize {
+        if self.is_disabled()
+            || self
+                .counterparty_in_surb_distress
+                .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            return 1;
+        }
+
+        let effective_target = self.effective_target();
+        let usable = self.usable_level(self.buffer_level());
+        let granted = self
+            .organic_surbs_granted_in_tick
+            .load(std::sync::atomic::Ordering::Acquire);
+        usize::try_from(effective_target.saturating_sub(usable.saturating_add(granted))).unwrap_or(usize::MAX)
+    }
+
+    /// Atomically claims up to `max_surbs` from the remaining SURB deficit for one outgoing data
+    /// packet, counting down per packet within each balancer tick so bursts cannot overshoot the
+    /// counterparty's target or evict stored SURBs (and PIX shares).
+    ///
+    /// When the balancer is disabled or the counterparty signalled distress, returns
+    /// `max_surbs.min(1)` (preserving the single-SURB fallback without unbounded bursts).
+    pub fn claim_organic_surbs(&self, max_surbs: usize) -> usize {
+        use std::sync::atomic::Ordering;
+
+        if max_surbs == 0 {
+            return 0;
+        }
+        if self.is_disabled() || self.counterparty_in_surb_distress.load(Ordering::Relaxed) {
+            return 1;
+        }
+
+        let effective_target = self.effective_target();
+        let usable = self.usable_level(self.buffer_level());
+        let cap = max_surbs as u64;
+        let mut claimed = 0usize;
+
+        let _ = self
+            .organic_surbs_granted_in_tick
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |granted| {
+                let remaining = effective_target.saturating_sub(usable.saturating_add(granted));
+                let grant = cap.min(remaining);
+                if grant == 0 {
+                    claimed = 0;
+                    None
+                } else {
+                    claimed = grant as usize;
+                    Some(granted.saturating_add(grant))
+                }
+            });
+
+        claimed
+    }
+
+    /// Reads the organic SURBs claimed so far in the current tick, taken immediately before the
+    /// estimator snapshot in `SurbBalancer::update` so only pre-snapshot grants are released once
+    /// `buffer_level` absorbs that snapshot.
+    pub(crate) fn snapshot_organic_surbs_granted_in_tick(&self) -> u64 {
+        self.organic_surbs_granted_in_tick
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Subtracts `absorbed` pre-snapshot grants from the per-tick accumulator after
+    /// [`buffer_level`](Self::buffer_level) has absorbed the estimator snapshot, preserving any
+    /// concurrent grants claimed after the snapshot was taken.
+    pub(crate) fn release_organic_surbs_granted_in_tick(&self, absorbed: u64) {
+        let _ = self.organic_surbs_granted_in_tick.fetch_update(
+            std::sync::atomic::Ordering::AcqRel,
+            std::sync::atomic::Ordering::Acquire,
+            |granted| Some(granted.saturating_sub(absorbed)),
+        );
     }
 
     /// Records that the counterparty was heard from now.
@@ -967,6 +1037,10 @@ where
 
         self.last_update = std::time::Instant::now();
 
+        // Capture grants made before reading the estimator snapshot so concurrent claims made
+        // after `snapshot` remain accounted for until the next tick absorbs them.
+        let granted_before_snapshot = self.state.snapshot_organic_surbs_granted_in_tick();
+
         // Take a snapshot of the active SURB estimator and calculate the balance change
         let snapshot = SimpleSurbFlowEstimator::from(&self.surb_estimator);
         let Some(target_buffer_change) = snapshot.estimated_surb_buffer_change(&self.last_estimator_state) else {
@@ -1042,6 +1116,8 @@ where
         self.state
             .buffer_level
             .store(current, std::sync::atomic::Ordering::Release);
+        self.state
+            .release_organic_surbs_granted_in_tick(granted_before_snapshot);
 
         // Invalid SURBs are held but cannot bring a reply home, so the balancer replaces them.
         let usable = self.state.usable_level(current);
