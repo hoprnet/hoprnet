@@ -1809,10 +1809,10 @@ pub(crate) struct SlotInstance {
     refusal: OnceLock<StartErrorReason>,
     /// Where an Entry slot's challenge goes when the slot is torn down, see [`ChallengeHome`].
     challenge_home: OnceLock<ChallengeHome>,
-    /// Whether the Entry that established this instance announced resume capability (Exit only).
+    /// Whether the Entry that established this instance announced `Capability::Resumable` (Exit only).
     ///
     /// Decides how the Exit addresses a post-establishment `SessionError` to it: by this instance's challenge
-    /// for a resume-capable Entry, which closes exactly this instance, by the Session ID for an older one.
+    /// for a resumable Entry, which closes exactly this instance, by the Session ID for an older one.
     resume_capable: bool,
     /// The progress of the stream of this instance's data plane (Exit only), see
     /// [`HoprSession::stream_progress`]. Set when the plane is built; empty for a raw Session.
@@ -1830,7 +1830,7 @@ impl SlotInstance {
         Self::new_with(challenge, false)
     }
 
-    /// A new instance established by a request with `challenge`, whose sender is resume-capable or not.
+    /// A new instance established by a request with `challenge`, whose sender is resumable or not.
     fn new_with(challenge: StartChallenge, resume_capable: bool) -> Arc<Self> {
         static NEXT_INSTANCE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         Arc::new(Self {
@@ -1898,7 +1898,7 @@ impl SlotInstance {
         let _ = self.challenge_home.set(ChallengeHome { cache });
     }
 
-    /// Whether the Entry announced resume capability when it established this instance.
+    /// Whether the Entry announced `Capability::Resumable` when it established this instance.
     fn is_resume_capable(&self) -> bool {
         self.resume_capable
     }
@@ -2106,7 +2106,7 @@ enum DrainAttempt {
 const DRAIN_REEVALUATIONS: usize = 3;
 
 /// How the Exit addresses a `SessionError` about the instance holding `slot`: by its challenge for an Entry that
-/// announced resume capability, by the Session ID otherwise.
+/// announced `Capability::Resumable`, by the Session ID otherwise.
 fn error_identifier_of(slot: &SessionSlot, id: &SessionId) -> ErrorIdentifier<SessionId> {
     if slot.instance.is_resume_capable() {
         ErrorIdentifier::Challenge(slot.instance.challenge)
@@ -2368,7 +2368,7 @@ impl SessionSlot {
     }
 
     /// Whether this slot's data plane may be set aside rather than the Session closed: a live control
-    /// plane that holds a paid cycle, for an Entry that can come back to take it over.
+    /// plane that holds a paid cycle, for an Entry that announced `Capability::Resumable`.
     fn is_detachable(&self) -> bool {
         self.is_stateless()
             && self.instance.is_resume_capable()
@@ -3731,7 +3731,7 @@ pub struct IncomingSessionPixConfig {
     /// Only the client ending the stream (`EmptyRead`) starts a detach; the Exit's own application
     /// closing its end (`WriteClosed`) does not. Only a frame-based Session on the stateless socket
     /// (`Capability::Segmentation`, no retransmission) is ever detached or taken over, and only by an
-    /// Entry that announces resume capability.
+    /// Entry that announces `Capability::Resumable`.
     ///
     /// The pseudonym alone authorises a takeover; see hoprnet#8723 for binding it to a secret of the
     /// original Entry.
@@ -7828,7 +7828,7 @@ where
     /// The peer's `handle_session_error` closes the Session on a `SessionId`-identified error and sends
     /// nothing back, so there is no error exchange to loop.
     ///
-    /// The `identifier` names what the peer is to close. An Exit addresses a resume-capable Entry by the
+    /// The `identifier` names what the peer is to close. An Exit addresses a resumable Entry by the
     /// challenge of the instance it means (see [`exit_error_identifier`](Self::exit_error_identifier)), so that
     /// the notice can only end that instance and not a successor under the same pseudonym.
     async fn notify_session_error(
@@ -7869,9 +7869,9 @@ where
     /// How the Exit addresses a post-establishment `SessionError` to the Entry of the Session driven by
     /// `control_plane`, or `None` when that Session is no longer there to be told about.
     ///
-    /// By the challenge of the slot's *current* instance when the Entry that established it announced resume
-    /// capability: the Entry closes the instance that challenge opened and nothing else, so a notice that is
-    /// delayed past a takeover, or sent about a plane that has since been replaced, cannot end the successor.
+    /// By the challenge of the slot's *current* instance when the Entry that established it announced
+    /// `Capability::Resumable`: the Entry closes the instance that challenge opened and nothing else, so a notice that
+    /// is delayed past a takeover, or sent about a plane that has since been replaced, cannot end the successor.
     /// By the Session ID for an Entry that does not understand that, as it always was.
     fn exit_error_identifier(
         &self,
@@ -9665,8 +9665,10 @@ where
         };
 
         let (new_tx, new_rx, new_ingress) = self.new_exit_ingress();
-        // The Entry announced resume capability, or the takeover would have been refused above.
-        let instance = SlotInstance::new_with(session_req.challenge, true);
+        let instance = SlotInstance::new_with(
+            session_req.challenge,
+            session_req.capabilities.0.contains(Capability::Resumable),
+        );
         let session = self.build_exit_data_plane(
             &held,
             session_id,
@@ -10060,12 +10062,12 @@ where
 
         info!(params = %client_params, ssas_per_request, "client offered acceptable PIX parameters");
 
-        // A flagged request for a held PIX Session is a client coming back for the Session it paid for.
+        // A resume attempt (bit 33) for a held PIX Session is a client coming back for the Session it paid for.
         // Decided before anything is reserved, so that nothing is reserved twice: a takeover keeps the
         // slot's cycle budget, and a refusal reserves nothing. A request by the very challenge that
         // established the held slot is a duplicate: refused as an occupied pseudonym is while that instance still
-        // holds the slot, and `NotResumable` once it is gone, since a flagged request never allocates a fresh
-        // Session. An unflagged request never takes over.
+        // holds the slot, and `NotResumable` once it is gone, since a resume attempt never allocates a fresh
+        // Session. A request that is not an attempt never takes over.
         if let Some(held) = held {
             if held.instance.challenge != session_req.challenge {
                 return self
@@ -10126,7 +10128,7 @@ where
 
         let instance = SlotInstance::new_with(
             session_req.challenge,
-            announced_resume_capable(session_req.additional_data),
+            session_req.capabilities.0.contains(Capability::Resumable),
         );
         let slot = SessionSlot {
             session_tx,
@@ -33322,7 +33324,7 @@ mod tests {
         fund: bool,
         idle_timeout: Option<Duration>,
         max_predeposit_packets: Option<u64>,
-        /// Whether the Entry's requests announce resume capability.
+        /// Whether the Entry's requests carry `Capability::Resumable`.
         resume_capable: bool,
     }
 
@@ -33354,7 +33356,7 @@ mod tests {
         pseudonym: HoprPseudonym,
         params: PixParams,
         capabilities: Capabilities,
-        /// Whether the Entry's requests announce resume capability.
+        /// Whether the Entry's requests carry `Capability::Resumable`.
         resume_capable: bool,
         /// When set, the session server closes the next `IncomingSession` the moment it is handed to it.
         close_on_delivery: Arc<std::sync::atomic::AtomicBool>,
@@ -33432,13 +33434,17 @@ mod tests {
             incoming,
             pseudonym: HoprPseudonym::random(),
             params,
-            capabilities: options.capabilities | Capability::UsePIX,
+            capabilities: if options.resume_capable {
+                options.capabilities | Capability::UsePIX | Capability::Resumable
+            } else {
+                options.capabilities | Capability::UsePIX
+            },
             resume_capable: options.resume_capable,
             close_on_delivery,
         };
         let mut first = None;
 
-        // The establishment is a fresh Session: not flagged.
+        // The establishment is a fresh Session: not an attempt.
         let establishment = paid.request_with(MIN_CHALLENGE, paid.params, paid.capabilities, false)?;
         paid.mgr
             .handle_incoming_session_initiation(paid.pseudonym, establishment)
@@ -33534,14 +33540,13 @@ mod tests {
             capabilities: Capabilities,
             resume: bool,
         ) -> anyhow::Result<StartInitiation<SessionTarget, HoprSessionCapabilities>> {
-            let capabilities = if resume {
-                capabilities | Capability::Resume
-            } else {
-                capabilities
-            };
-            let mut additional_data = into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO);
+            let mut capabilities = capabilities;
             if !self.resume_capable {
-                additional_data &= !INITIATION_RESUME_CAPABLE;
+                capabilities -= Capability::Resumable;
+            }
+            let mut additional_data = into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO);
+            if resume {
+                additional_data |= INITIATION_RESUME_ATTEMPT;
             }
             Ok(StartInitiation {
                 challenge,
@@ -33558,7 +33563,7 @@ mod tests {
                 .await
         }
 
-        /// An Entry connecting afresh under this pseudonym: not flagged, so never a takeover.
+        /// An Entry connecting afresh under this pseudonym: not an attempt, so never a takeover.
         async fn start_fresh(&self, challenge: StartChallenge) -> errors::Result<()> {
             let request = self
                 .request_with(challenge, self.params, self.capabilities, false)
@@ -34754,7 +34759,7 @@ mod tests {
     /// A request that does not ask to resume never takes over: with a Session held it is refused as an
     /// occupied pseudonym is, and the held Session is untouched.
     #[test_log::test(tokio::test)]
-    async fn an_unflagged_request_never_takes_over() -> anyhow::Result<()> {
+    async fn a_request_that_is_not_an_attempt_never_takes_over() -> anyhow::Result<()> {
         let (mut exit, _first) = paid_exit(PaidExitOptions::default()).await?;
         let before = exit.instance()?;
         let _ = exit.originated(Duration::from_millis(50)).await;
@@ -34775,14 +34780,14 @@ mod tests {
         Ok(())
     }
 
-    /// A Session established by an unflagged request is taken over: the stored terms carry no `Resume` flag, as
-    /// the request's stripped capabilities do not.
+    /// The stored terms keep `Resumable`, as the request's capabilities carry it, and the Session is taken over.
     #[test_log::test(tokio::test)]
-    async fn a_session_established_unflagged_can_be_taken_over() -> anyhow::Result<()> {
+    async fn the_stored_terms_keep_resumable_and_the_session_can_be_taken_over() -> anyhow::Result<()> {
         let (mut exit, _first) = paid_exit(PaidExitOptions::default()).await?;
         let slot = exit.slot()?;
         let terms = slot.exit_resume.terms.get().context("terms")?;
-        assert!(!terms.capabilities.contains(Capability::Resume));
+        assert!(terms.capabilities.contains(Capability::Resumable));
+        assert!(slot.instance.is_resume_capable());
         drop(slot);
         let _ = exit.originated(Duration::from_millis(50)).await;
 
@@ -34794,7 +34799,7 @@ mod tests {
         Ok(())
     }
 
-    /// A flagged request with nothing held, or with takeover switched off, is refused before anything is
+    /// A resume attempt with nothing held, or with takeover switched off, is refused before anything is
     /// allocated or reserved.
     #[rstest]
     #[case::nothing_held(false)]
@@ -35105,7 +35110,7 @@ mod tests {
         Ok(())
     }
 
-    /// A `SessionError` after establishment is addressed to a resume-capable Entry by the challenge of the
+    /// A `SessionError` after establishment is addressed to a resumable Entry by the challenge of the
     /// instance it means, to an older Entry by the Session ID.
     #[rstest]
     #[case::capable(true)]
@@ -35344,7 +35349,7 @@ mod tests {
         Ok(())
     }
 
-    /// With the window at zero there is no takeover at all, of a live Session or of one flagged as
+    /// With the window at zero there is no takeover at all, of a live Session or of one marked as
     /// detached: every resume request is `NotResumable`.
     #[rstest]
     #[case::live(false)]
