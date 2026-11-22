@@ -3,7 +3,7 @@
 use validator::{Validate, ValidationError, ValidationErrors};
 
 fn default_ack_buffer_interval() -> std::time::Duration {
-    std::time::Duration::from_millis(200)
+    std::time::Duration::from_millis(500)
 }
 
 fn default_ack_grouping_capacity() -> usize {
@@ -22,9 +22,13 @@ fn default_ack_out_buffer_size() -> usize {
 #[derive(Debug, Copy, Clone, smart_default::SmartDefault, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct AcknowledgementPipelineConfig {
-    /// Interval for which to wait to buffer acknowledgements before sending them out.
+    /// Maximum interval to wait for per-peer acknowledgements before flushing a partial batch.
     ///
-    /// Default is 200 ms.
+    /// Full batches of `MAX_ACKNOWLEDGEMENTS_BATCH_SIZE` (33) flush immediately without waiting;
+    /// low-rate peers wait at most this interval before their partial batch flushes. Retains the
+    /// `ack_buffer_interval` field/YAML key name for configuration backwards compatibility.
+    ///
+    /// Default is 500 ms.
     #[default(default_ack_buffer_interval())]
     #[cfg_attr(
         feature = "serde",
@@ -274,5 +278,12 @@ mod tests {
             ..PoolArbitrationConfig::default()
         };
         assert_eq!(disabled.to_arbitration(), ArbitrationConfig::Disabled);
+    }
+
+    #[test]
+    fn ack_pipeline_config_default_interval_is_500ms_and_valid() {
+        let cfg = AcknowledgementPipelineConfig::default();
+        assert_eq!(std::time::Duration::from_millis(500), cfg.ack_buffer_interval);
+        assert!(cfg.validate().is_ok());
     }
 }
