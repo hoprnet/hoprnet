@@ -10131,6 +10131,18 @@ where
                 "client offered unacceptable PIX parameters"
             );
 
+            // A resume attempt for a held Session is refused as any ineligible takeover is: the Entry then forgets
+            // its PIX state and switches pseudonym, where `UnacceptablePixParams` would have it retry the resume.
+            if held.is_some() {
+                return self
+                    .refuse_takeover(
+                        &session_req,
+                        reply_routing,
+                        "held terms no longer fit the admitted quota",
+                    )
+                    .await;
+            }
+
             // Notify the sender that the session could not be established
             return self
                 .refuse_session_start(
@@ -33532,6 +33544,8 @@ mod tests {
         requests: Arc<std::sync::atomic::AtomicUsize>,
         hold_next: Arc<std::sync::atomic::AtomicBool>,
         release: Arc<tokio::sync::Notify>,
+        /// Whether decisions narrow the quota range to one above the fixture's offer.
+        narrow_quota: Arc<std::sync::atomic::AtomicBool>,
     }
 
     impl GatedAdmission {
@@ -33544,12 +33558,19 @@ mod tests {
                     this.requests.fetch_add(1, Ordering::SeqCst);
                     let hold = this.hold_next.swap(false, Ordering::SeqCst);
                     let release = this.release.clone();
+                    let narrow = this.narrow_quota.load(Ordering::SeqCst);
                     // Answered off the loop, so that a held request does not hold the ones behind it.
                     tokio::spawn(async move {
                         if hold {
                             release.notified().await;
                         }
-                        let _ = reply.send(Ok(SessionAdmissionDecision::default()));
+                        let decision = if narrow {
+                            let above = pix_params_to_quota(&fill_pix_params()) + 1;
+                            SessionAdmissionDecision::default().with_pix_quota_range(above..=u64::MAX)
+                        } else {
+                            SessionAdmissionDecision::default()
+                        };
+                        let _ = reply.send(Ok(decision));
                     });
                 }
             });
@@ -35867,6 +35888,32 @@ mod tests {
             );
             assert_eq!(1, seen.data, "only the winner's write is sent: {seen:?}");
         }
+        Ok(())
+    }
+
+    /// A resume attempt whose held terms no longer fit the quota range admission now allows is refused as an
+    /// ineligible takeover (`NotResumable`), not as `UnacceptablePixParams`, which would have the Entry retry it.
+    #[test_log::test(tokio::test)]
+    async fn a_resume_whose_terms_no_longer_fit_the_admitted_quota_is_not_resumable() -> anyhow::Result<()> {
+        let admission = GatedAdmission::default();
+        let (mut exit, _first) = paid_exit(PaidExitOptions {
+            session_admission: Some(admission.sink()),
+            ..Default::default()
+        })
+        .await?;
+        let before = exit.instance()?;
+        let _ = exit.originated(Duration::from_millis(50)).await;
+
+        admission.narrow_quota.store(true, Ordering::SeqCst);
+        exit.reconnect(MIN_CHALLENGE + 1).await?;
+
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
+        assert_eq!(0, seen.resumed.len(), "{seen:?}");
+        assert!(
+            Arc::ptr_eq(&exit.slot()?.instance, &before),
+            "the held slot is untouched"
+        );
         Ok(())
     }
 
