@@ -1372,8 +1372,8 @@ mod tests {
     }
 
     #[test]
-    fn byte_capabilities_resume_round_trip() -> anyhow::Result<()> {
-        let caps: Capabilities = Capability::UsePIX | Capability::Resume;
+    fn byte_capabilities_resumable_round_trip() -> anyhow::Result<()> {
+        let caps: Capabilities = Capability::UsePIX | Capability::Resumable;
         let byte_val: u8 = HoprSessionCapabilities::from(caps).into();
         assert_eq!(byte_val, 0b0110_0000);
         assert_eq!(*HoprSessionCapabilities::try_from(byte_val)?.as_ref(), caps);

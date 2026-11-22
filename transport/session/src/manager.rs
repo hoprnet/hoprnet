@@ -3471,32 +3471,24 @@ impl EffectivePixAdmission {
 
 /// Bit position of the 64-bit options word within `StartInitiation::additional_data`.
 ///
-/// The options word (PIX parameters and SURB balancer target) occupies the most significant 64 bits. The
-/// least significant 32 bits carry the Entry's idle timeout (see [`into_initiation_additional_data`]); the 32
-/// above them are unused and always sent as `0`.
+/// The layout is: the low 32 bits carry the Entry's idle timeout (see [`into_initiation_additional_data`]),
+/// bit 32 is reserved for forward receipts (hoprnet#8702), bit 33 marks a resume attempt
+/// ([`INITIATION_RESUME_ATTEMPT`]), bits 34 to 63 are reserved for the resume secret (hoprnet#8723), and the
+/// high 64 bits are the options word.
 const INITIATION_OPTIONS_SHIFT: u32 = u64::BITS;
 
-/// Bit of `StartInitiation::additional_data` announcing that the Entry is resume-capable: it understands
-/// `SessionResumed` and agreed stream bases (see [`StartResumed`]).
-///
-/// Sits in the unused half of the reserved least significant 64 bits (bit 32, just above the idle
-/// timeout). An Exit that predates it ignores the bit; an Exit takes a held Session over only for an
-/// Entry that set it, so an Entry without it is refused as before. Bits 33 to 63 stay reserved for a
-/// resume MAC that would bind a takeover to a secret rather than to the pseudonym alone, see
-/// hoprnet#8723.
-const INITIATION_RESUME_CAPABLE: u128 = 1 << 32;
+/// Bit of `StartInitiation::additional_data` marking an attempt to resume a Session the Entry still holds PIX
+/// state for. It is set only by the session manager, and an Exit that predates it ignores it.
+const INITIATION_RESUME_ATTEMPT: u128 = 1 << 33;
 
-/// Whether the Entry announced resume capability in `additional_data`; see [`INITIATION_RESUME_CAPABLE`].
-// Read by the Exit side of the handshake (hoprnet#8721).
-#[allow(dead_code)]
+/// Whether `additional_data` marks a resume attempt; see [`INITIATION_RESUME_ATTEMPT`].
 #[inline]
-pub(crate) const fn announced_resume_capable(additional_data: u128) -> bool {
-    additional_data & INITIATION_RESUME_CAPABLE != 0
+pub(crate) const fn announced_resume_attempt(additional_data: u128) -> bool {
+    additional_data & INITIATION_RESUME_ATTEMPT != 0
 }
 
 /// Packs the 64-bit options word into the most significant half of `StartInitiation::additional_data`, and
-/// the Entry's idle timeout into its lowest 32 bits. The resume-capable bit ([`INITIATION_RESUME_CAPABLE`]) is
-/// always set: every Session this Entry opens understands `SessionResumed`.
+/// the Entry's idle timeout into its lowest 32 bits. No bit between them is set.
 ///
 /// The timeout is in whole seconds, at least 1 for a nonzero one, saturating at `u32::MAX`; `0` means it is
 /// not announced. The Exit bounds its idle report backoff by it (see [`session_idle_notify_cap`]).
@@ -3507,7 +3499,7 @@ fn into_initiation_additional_data(options: u64, entry_idle_timeout: Duration) -
     } else {
         entry_idle_timeout.as_secs().clamp(1, u32::MAX as u64) as u32
     };
-    ((options as u128) << INITIATION_OPTIONS_SHIFT) | INITIATION_RESUME_CAPABLE | idle_secs as u128
+    ((options as u128) << INITIATION_OPTIONS_SHIFT) | idle_secs as u128
 }
 
 /// Inverse of [`into_initiation_additional_data`] for the options word, ignoring the least significant half.
@@ -5861,8 +5853,12 @@ where
         target: SessionTarget,
         mut cfg: SessionClientConfig,
     ) -> errors::Result<HoprSession> {
-        // Only the manager decides to resume; a caller-supplied flag must reach neither the wire nor the Session.
-        cfg.capabilities -= Capability::Resume;
+        // Every PIX Session is resumable and no other is, whatever the caller passed.
+        if cfg.capabilities.contains(Capability::UsePIX) {
+            cfg.capabilities |= Capability::Resumable;
+        } else {
+            cfg.capabilities -= Capability::Resumable;
+        }
 
         // Evicts a slot that idled out but that the cache has not yet evicted, running its eviction
         // listener here and now: that is what parks an expired predecessor's PIX ledger before the
@@ -6046,15 +6042,15 @@ where
                         .get()
                         .is_some_and(|toolbox| toolbox.share_generator.emission_progress(&pseudonym).is_some())
             });
-        let mut initiation_capabilities = cfg.capabilities;
+        let mut additional_data = into_initiation_additional_data(additional_data, self.cfg.idle_timeout);
         if resuming {
-            initiation_capabilities |= Capability::Resume;
+            additional_data |= INITIATION_RESUME_ATTEMPT;
         }
         let start_session_msg = HoprStartProtocol::StartSession(StartInitiation {
             challenge,
             target,
-            capabilities: HoprSessionCapabilities(initiation_capabilities),
-            additional_data: into_initiation_additional_data(additional_data, self.cfg.idle_timeout),
+            capabilities: HoprSessionCapabilities(cfg.capabilities),
+            additional_data,
         });
 
         let forward_routing = DestinationRouting::Forward {
@@ -8708,13 +8704,11 @@ where
     async fn handle_incoming_session_initiation(
         &self,
         pseudonym: HoprPseudonym,
-        mut session_req: StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        session_req: StartInitiation<SessionTarget, HoprSessionCapabilities>,
     ) -> errors::Result<()> {
         trace!(challenge = session_req.challenge, "received session initiation request");
 
-        // Read once and stripped, so that everything downstream sees clean capabilities.
-        let resume_requested = session_req.capabilities.0.contains(Capability::Resume);
-        session_req.capabilities.0 -= Capability::Resume;
+        let resume_requested = announced_resume_attempt(session_req.additional_data);
 
         debug!("got new session request, searching for a free session slot");
 
@@ -9362,7 +9356,7 @@ where
                     }
                     error!(%challenge, "session establishment error received");
                 } else if let Some(instance) = self.forward_instance_of_challenge(&pseudonym, challenge) {
-                    // An error an Exit sends to a resume-capable Entry after its reply, scoped to the
+                    // An error an Exit sends to a resumable Entry after its reply, scoped to the
                     // Session instance this challenge opened: the pseudonym is reusable, so an error
                     // that names a challenge of an earlier Session of it must not close this one. A
                     // setup still in progress fails with the reason.
@@ -19068,8 +19062,8 @@ mod tests {
         Ok(())
     }
 
-    /// An Exit cannot resume: a request carrying `Resume` is refused with `NotResumable` before the session
-    /// server is asked, and no slot is created.
+    /// An Exit cannot resume: a request marked as a resume attempt (bit 33) is refused with `NotResumable` before the
+    /// session server is asked, and no slot is created.
     #[test_log::test(tokio::test)]
     async fn an_exit_refuses_a_resume_request_without_asking_the_session_server() -> anyhow::Result<()> {
         let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -19084,7 +19078,7 @@ mod tests {
             started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
 
         let mut offer = pix_offer();
-        offer.capabilities = HoprSessionCapabilities(offer.capabilities.0 | Capability::Resume);
+        offer.additional_data |= INITIATION_RESUME_ATTEMPT;
         let pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(pseudonym, offer).await?;
 
@@ -31001,6 +30995,16 @@ mod tests {
             Ok(session)
         }
 
+        /// Whether the last `StartSession` the Entry sent marked a resume attempt.
+        fn last_attempt(&self) -> anyhow::Result<bool> {
+            self.initiations
+                .lock()
+                .last()
+                .copied()
+                .map(announced_resume_attempt)
+                .context("no StartSession was sent")
+        }
+
         /// The capabilities of the last `StartSession` the Entry sent.
         fn last_capabilities(&self) -> anyhow::Result<Capabilities> {
             self.capabilities
@@ -31403,33 +31407,40 @@ mod tests {
         Ok(())
     }
 
-    /// Every `StartSession` announces resume capability, and the accessor reads it.
+    /// Every PIX `StartSession` carries `Resumable`, a non-PIX one does not, and no bit above the idle timeout
+    /// is set on a first connect.
     #[test_log::test(tokio::test)]
-    async fn every_initiation_announces_resume_capability() -> anyhow::Result<()> {
+    async fn every_pix_initiation_carries_resumable() -> anyhow::Result<()> {
         let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
         let _plain = rig.connect(entry_cfg(Capabilities::empty(), None)).await?;
+        assert!(!rig.last_capabilities()?.contains(Capability::Resumable));
         let _pix = rig.connect_pix(None).await?;
+        assert!(rig.last_capabilities()?.contains(Capability::Resumable));
         let sent = rig.initiations.lock().clone();
         assert_eq!(2, sent.len());
         for additional_data in sent {
-            assert!(announced_resume_capable(additional_data), "{additional_data:#x}");
-            assert_eq!(1 << 32, additional_data & (0xffff_ffff << 32), "no other reserved bit");
+            assert!(!announced_resume_attempt(additional_data), "{additional_data:#x}");
+            assert_eq!(0, additional_data & (0xffff_ffffu128 << 32), "{additional_data:#x}");
         }
         Ok(())
     }
 
     #[test]
-    fn the_resume_capable_bit_is_bit_32_and_leaves_the_other_fields_alone() {
-        assert_eq!(1u128 << 32, INITIATION_RESUME_CAPABLE);
+    fn the_resume_attempt_bit_is_bit_33_and_leaves_the_other_fields_alone() {
+        assert_eq!(1u128 << 33, INITIATION_RESUME_ATTEMPT);
+        let reserved = 0xffff_ffffu128 << 32;
         for (options, idle) in [(0u64, Duration::ZERO), (0xdead_beef_0000_0001, Duration::from_secs(90))] {
             let data = into_initiation_additional_data(options, idle);
-            assert!(announced_resume_capable(data));
-            assert_eq!(options, initiation_options(data));
-            assert_eq!((!idle.is_zero()).then_some(idle), announced_idle_timeout(data));
+            assert!(!announced_resume_attempt(data));
+            assert_eq!(0, data & reserved, "bits 32..64 stay clear");
+            let attempt = data | INITIATION_RESUME_ATTEMPT;
+            assert!(announced_resume_attempt(attempt));
+            assert_eq!(options, initiation_options(attempt));
+            assert_eq!((!idle.is_zero()).then_some(idle), announced_idle_timeout(attempt));
         }
-        assert!(!announced_resume_capable(0));
-        assert!(!announced_resume_capable(!INITIATION_RESUME_CAPABLE));
-        assert!(announced_resume_capable(INITIATION_RESUME_CAPABLE));
+        assert!(!announced_resume_attempt(0));
+        assert!(!announced_resume_attempt(!INITIATION_RESUME_ATTEMPT));
+        assert!(announced_resume_attempt(INITIATION_RESUME_ATTEMPT));
     }
 
     /// A base the socket cannot number a stream from, or a stateful socket, fails the establishment
@@ -31471,10 +31482,7 @@ mod tests {
                 .connect(entry_cfg(capabilities | Capability::UsePIX, Some(pseudonym)))
                 .await
                 .expect_err(case);
-            assert!(
-                rig.last_capabilities()?.contains(Capability::Resume),
-                "{case}: a resume attempt"
-            );
+            assert!(rig.last_attempt()?, "{case}: a resume attempt");
             assert!(
                 matches!(
                     err.downcast_ref::<TransportSessionError>(),
@@ -31509,31 +31517,30 @@ mod tests {
         Ok(())
     }
 
-    /// `Resume` is offered exactly when the Entry holds PIX state for the pseudonym, and a caller cannot set it.
+    /// The resume attempt is marked exactly when the Entry holds PIX state for the pseudonym, and a caller
+    /// cannot set `Resumable` on a non-PIX Session.
     #[test_log::test(tokio::test)]
-    async fn the_resume_flag_follows_the_pix_state() -> anyhow::Result<()> {
+    async fn the_resume_attempt_follows_the_pix_state() -> anyhow::Result<()> {
         let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
         let pseudonym = HoprPseudonym::random();
 
         // A first connect holds no state.
         let _first = rig.connect_pix(Some(pseudonym)).await?;
-        assert!(!rig.last_capabilities()?.contains(Capability::Resume), "first connect");
+        assert!(!rig.last_attempt()?, "first connect");
 
         // A ledger watermark alone: offered, though the Entry cannot continue on half its state.
         rig.request(pseudonym, 1).await?;
         rig.generator.forget(&pseudonym);
         rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
         assert!(rig.connect_pix(Some(pseudonym)).await.is_err());
-        assert!(
-            rig.last_capabilities()?.contains(Capability::Resume),
-            "ledger watermark"
-        );
+        assert!(rig.last_attempt()?, "ledger watermark");
         assert!(rig.last_capabilities()?.contains(Capability::UsePIX));
 
-        // A non-PIX connect never offers it.
+        // A non-PIX connect never attempts one.
         rig.reply_with(StubReply::Established);
         let _plain = rig.connect(entry_cfg(Capabilities::empty(), Some(pseudonym))).await?;
         assert!(rig.last_capabilities()?.is_empty(), "non-PIX connect");
+        assert!(!rig.last_attempt()?, "non-PIX connect");
 
         // Generator state alone: a ledger without a watermark.
         let generator_only = HoprPseudonym::random();
@@ -31546,10 +31553,7 @@ mod tests {
         assert!(rig.generator.emission_progress(&generator_only).is_some());
         rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
         assert!(rig.connect_pix(Some(generator_only)).await.is_err());
-        assert!(
-            rig.last_capabilities()?.contains(Capability::Resume),
-            "generator-only state"
-        );
+        assert!(rig.last_attempt()?, "generator-only state");
 
         // A ledger of other dimensions is replaced together with the generator's state.
         let replaced = HoprPseudonym::random();
@@ -31564,22 +31568,21 @@ mod tests {
         rig.mgr.pix_ledgers.insert(replaced, EntryPixLedger::new(other));
         rig.reply_with(StubReply::Established);
         let _fresh = rig.connect_pix(Some(replaced)).await?;
-        assert!(
-            !rig.last_capabilities()?.contains(Capability::Resume),
-            "a replaced ledger starts over"
-        );
+        assert!(!rig.last_attempt()?, "a replaced ledger starts over");
         assert!(rig.generator.emission_progress(&replaced).is_none());
 
-        // A caller-set flag reaches neither the wire nor the Session.
+        // A PIX Session is resumable even if the caller did not say so, and a non-PIX one never is.
         rig.reply_with(StubReply::Established);
         let session = rig
-            .connect(entry_cfg(
-                Capability::UsePIX | Capability::Resume,
-                Some(HoprPseudonym::random()),
-            ))
+            .connect(entry_cfg(Capability::UsePIX.into(), Some(HoprPseudonym::random())))
             .await?;
-        assert!(!rig.last_capabilities()?.contains(Capability::Resume));
-        assert!(!session.config().capabilities.contains(Capability::Resume));
+        assert!(rig.last_capabilities()?.contains(Capability::Resumable));
+        assert!(session.config().capabilities.contains(Capability::Resumable));
+        let session = rig
+            .connect(entry_cfg(Capability::Resumable.into(), Some(HoprPseudonym::random())))
+            .await?;
+        assert!(!rig.last_capabilities()?.contains(Capability::Resumable));
+        assert!(!session.config().capabilities.contains(Capability::Resumable));
         Ok(())
     }
 
@@ -31594,7 +31597,7 @@ mod tests {
 
         rig.reply_with(StubReply::Refused(StartErrorReason::NotResumable));
         let err = rig.connect_pix(Some(pseudonym)).await.expect_err("refused");
-        assert!(rig.last_capabilities()?.contains(Capability::Resume));
+        assert!(rig.last_attempt()?);
         assert!(
             matches!(
                 err.downcast_ref::<TransportSessionError>(),
@@ -31609,10 +31612,10 @@ mod tests {
         assert!(rig.parked_ledger(&pseudonym).is_none(), "no ledger is parked");
         assert!(rig.mgr.sessions.get(&pseudonym).is_none());
 
-        // The next connect is a first one: unflagged, and its opening batch commits SSA 1.
+        // The next connect is a first one: not an attempt, and its opening batch commits SSA 1.
         rig.reply_with(StubReply::Established);
         let _next = rig.connect_pix(Some(pseudonym)).await?;
-        assert!(!rig.last_capabilities()?.contains(Capability::Resume));
+        assert!(!rig.last_attempt()?);
         assert_eq!(None, rig.watermark(&pseudonym));
         rig.request(pseudonym, 1).await?;
         assert_eq!(1, rig.deposits().await);
@@ -31631,7 +31634,7 @@ mod tests {
 
         let (connected, concurrent) = tokio::join!(rig.connect_pix(Some(pseudonym)), rig.request(pseudonym, 1));
         let err = connected.expect_err("a fresh Session cannot answer a resume attempt");
-        assert!(rig.last_capabilities()?.contains(Capability::Resume));
+        assert!(rig.last_attempt()?);
         assert!(
             matches!(
                 err.downcast_ref::<TransportSessionError>(),
@@ -31655,14 +31658,14 @@ mod tests {
         Ok(())
     }
 
-    /// A `SessionResumed` answering a request that did not offer to resume fails the establishment.
+    /// A `SessionResumed` answering a request that was not a resume attempt fails the establishment.
     #[test_log::test(tokio::test)]
-    async fn a_resumed_session_answering_an_unflagged_request_fails_the_establishment() -> anyhow::Result<()> {
+    async fn a_resumed_session_answering_a_non_attempt_fails_the_establishment() -> anyhow::Result<()> {
         let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
         rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
         let pseudonym = HoprPseudonym::random();
         let err = rig.connect_pix(Some(pseudonym)).await.expect_err("not offered");
-        assert!(!rig.last_capabilities()?.contains(Capability::Resume));
+        assert!(!rig.last_attempt()?);
         assert!(
             matches!(
                 err.downcast_ref::<TransportSessionError>(),
@@ -31972,7 +31975,7 @@ mod tests {
 
         rig.reply_with(StubReply::ResumedOther(TEST_STREAM_BASE));
         let err = rig.connect_pix(Some(pseudonym)).await.expect_err("another Session");
-        assert!(rig.last_capabilities()?.contains(Capability::Resume));
+        assert!(rig.last_attempt()?);
         assert!(
             matches!(
                 err.downcast_ref::<TransportSessionError>(),

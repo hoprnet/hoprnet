@@ -125,11 +125,12 @@ flagset::flags! {
         /// (from this node's  [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator)) falls
         /// outside its acceptable range, or (with `enforce_pix`) if this flag is *absent*.
         UsePIX = 0b0010_0000,
-        /// Marks an attempt to resume a Session the Entry still holds PIX state for.
+        /// Announces that the Entry can resume this Session later, i.e. it understands `SessionResumed`, stream
+        /// bases and errors addressed by challenge.
         ///
-        /// Set by the session manager on a resume attempt only; a caller-supplied value is ignored.
-        /// An Exit without this flag cannot parse it, so Exits must be upgraded before clients.
-        Resume = 0b0100_0000,
+        /// The session manager sets it on every PIX Session. An Exit that predates it ignores it, because
+        /// unknown capability bits are ignored since hoprnet#8736.
+        Resumable = 0b0100_0000,
     }
 }
 

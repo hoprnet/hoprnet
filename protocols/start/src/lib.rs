@@ -114,10 +114,10 @@ pub struct StartInitiation<T, C> {
     /// and the lower 32 bits of them are the SURB balancer target.
     ///
     /// The least significant 64 bits are reserved: the lowest 32 carry the sender's session idle timeout in
-    /// whole seconds (`0` if not announced), and the 32 above them are for extensions. Bit 32 announces that the
-    /// sender is resume-capable: it understands [`StartProtocol::SessionResumed`] and the stream base it carries.
-    /// Bits 33 to 63 stay reserved (for a resume MAC, see hoprnet#8723). Senders set unused bits to `0` and
-    /// receivers ignore them, so that they can be allocated later without breaking older decoders.
+    /// whole seconds (`0` if not announced), bit 32 is reserved for forward receipts (hoprnet#8702), and bit 33
+    /// marks an attempt to resume a Session (answered by [`StartProtocol::SessionResumed`]). Bits 34 to 63 stay
+    /// reserved (for a resume secret, see hoprnet#8723). Senders set unused bits to `0` and receivers ignore
+    /// them, so that they can be allocated later without breaking older decoders.
     pub additional_data: u128,
 }
 
@@ -135,8 +135,8 @@ pub struct StartEstablished<I> {
 
 /// Message of the Start protocol that confirms a takeover of a Session the Exit still held.
 ///
-/// It is sent by an Exit only to an Entry that announced resume capability in the
-/// [initiation](StartInitiation), in place of [`StartEstablished`], after the Exit took over a Session
+/// It is sent by an Exit only in answer to a resume attempt (see [`StartInitiation::additional_data`]),
+/// in place of [`StartEstablished`], after the Exit took over a Session
 /// it was still holding for the same pseudonym. The Entry then keeps its accounting state for the
 /// pseudonym, numbers its stream from [`stream_base`](Self::stream_base) and expects the Exit's frames
 /// to be numbered from it, so that the predecessor's frames are all below the base.
@@ -172,7 +172,7 @@ pub struct StartResumed<I> {
 ///      Note right of Exit: SessionID [Pseudonym, Tag]
 ///      Exit->>Entry: SessionEstablished (Challenge, SessionID)
 ///      Note left of Entry: SessionID [Pseudonym, Tag]
-///      Note over Entry,Exit: after a takeover of a held Session, to a resume-capable Entry only, SessionResumed (Challenge, SessionID, StreamBase) replaces SessionEstablished
+///      Note over Entry,Exit: after a takeover of a held Session, to a resume attempt only, SessionResumed (Challenge, SessionID, StreamBase) replaces SessionEstablished
 ///      Exit->>Entry: SsaRequest (SessionID, SsaIndex, ServerCommitments)
 ///      Entry->>Exit: SsaCommit (SessionID, SsaIndex, CoeffIndex, PolyCoeffs)
 ///      Entry->>Exit: KeepAlive (SessionID)
@@ -187,7 +187,8 @@ pub struct StartResumed<I> {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
+#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount))]
+#[repr(u8)]
 pub enum StartProtocol<I, T, C, G, K, D> {
     /// Request to initiate a new session.
     StartSession(StartInitiation<T, C>),
@@ -203,10 +204,10 @@ pub enum StartProtocol<I, T, C, G, K, D> {
     KeepAlive(KeepAliveMessage<I>),
     /// Confirmation that the counterparty took over a Session it still held (see [`StartResumed`]).
     ///
-    /// Sent only to an Entry that announced resume capability, in place of
-    /// [`SessionEstablished`](StartProtocol::SessionEstablished). It is the last variant so that the
-    /// discriminants of all other messages stay unchanged.
-    SessionResumed(StartResumed<I>),
+    /// Sent only in answer to a resume attempt, in place of
+    /// [`SessionEstablished`](StartProtocol::SessionEstablished). It has tag 7 because tag 6 is reserved for
+    /// forward receipts (hoprnet#8702).
+    SessionResumed(StartResumed<I>) = 7,
 }
 
 /// Filling up the Client's commitment to the Session Stealth Address (SSA).
@@ -1397,6 +1398,7 @@ mod tests {
                 stream_base: 0x0001_0000,
             });
         let (tag, data) = msg.clone().encode()?;
+        assert_eq!(7, data[1]);
         assert_eq!(StartProtocolDiscriminants::SessionResumed as u8, data[1]);
         assert_eq!(&0x0102_0304_0506_0708u64.to_be_bytes(), &data[4..12]);
         assert_eq!(&0x0001_0000u32.to_be_bytes(), &data[12..16]);
@@ -1411,6 +1413,24 @@ mod tests {
     }
 
     #[test]
+    fn reserved_tag_6_should_decode_as_unknown_message() {
+        let data = [
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::START_PROTOCOL_VERSION,
+            6,
+            0,
+            1,
+            0,
+        ];
+        assert!(matches!(
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(
+                StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG,
+                &data
+            ),
+            Err(StartProtocolError::UnknownMessage)
+        ));
+    }
+
+    #[test]
     fn start_protocol_discriminants_should_stay_stable_and_resumed_should_be_last() -> anyhow::Result<()> {
         assert_eq!(0, StartProtocolDiscriminants::StartSession as u8);
         assert_eq!(1, StartProtocolDiscriminants::SessionEstablished as u8);
@@ -1418,8 +1438,10 @@ mod tests {
         assert_eq!(3, StartProtocolDiscriminants::SsaRequest as u8);
         assert_eq!(4, StartProtocolDiscriminants::SessionError as u8);
         assert_eq!(5, StartProtocolDiscriminants::KeepAlive as u8);
-        assert_eq!(6, StartProtocolDiscriminants::SessionResumed as u8);
+        assert_eq!(7, StartProtocolDiscriminants::SessionResumed as u8);
+        // Tag 6 is skipped (reserved for forward receipts), so the count is one less than the last tag + 1.
         assert_eq!(7, <StartProtocolDiscriminants as strum::EnumCount>::COUNT);
+        assert!(StartProtocolDiscriminants::from_repr(6).is_none());
 
         // A message of an existing kind, as an old peer encodes it, still decodes
         let old = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionEstablished(
