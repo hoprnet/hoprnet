@@ -2435,6 +2435,9 @@ impl SessionSlot {
         if !self.is_stateless() {
             return Some("only a frame-based Session on the stateless socket can be taken over");
         }
+        if !self.instance.is_resume_capable() {
+            return Some("established by an Entry that did not announce Resumable");
+        }
         if self.pix_fill.get().is_none_or(|fill| fill.is_draining()) {
             return Some("draining");
         }
@@ -34995,6 +34998,43 @@ mod tests {
         Ok(())
     }
 
+    /// A Session established by an Entry that never announced `Resumable` is not taken over by a resume attempt
+    /// either: refused before admission, the held Session untouched.
+    #[test_log::test(tokio::test)]
+    async fn a_session_of_an_entry_that_did_not_announce_resumable_is_not_taken_over() -> anyhow::Result<()> {
+        let (mut exit, _first) = paid_exit(PaidExitOptions {
+            resume_capable: false,
+            ..Default::default()
+        })
+        .await?;
+        let _ = exit.originated(Duration::from_millis(50)).await;
+        let held_before = exit.instance()?;
+        let cycle_bytes = exit.mgr.live_cycle_bytes.load(Ordering::Relaxed);
+
+        // The attempt has the very capabilities the held Session was established with: no `Resumable`.
+        exit.reconnect(MIN_CHALLENGE + 1).await?;
+
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
+        assert_eq!(0, seen.established + seen.resumed.len(), "{seen:?}");
+        assert!(
+            exit.incoming.try_recv().is_err(),
+            "nothing is handed to the session server"
+        );
+        assert!(
+            Arc::ptr_eq(&held_before, &exit.instance()?),
+            "the held Session is untouched"
+        );
+        assert!(!exit.slot()?.instance.is_superseded());
+        assert_eq!(1, exit.mgr.num_active_sessions());
+        assert_eq!(
+            cycle_bytes,
+            exit.mgr.live_cycle_bytes.load(Ordering::Relaxed),
+            "nothing reserved"
+        );
+        Ok(())
+    }
+
     /// A raw Session (no frames, so no stream to number) is never taken over, nor detached.
     #[test_log::test(tokio::test)]
     async fn a_raw_session_is_neither_detached_nor_taken_over() -> anyhow::Result<()> {
@@ -35898,7 +35938,7 @@ mod tests {
     /// The first challenge under a pseudonym is drawn from the lower half of the range, so that
     /// increments cannot realistically wrap; later ones follow the last, and a collision probes upward.
     #[test]
-    fn challenge_selection_starts_low_follows_the_last_and_probes_upward() {
+    fn challenge_selection_starts_low_follows_the_last_and_probes_upward() -> anyhow::Result<()> {
         use hopr_api::types::crypto_random::MAX_RANDOM_INTEGER;
 
         for _ in 0..500 {
@@ -35912,8 +35952,9 @@ mod tests {
         let cache: moka::sync::Cache<StartChallenge, u8> = moka::sync::Cache::builder().max_capacity(10).build();
         cache.insert(8, 0);
         let (claimed, _) = insert_into_next_slot(&cache, |ch| next_challenge(Some(7), ch), |_| 1u8, Some(10))
-            .expect("a free challenge exists");
+            .context("a free challenge exists")?;
         assert_eq!(9, claimed);
+        Ok(())
     }
 
     /// The record keeps the largest challenge whatever the order the notes arrive in.
