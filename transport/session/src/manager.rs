@@ -4202,9 +4202,28 @@ where
     D: TryInto<ApplicationData>,
     D::Error: std::error::Error + Send + Sync + 'static,
 {
+    send_via_msg_sender_with_info(msg_sender, routing, data, None, error_context).await
+}
+
+/// [`send_via_msg_sender`] with explicit `packet_info` for the outgoing packet.
+async fn send_via_msg_sender_with_info<S, D>(
+    msg_sender: &mut S,
+    routing: DestinationRouting,
+    data: D,
+    packet_info: Option<OutgoingPacketInfo>,
+    error_context: &'static str,
+) -> errors::Result<()>
+where
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    D: TryInto<ApplicationData>,
+    D::Error: std::error::Error + Send + Sync + 'static,
+{
     let app_data: ApplicationData = data.try_into().map_err(SessionManagerError::other)?;
+    let mut out = ApplicationDataOut::with_no_packet_info(app_data);
+    out.packet_info = packet_info;
     msg_sender
-        .send((routing, ApplicationDataOut::with_no_packet_info(app_data)))
+        .send((routing, out))
         .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
         .await
         .map_err(|_| {
@@ -4216,6 +4235,17 @@ where
             SessionManagerError::other(error)
         })?;
     Ok(())
+}
+
+/// Packet info for an `SsaCommit`: no SURBs.
+///
+/// Share-bearing SURBs sent with a commitment land in an Exit ring that is already full and evict the
+/// shares due next. The keep-alives and data packets already keep the Exit supplied.
+fn ssa_commit_packet_info() -> OutgoingPacketInfo {
+    OutgoingPacketInfo {
+        max_surbs_in_packet: 0,
+        ..Default::default()
+    }
 }
 
 /// Counts a send's outcome in `hopr_exit_control_packets_total`, passing the result through.
@@ -4337,10 +4367,11 @@ where
 {
     let ssa_index = quota.ssa_id.ssa_index();
     for commitment_msg in burst {
-        send_via_msg_sender(
+        send_via_msg_sender_with_info(
             msg_sender,
             routing.clone(),
             HoprStartProtocol::SsaCommit(commitment_msg),
+            Some(ssa_commit_packet_info()),
             error_context,
         )
         .await?;
@@ -4556,10 +4587,11 @@ where
             SsaClientCommitmentMessage::new_multiple(session_id, commitment).map_err(SessionManagerError::other)?;
         let num_messages = burst.len();
         for commitment_msg in burst {
-            if let Err(error) = send_via_msg_sender(
+            if let Err(error) = send_via_msg_sender_with_info(
                 msg_sender,
                 routing.clone(),
                 HoprStartProtocol::SsaCommit(commitment_msg),
+                Some(ssa_commit_packet_info()),
                 "re-sent client SSA commitment message",
             )
             .await
@@ -8822,10 +8854,11 @@ where
             let num_messages = commitment_msgs.len();
 
             for commitment_msg in commitment_msgs {
-                send_via_msg_sender(
+                send_via_msg_sender_with_info(
                     &mut msg_sender,
                     session_slot.routing_opts.clone(),
                     HoprStartProtocol::SsaCommit(commitment_msg),
+                    Some(ssa_commit_packet_info()),
                     "re-sent client SSA commitment message",
                 )
                 .await?;
@@ -22657,6 +22690,8 @@ mod tests {
     #[derive(Default)]
     struct WireRecord {
         sent: parking_lot::Mutex<Vec<StartProtocolDiscriminants>>,
+        /// The `packet_info` and the SURB estimate of every `SsaCommit` sent.
+        commit_surbs: parking_lot::Mutex<Vec<(Option<OutgoingPacketInfo>, usize)>>,
     }
 
     impl WireRecord {
@@ -22765,6 +22800,11 @@ mod tests {
                 let Ok(message) = HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text) else {
                     return Ok(());
                 };
+                if matches!(message, HoprStartProtocol::SsaCommit(_)) {
+                    wire.commit_surbs
+                        .lock()
+                        .push((data.packet_info, data.estimate_surbs_with_msg()));
+                }
                 wire.sent.lock().push(StartProtocolDiscriminants::from(message));
                 Ok(())
             })
@@ -24213,6 +24253,53 @@ mod tests {
             "a repeat must not burst the same commitment again"
         );
         assert_eq!(vec![pseudonym], mgr.active_sessions(), "and must not cost the Session");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Every `SsaCommit` the Entry sends carries no SURBs: share-bearing SURBs sent with a commitment
+    /// land in an Exit ring that is already full and evict the shares due next.
+    #[test_log::test(tokio::test)]
+    async fn ssa_commit_messages_should_carry_no_surbs() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) = entry_with_recorded_pix_session(
+            params,
+            SsaReconstructorConfig::default().early_recovery_threshold,
+            wire.clone(),
+        )
+        .await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        serve_the_opening_cycle(&mgr, &generator, &pseudonym, &params)?;
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+        )
+        .await
+        .context("the successor must be admitted once it has been earned")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        let commits = settled_commit_count(&wire).await;
+        assert!(commits > 0, "the fixture must have sent commitment messages");
+        let recorded = wire.commit_surbs.lock().clone();
+        assert_eq!(commits, recorded.len());
+        for (info, estimate) in recorded {
+            assert_eq!(
+                Some(0),
+                info.map(|info| info.max_surbs_in_packet),
+                "an SsaCommit must not allow SURBs"
+            );
+            assert_eq!(0, estimate, "an SsaCommit must not carry SURBs");
+        }
 
         bob_sender.close_channel();
         bob_handle.await??;
