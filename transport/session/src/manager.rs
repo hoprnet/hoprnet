@@ -2312,6 +2312,8 @@ struct ExitTerms {
     ssas_per_request: usize,
     /// The capabilities the Entry's `StartSession` asked for.
     capabilities: Capabilities,
+    /// The behaviour bits of the initiation's `additional_data` ([`INITIATION_BEHAVIOUR_BITS`]).
+    behaviour_bits: u128,
     /// The egress rate limiter of a rate-controlled Session, shared with its balancer, which keeps
     /// steering it across a takeover. `None` for a `NoRateControl` Session.
     egress_rate_control: Option<RateController>,
@@ -2384,14 +2386,36 @@ impl SessionSlot {
     /// (the Entry draws them increasing per pseudonym), so an attempt the client has abandoned can
     /// arrive, delayed in the mixnet, after a newer one has taken the Session over and is in use, and
     /// must never take it over again. The Session must run on the stateless socket (see
-    /// [`is_stateless`](Self::is_stateless)), and the request must ask for the same PIX terms:
-    /// parameters, batch size and capabilities.
+    /// [`is_stateless`](Self::is_stateless)), and the request must ask for the same terms: PIX parameters,
+    /// capabilities, behaviour bits and, once admission has chosen it, batch size.
     fn takeover_refusal(
         &self,
         challenge: StartChallenge,
         params: &PixParams,
         ssas_per_request: usize,
         capabilities: Capabilities,
+        additional_data: u128,
+    ) -> Option<TakeoverRefusal> {
+        if let Some(why) =
+            self.takeover_refusal_before_admission(challenge, Some(params), capabilities, additional_data)
+        {
+            return Some(why);
+        }
+        match self.exit_resume.terms.get() {
+            Some(terms) if terms.ssas_per_request == ssas_per_request => None,
+            _ => Some("different batch size"),
+        }
+    }
+
+    /// The part of [`takeover_refusal`](Self::takeover_refusal) that needs nothing admission decides, so that it can
+    /// run before the session server is asked. Only the batch size depends on the admission result. The PIX
+    /// parameters are compared when the request offered any.
+    fn takeover_refusal_before_admission(
+        &self,
+        challenge: StartChallenge,
+        offered: Option<&PixParams>,
+        capabilities: Capabilities,
+        additional_data: u128,
     ) -> Option<TakeoverRefusal> {
         if !matches!(self.routing_opts, DestinationRouting::Return(_)) {
             return Some("not an Exit-side session");
@@ -2420,12 +2444,15 @@ impl SessionSlot {
         if !self.holds_paid_cycle() {
             return Some("nothing paid for yet");
         }
-        if self.current_ssa_state.get().map(|state| state.params) != Some(*params) {
+        if offered.is_some_and(|params| self.current_ssa_state.get().map(|state| state.params) != Some(*params)) {
             return Some("different PIX parameters");
         }
         match self.exit_resume.terms.get() {
-            Some(terms) if terms.ssas_per_request == ssas_per_request && terms.capabilities == capabilities => None,
-            Some(_) => Some("different batch size or capabilities"),
+            Some(terms) if terms.capabilities != capabilities => Some("different capabilities"),
+            Some(terms) if terms.behaviour_bits != additional_data & INITIATION_BEHAVIOUR_BITS => {
+                Some("different behaviour bits")
+            }
+            Some(_) => None,
             None => Some("established without terms"),
         }
     }
@@ -3825,6 +3852,10 @@ const INITIATION_OPTIONS_SHIFT: u32 = u64::BITS;
 /// Bit of `StartInitiation::additional_data` marking an attempt to resume a Session the Entry still holds PIX
 /// state for. It is set only by the session manager, and an Exit that predates it ignores it.
 const INITIATION_RESUME_ATTEMPT: u128 = 1 << 33;
+
+/// The bits of `StartInitiation::additional_data` that change a Session's behaviour, and that a takeover must carry
+/// unchanged. Bit 32 is reserved for forward receipts (hoprnet#8702).
+const INITIATION_BEHAVIOUR_BITS: u128 = 1 << 32;
 
 /// Whether `additional_data` marks a resume attempt; see [`INITIATION_RESUME_ATTEMPT`].
 #[inline]
@@ -9593,19 +9624,18 @@ where
     ///    is refused with [`PixAdmissionRejection::TakeoverIneligible`] (`NotResumable` on the wire), and the slot is
     ///    not touched. Eligibility is the pseudonym alone: whoever starts a Session under it, with a greater challenge,
     ///    takes it over. See hoprnet#8723 for binding a takeover to a secret of the original Entry.
-    /// 2. The new data plane is built and **delivered to the session server before** the slot is touched. If that fails
-    ///    the plane is dropped and the request refused: the old slot stays exactly as it was.
-    /// 3. The swap is one compute on the slot: the slot must still be the instance that was judged, not draining and
-    ///    not poisoned. Everything that has to be atomic with it is done inside it: the old instance is superseded (its
-    ///    writes fail), the detached flag and the window timer are cleared, the new ingress handle goes in (which
-    ///    aborts the old one, so the old reader sees EOF), and telemetry ownership is handed over. A loser of a race (a
-    ///    concurrent takeover, an expired window, an operator close, an eviction) has its already delivered plane cut
-    ///    off the same way (superseded, ingress aborted), so the session server sees it end, and is refused.
-    /// 4. The newly announced SURB target is applied.
-    /// 5. `SessionResumed`, naming the stream base, is sent in place of `SessionEstablished`, unless the session server
-    ///    already ended the new Session (it is then closed, scoped to its instance, and nothing is sent). If the send
-    ///    fails the new instance is *detached* (the window applies again) rather than closing the funded control plane
-    ///    with it.
+    /// 2. The new data plane is built, but handed to nobody yet.
+    /// 3. The swap is one compute on the slot: the slot must still be the instance that was judged and have a live
+    ///    control plane. In it the old instance is superseded (its writes fail), the window timer is cleared, the new
+    ///    ingress handle goes in (which aborts the old one), and telemetry ownership is handed over. The supervisor
+    ///    stays told the data plane is detached. A loser of a race (a concurrent takeover, an expired window, an
+    ///    operator close, an eviction) drops its plane, which nobody has seen, and is refused.
+    /// 4. The newly announced SURB target is applied, unless the new instance has ended already (it is then closed,
+    ///    scoped to its instance, and nothing is sent).
+    /// 5. `SessionResumed`, naming the stream base, is sent in place of `SessionEstablished`. If the send fails the new
+    ///    instance is *detached* (the window applies again) rather than closing the funded control plane with it.
+    /// 6. The plane is delivered to the session server, with the same outcome on failure.
+    /// 7. Only then is the data plane attached, which lets the supervisor issue the successor requests it deferred.
     async fn take_over_session(
         &self,
         session_id: SessionId,
@@ -9621,6 +9651,7 @@ where
             &client_params,
             ssas_per_request,
             session_req.capabilities.0,
+            session_req.additional_data,
         ) {
             debug!(
                 challenge = session_req.challenge,
@@ -9680,51 +9711,9 @@ where
             Some(stream_base),
         )?;
 
-        // Delivered before the slot is touched: a session server that cannot take it leaves the held
-        // slot exactly as it was.
-        let incoming_session = IncomingSession {
-            id: session_id,
-            session,
-            target: session_req.target.clone(),
-        };
-        let delivered = async {
-            let mut guard = new_session_notifier.lock().await;
-            guard.send(incoming_session).await
-        }
-        .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-        .await;
-        let failure = match delivered {
-            Ok(Ok(())) => None,
-            Err(_) => {
-                error!(%session_id, "timeout to notify about a taken over incoming session");
-                Some(TransportSessionError::Timeout)
-            }
-            Ok(Err(error)) => {
-                error!(%session_id, %error, "failed to notify about a taken over incoming session");
-                Some(SessionManagerError::other(error).into())
-            }
-        };
-        if let Some(failure) = failure {
-            // The held slot is untouched. The plane that was built is cut off, and the Entry is told:
-            // a takeover that the session server did not take is a refusal like any other.
-            new_ingress.abort();
-            instance.supersede();
-            #[cfg(feature = "telemetry")]
-            telemetry::pix::record_resumption(telemetry::pix::PixResumption::Refused);
-            self.refuse_session_start(
-                reply_routing,
-                session_req,
-                PixAdmissionRejection::Busy,
-                StartErrorReason::Busy,
-                "session error due to a session server that did not take the session over",
-            )
-            .await?;
-            return Err(failure);
-        }
-
         // The swap. The closure runs once, under the key's lock, so it serialises against a detach, a
         // drain, a removal and another takeover; everything that must be atomic with the swap is done
-        // in it.
+        // in it. The plane is not handed to anyone yet, so a loser has written and sent nothing.
         let observed = held.instance.clone();
         let mut new_ingress = Some(new_ingress);
         let mut new_tx = Some(new_tx);
@@ -9746,13 +9735,10 @@ where
                     .detached
                     .store(false, std::sync::atomic::Ordering::Release);
                 if let Some(gate) = old.pix_egress_gate.get() {
-                    // Read by the supervisor's worker, which then issues a successor request that was
-                    // deferred while detached.
-                    gate.set_data_plane_detached(false);
-                }
-                if let Some(supervisor) = old.pix_supervisor.get() {
-                    // A wake-up for an idle worker; the level is on the gate.
-                    let _ = supervisor.try_send_event(SessionPixEvent::DataPlaneChanged);
+                    // The supervisor's level stays detached until `attach_data_plane`, after `SessionResumed`
+                    // and the delivery, so that no successor request precedes them. A live predecessor is
+                    // held the same way.
+                    gate.set_data_plane_detached(true);
                 }
                 {
                     let mut handles = old.abort_handles.lock();
@@ -9777,12 +9763,12 @@ where
             });
 
         if taken_over.is_none() {
-            // Lost a race, or the slot went away: cut the delivered plane off, so the session server
-            // sees it end, and refuse.
+            // Lost a race, or the slot went away: the plane was never handed out, and is dropped.
             if let Some(ingress) = new_ingress.take() {
                 ingress.abort();
             }
             instance.supersede();
+            drop(session);
             return self
                 .refuse_takeover_with(
                     session_req,
@@ -9794,10 +9780,11 @@ where
                 .await;
         }
 
-        // The session server may have closed the Session it was handed before the swap made the instance
-        // current: its report was dropped as stale, but the instance kept the mark. The Entry is not told it
-        // has a Session that is already over; the end is carried out now, for this instance only and by the
-        // rules a report of it would have been handled by (a client's end detaches, within the window).
+        // The plane may have ended on its own between its construction and the swap, which made it the
+        // current instance: the Entry is not told it has a Session that is already over. The end is carried
+        // out now, for this instance only and by the rules a report of it would have been handled by (a
+        // client's end detaches, within the window). Past this point, the session server is the only one
+        // that can end it, and its report is handled as it arrives, since the instance is current.
         if let Some(reason) = instance.ended_with() {
             warn!(
                 %session_id,
@@ -9834,16 +9821,45 @@ where
             // for that: the new instance is detached and its window applies as it would have after
             // any other end of a data plane. Where detaching is off, the close is the ordinary one.
             warn!(%session_id, %error, "could not answer a takeover — detaching the session again");
-            // A takeover only happens with a window above zero (see the caller), so this detaches.
-            // What it can fail to detach is a Session that is already ending (poisoned, draining) or
-            // that has since gone to another instance, and the close is then scoped to this instance:
-            // it leaves a successor alone, and a funded live Session is never drained or closed here.
-            let window = self.cfg.pix_config.resume_window;
-            if self.detach_instance(&session_id, &instance, window, true).is_none() {
-                self.close_session_scoped(&session_id, ClosureReason::EmptyRead, CloseScope::Instance(&instance));
-            }
+            self.detach_taken_over(&session_id, &instance);
+            drop(session);
             return Err(error);
         }
+
+        let incoming_session = IncomingSession {
+            id: session_id,
+            session,
+            target: session_req.target.clone(),
+        };
+        let delivered = async {
+            let mut guard = new_session_notifier.lock().await;
+            guard.send(incoming_session).await
+        }
+        .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+        .await;
+        let failure = match delivered {
+            Ok(Ok(())) => None,
+            Err(_) => {
+                error!(%session_id, "timeout to notify about a taken over incoming session");
+                Some(TransportSessionError::Timeout)
+            }
+            Ok(Err(error)) => {
+                error!(%session_id, %error, "failed to notify about a taken over incoming session");
+                Some(SessionManagerError::other(error).into())
+            }
+        };
+        if let Some(failure) = failure {
+            // The Entry has been told, so this is no refusal: the new instance waits out the window as after
+            // a failed answer, and successor requests stay deferred.
+            #[cfg(feature = "telemetry")]
+            telemetry::pix::record_resumption(telemetry::pix::PixResumption::Refused);
+            self.detach_taken_over(&session_id, &instance);
+            return Err(failure);
+        }
+
+        // Only now may the supervisor issue what it deferred: after `SessionResumed`, with the plane in the
+        // session server's hands.
+        self.attach_data_plane(&session_id, &instance);
 
         info!(
             %session_id,
@@ -9854,6 +9870,38 @@ where
         #[cfg(feature = "telemetry")]
         telemetry::pix::record_resumption(telemetry::pix::PixResumption::TakenOver);
         Ok(())
+    }
+
+    /// Detaches a taken-over `instance` whose answer or delivery failed, or closes it, scoped to it, when it cannot
+    /// be detached (it is already ending, or has gone to another instance).
+    fn detach_taken_over(&self, session_id: &SessionId, instance: &Arc<SlotInstance>) {
+        // A takeover only happens with a window above zero (see the caller), so this detaches.
+        let window = self.cfg.pix_config.resume_window;
+        if self.detach_instance(session_id, instance, window, true).is_none() {
+            self.close_session_scoped(session_id, ClosureReason::EmptyRead, CloseScope::Instance(instance));
+        }
+    }
+
+    /// Tells the supervisor the data plane of `instance` is attached, unless it has been detached again or is no
+    /// longer the slot's instance. Under the slot's key, so it is ordered against a detach.
+    fn attach_data_plane(&self, session_id: &SessionId, instance: &Arc<SlotInstance>) {
+        self.sessions
+            .entry(*session_id)
+            .and_compute_with(|entry: Option<moka::Entry<SessionId, SessionSlot>>| {
+                if let Some(entry) = entry.filter(|entry| Arc::ptr_eq(&entry.value().instance, instance)) {
+                    let slot = entry.value();
+                    if !slot.is_detached() {
+                        if let Some(gate) = slot.pix_egress_gate.get() {
+                            gate.set_data_plane_detached(false);
+                        }
+                        if let Some(supervisor) = slot.pix_supervisor.get() {
+                            // A wake-up for an idle worker; the level is on the gate.
+                            let _ = supervisor.try_send_event(SessionPixEvent::DataPlaneChanged);
+                        }
+                    }
+                }
+                moka::ops::compute::Op::Nop
+            });
     }
 
     /// Answers a resume request that carries the challenge of the `held` instance: `NoSlotsAvailable`, as an
@@ -10016,6 +10064,36 @@ where
         };
 
         let session_id: SessionId = pseudonym;
+
+        // What does not depend on the admission result is judged first, so that a request that cannot take the
+        // held Session over never asks the session server, and is told `NotResumable` rather than whatever
+        // admission would have said. A request by the very challenge that established the held slot is a
+        // duplicate: refused as an occupied pseudonym is while that instance still holds the slot, and
+        // `NotResumable` once it is gone, since a resume attempt never allocates a fresh Session.
+        if let Some(held) = &held {
+            if held.instance.challenge == session_req.challenge {
+                return self
+                    .refuse_duplicate_resume(session_id, &session_req, reply_routing, held)
+                    .await;
+            }
+            if let Some(why) = held.takeover_refusal_before_admission(
+                session_req.challenge,
+                offered.as_ref(),
+                session_req.capabilities.0,
+                session_req.additional_data,
+            ) {
+                debug!(
+                    challenge = session_req.challenge,
+                    %session_id,
+                    why,
+                    "refusing a PIX session: the pseudonym's held session cannot be taken over"
+                );
+                return self
+                    .refuse_takeover(&session_req, reply_routing, "held session not eligible")
+                    .await;
+            }
+        }
+
         let admission = match self.request_admission(session_id, &session_req, offered).await {
             Ok(decision) => decision,
             Err(reason) => {
@@ -10064,18 +10142,10 @@ where
 
         // A resume attempt (bit 33) for a held PIX Session is a client coming back for the Session it paid for.
         // Decided before anything is reserved, so that nothing is reserved twice: a takeover keeps the
-        // slot's cycle budget, and a refusal reserves nothing. A request by the very challenge that
-        // established the held slot is a duplicate: refused as an occupied pseudonym is while that instance still
-        // holds the slot, and `NotResumable` once it is gone, since a resume attempt never allocates a fresh
-        // Session. A request that is not an attempt never takes over.
+        // slot's cycle budget, and a refusal reserves nothing. A request that is not an attempt never takes over.
         if let Some(held) = held {
-            if held.instance.challenge != session_req.challenge {
-                return self
-                    .take_over_session(session_id, &session_req, client_params, ssas_per_request, held)
-                    .await;
-            }
             return self
-                .refuse_duplicate_resume(session_id, &session_req, reply_routing, &held)
+                .take_over_session(session_id, &session_req, client_params, ssas_per_request, held)
                 .await;
         }
 
@@ -10154,6 +10224,7 @@ where
         let _ = slot.exit_resume.terms.set(ExitTerms {
             ssas_per_request,
             capabilities: session_req.capabilities.0,
+            behaviour_bits: session_req.additional_data & INITIATION_BEHAVIOUR_BITS,
             egress_rate_control: (!session_req.capabilities.0.contains(Capability::NoRateControl))
                 .then(|| RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1))),
         });
@@ -33326,6 +33397,10 @@ mod tests {
         max_predeposit_packets: Option<u64>,
         /// Whether the Entry's requests carry `Capability::Resumable`.
         resume_capable: bool,
+        /// The session server's admission channel, if the test drives it.
+        session_admission: Option<SessionAdmissionSink>,
+        /// Bits OR-ed into the `additional_data` of the Entry's requests.
+        additional_bits: u128,
     }
 
     impl Default for PaidExitOptions {
@@ -33344,6 +33419,8 @@ mod tests {
                 idle_timeout: None,
                 max_predeposit_packets: None,
                 resume_capable: true,
+                session_admission: None,
+                additional_bits: 0,
             }
         }
     }
@@ -33360,6 +33437,45 @@ mod tests {
         resume_capable: bool,
         /// When set, the session server closes the next `IncomingSession` the moment it is handed to it.
         close_on_delivery: Arc<std::sync::atomic::AtomicBool>,
+        /// When set, the session server writes on every `IncomingSession` the moment it is handed to it.
+        write_on_delivery: Arc<std::sync::atomic::AtomicBool>,
+        /// Bits OR-ed into the `additional_data` of the Entry's requests.
+        additional_bits: u128,
+    }
+
+    /// A session server's admission handler that counts its requests and can hold the next one.
+    #[derive(Clone, Default)]
+    struct GatedAdmission {
+        requests: Arc<std::sync::atomic::AtomicUsize>,
+        hold_next: Arc<std::sync::atomic::AtomicBool>,
+        release: Arc<tokio::sync::Notify>,
+    }
+
+    impl GatedAdmission {
+        fn sink(&self) -> SessionAdmissionSink {
+            let (tx, mut rx) =
+                futures::channel::mpsc::channel::<(SessionAdmissionRequest, crate::types::SessionAdmissionReply)>(4);
+            let this = self.clone();
+            tokio::spawn(async move {
+                while let Some((_request, reply)) = rx.next().await {
+                    this.requests.fetch_add(1, Ordering::SeqCst);
+                    let hold = this.hold_next.swap(false, Ordering::SeqCst);
+                    let release = this.release.clone();
+                    // Answered off the loop, so that a held request does not hold the ones behind it.
+                    tokio::spawn(async move {
+                        if hold {
+                            release.notified().await;
+                        }
+                        let _ = reply.send(Ok(SessionAdmissionDecision::default()));
+                    });
+                }
+            });
+            tx
+        }
+
+        fn requests(&self) -> usize {
+            self.requests.load(Ordering::SeqCst)
+        }
     }
 
     /// Brings up a PIX Exit Session and funds its first cycle, returning it with the first `IncomingSession`.
@@ -33403,9 +33519,17 @@ mod tests {
         // The session server: hands the Session on, or ends it first when the test asks it to.
         let close_on_delivery = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let server_flag = close_on_delivery.clone();
+        let write_on_delivery = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let write_flag = write_on_delivery.clone();
         let session_server = futures::sink::unfold(new_session_tx, move |mut tx, mut incoming: IncomingSession| {
             let server_flag = server_flag.clone();
+            let write_flag = write_flag.clone();
             async move {
+                if write_flag.load(std::sync::atomic::Ordering::SeqCst) {
+                    use futures::AsyncWriteExt;
+                    let _ = incoming.session.write_all(b"written on delivery").await;
+                    let _ = incoming.session.flush().await;
+                }
                 if server_flag.swap(false, std::sync::atomic::Ordering::SeqCst) {
                     use futures::AsyncWriteExt;
                     let _ = incoming.session.close().await;
@@ -33425,7 +33549,7 @@ mod tests {
                 })),
                 SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
             )),
-            None,
+            options.session_admission,
         )?;
 
         let mut paid = PaidExit {
@@ -33441,6 +33565,8 @@ mod tests {
             },
             resume_capable: options.resume_capable,
             close_on_delivery,
+            write_on_delivery,
+            additional_bits: options.additional_bits,
         };
         let mut first = None;
 
@@ -33544,7 +33670,8 @@ mod tests {
             if !self.resume_capable {
                 capabilities -= Capability::Resumable;
             }
-            let mut additional_data = into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO);
+            let mut additional_data =
+                into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO) | self.additional_bits;
             if resume {
                 additional_data |= INITIATION_RESUME_ATTEMPT;
             }
@@ -33596,8 +33723,14 @@ mod tests {
                 }
                 match HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text) {
                     Ok(HoprStartProtocol::SessionEstablished(_)) => seen.established += 1,
-                    Ok(HoprStartProtocol::SessionResumed(resumed)) => seen.resumed.push(resumed),
-                    Ok(HoprStartProtocol::SsaRequest(_)) => seen.ssa_requests += 1,
+                    Ok(HoprStartProtocol::SessionResumed(resumed)) => {
+                        seen.resumed.push(resumed);
+                        seen.order.push("SessionResumed");
+                    }
+                    Ok(HoprStartProtocol::SsaRequest(_)) => {
+                        seen.ssa_requests += 1;
+                        seen.order.push("SsaRequest");
+                    }
                     Ok(HoprStartProtocol::SessionError(error)) => {
                         seen.errors.push(error.reason);
                         seen.error_identifiers.push(error.identifier);
@@ -33623,6 +33756,8 @@ mod tests {
         /// The identifier of every `SessionError` sent, in the order of `errors`.
         error_identifiers: Vec<ErrorIdentifier<SessionId>>,
         ssa_requests: usize,
+        /// `SessionResumed` and `SsaRequest` messages in the order they were sent.
+        order: Vec<&'static str>,
         keep_alives: usize,
         data: usize,
         errors: Vec<StartErrorReason>,
@@ -34292,6 +34427,8 @@ mod tests {
         SameChallenge,
         OtherParams,
         OtherCapabilities,
+        OlderChallenge,
+        OtherBehaviourBits,
         NothingPaid,
         Poisoned,
         Draining,
@@ -34308,20 +34445,20 @@ mod tests {
 
         assert_eq!(
             None,
-            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps)
+            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps, 0)
         );
         assert!(
-            slot.takeover_refusal(MIN_CHALLENGE, &exit.params, batch, caps)
+            slot.takeover_refusal(MIN_CHALLENGE, &exit.params, batch, caps, 0)
                 .is_some(),
             "the same challenge"
         );
         assert!(
-            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch + 1, caps)
+            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch + 1, caps, 0)
                 .is_some(),
             "another batch size"
         );
         assert!(
-            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps | Capability::NoDelay)
+            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps | Capability::NoDelay, 0)
                 .is_some(),
             "other capabilities"
         );
@@ -34332,7 +34469,7 @@ mod tests {
         };
         assert!(
             unestablished
-                .takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps)
+                .takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps, 0)
                 .is_some(),
             "not established"
         );
@@ -34348,7 +34485,7 @@ mod tests {
         };
         assert!(
             outgoing
-                .takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps)
+                .takeover_refusal(MIN_CHALLENGE + 1, &exit.params, batch, caps, 0)
                 .is_some(),
             "an Entry slot"
         );
@@ -34393,7 +34530,7 @@ mod tests {
         assert!(!winner.is_superseded());
         assert!(!exit.slot()?.is_detached());
 
-        // The loser's session object was delivered before the swap, and is cut off.
+        // Only a plane that won its swap is delivered.
         let mut live = 0;
         while let Ok(session) = exit.incoming.try_recv() {
             if session.session.slot_instance() == Some(winner.id()) {
@@ -34592,6 +34729,14 @@ mod tests {
         assert!(!exit.gate()?.is_poisoned(), "the funded cycle is not destroyed");
         assert!(Arc::ptr_eq(&slot.pix_supervisor, &before.pix_supervisor));
         assert!(has_handle(&slot, SessionHandles::ResumeWindow));
+        assert!(
+            exit.gate()?.data_plane_detached(),
+            "successor requests stay deferred, none can precede an answer"
+        );
+        assert!(
+            exit.incoming.try_recv().is_err(),
+            "the session server is handed nothing of an unanswered takeover"
+        );
         Ok(())
     }
 
@@ -35195,11 +35340,10 @@ mod tests {
         Ok(())
     }
 
-    /// The session server ending the new Session the moment it is handed to it, before the takeover swaps the
-    /// slot, is not lost: the Entry is not told it has a Session that is over, and the instance is closed
-    /// scoped to itself.
+    /// The session server ending the new Session the moment it is handed to it comes after the swap and
+    /// `SessionResumed`: the end is a report of the current instance, handled by the ordinary rules.
     #[test_log::test(tokio::test)]
-    async fn a_session_the_server_closes_before_the_swap_is_not_confirmed() -> anyhow::Result<()> {
+    async fn a_session_the_server_closes_on_delivery_is_ended_after_the_answer() -> anyhow::Result<()> {
         let (mut exit, _first) = paid_exit(PaidExitOptions {
             fill: crate::supervision::PixFillConfig {
                 min_surb_reserve: 1,
@@ -35217,11 +35361,7 @@ mod tests {
         let _new = exit.next_session().await?;
 
         let seen = exit.originated(Duration::from_millis(300)).await;
-        assert_eq!(
-            0,
-            seen.resumed.len(),
-            "no SessionResumed for a Session that is over: {seen:?}"
-        );
+        assert_eq!(1, seen.resumed.len(), "the Entry is answered before the end: {seen:?}");
         assert_eq!(0, seen.established, "{seen:?}");
         assert!(original.is_superseded(), "the takeover did swap the slot");
         assert!(
@@ -35257,7 +35397,7 @@ mod tests {
             "everything else holds"
         );
         assert!(
-            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, 1, exit.capabilities)
+            slot.takeover_refusal(MIN_CHALLENGE + 1, &exit.params, 1, exit.capabilities, 0)
                 .is_some(),
             "ineligible for takeover"
         );
@@ -35457,6 +35597,11 @@ mod tests {
                 1, seen.ssa_requests,
                 "the deferred successor request goes out after the takeover: {seen:?}"
             );
+            assert_eq!(
+                vec!["SessionResumed", "SsaRequest"],
+                seen.order,
+                "SessionResumed precedes every SsaRequest"
+            );
         } else {
             assert_eq!(
                 1, seen.ssa_requests,
@@ -35504,10 +35649,10 @@ mod tests {
         Ok(())
     }
 
-    /// A session server that cannot take the new session leaves the held slot as it was, and the
-    /// request is refused.
+    /// A session server that cannot take the new session, once the Entry has been told `SessionResumed`, detaches
+    /// the new instance rather than destroying the funded cycle, and keeps successor requests deferred.
     #[test_log::test(tokio::test)]
-    async fn a_takeover_the_session_server_cannot_take_is_refused_and_leaves_the_slot_alone() -> anyhow::Result<()> {
+    async fn a_takeover_the_session_server_cannot_take_detaches_the_new_instance() -> anyhow::Result<()> {
         let (mut exit, _first) = paid_exit(PaidExitOptions::default()).await?;
         let original = exit.instance()?;
         // The application is gone: nothing can be delivered.
@@ -35519,10 +35664,177 @@ mod tests {
         let outcome = exit.reconnect(MIN_CHALLENGE + 1).await;
         assert!(outcome.is_err());
         let seen = exit.originated(Duration::from_millis(300)).await;
-        assert_eq!(vec![StartErrorReason::Busy], seen.errors, "{seen:?}");
-        assert_eq!(0, seen.established);
-        assert!(Arc::ptr_eq(&exit.slot()?.instance, &original));
-        assert!(!original.is_superseded());
+        assert_eq!(1, seen.resumed.len(), "the Entry was answered first: {seen:?}");
+        assert!(seen.errors.is_empty(), "{seen:?}");
+        assert_eq!(0, seen.ssa_requests, "{seen:?}");
+        let slot = exit.slot()?;
+        assert!(!Arc::ptr_eq(&slot.instance, &original));
+        assert!(slot.is_detached(), "the new instance waits out the window");
+        assert!(has_handle(&slot, SessionHandles::ResumeWindow));
+        assert!(exit.gate()?.data_plane_detached(), "successor requests stay deferred");
+        assert!(!exit.gate()?.is_poisoned());
+        Ok(())
+    }
+
+    /// The session server writes the moment it is handed a Session. A takeover that loses its swap, to a
+    /// competing takeover or to a close, never hands its plane over, and nothing of it is sent.
+    #[rstest]
+    #[case::to_a_competing_takeover(false)]
+    #[case::to_a_close(true)]
+    #[test_log::test(tokio::test)]
+    async fn a_takeover_that_loses_the_swap_never_delivers_its_plane(#[case] close: bool) -> anyhow::Result<()> {
+        let admission = GatedAdmission::default();
+        let (mut exit, _first) = paid_exit(PaidExitOptions {
+            session_admission: Some(admission.sink()),
+            fill: crate::supervision::PixFillConfig {
+                min_surb_reserve: 1,
+                drain_after_close: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .await?;
+        let _ = exit.originated(Duration::from_millis(50)).await;
+        exit.write_on_delivery.store(true, Ordering::SeqCst);
+        let asked = admission.requests();
+
+        // The first request is held at the admission server, while the rival is carried out.
+        admission.hold_next.store(true, Ordering::SeqCst);
+        let loser = exit.reconnect(MIN_CHALLENGE + 1);
+        let rival = async {
+            assert!(
+                eventually(Duration::from_secs(2), || admission.requests() == asked + 1).await,
+                "the first request reaches the admission server"
+            );
+            if close {
+                assert!(exit.mgr.close_session(&exit.pseudonym));
+            } else {
+                exit.reconnect(MIN_CHALLENGE + 2).await.expect("the rival takes over");
+            }
+            admission.release.notify_one();
+        };
+        let (outcome, ()) = tokio::join!(loser, rival);
+        outcome?;
+
+        let seen = exit.originated(Duration::from_millis(500)).await;
+        // Busy where the swap lost, `NotResumable` where the close was already seen by the eligibility check.
+        assert!(
+            matches!(
+                seen.errors[..],
+                [StartErrorReason::Busy] | [StartErrorReason::NotResumable]
+            ),
+            "the loser is refused: {seen:?}"
+        );
+        let mut delivered = Vec::new();
+        while let Ok(session) = exit.incoming.try_recv() {
+            delivered.push(session);
+        }
+        if close {
+            assert!(delivered.is_empty(), "nothing is delivered");
+            assert!(seen.resumed.is_empty(), "{seen:?}");
+            assert_eq!(0, seen.data, "nothing of the loser's plane is sent: {seen:?}");
+        } else {
+            assert_eq!(1, delivered.len(), "only the winner's plane is delivered");
+            assert_eq!(
+                delivered[0].session.slot_instance(),
+                Some(exit.instance()?.id()),
+                "and it is the current one"
+            );
+            assert_eq!(
+                vec![MIN_CHALLENGE + 2],
+                seen.resumed.iter().map(|r| r.orig_challenge).collect::<Vec<_>>(),
+                "only the winner is answered: {seen:?}"
+            );
+            assert_eq!(1, seen.data, "only the winner's write is sent: {seen:?}");
+        }
+        Ok(())
+    }
+
+    /// A resume request that cannot take the held Session over is refused without asking the session server.
+    #[rstest]
+    #[case::an_older_challenge(Refuse::OlderChallenge)]
+    #[case::other_capabilities(Refuse::OtherCapabilities)]
+    #[case::other_dimensions(Refuse::OtherParams)]
+    #[case::other_behaviour_bits(Refuse::OtherBehaviourBits)]
+    #[case::the_same_challenge(Refuse::SameChallenge)]
+    #[test_log::test(tokio::test)]
+    async fn an_ineligible_resume_never_asks_the_admission_server(#[case] why: Refuse) -> anyhow::Result<()> {
+        let admission = GatedAdmission::default();
+        let (mut exit, _first) = paid_exit(PaidExitOptions {
+            session_admission: Some(admission.sink()),
+            ..Default::default()
+        })
+        .await?;
+        exit.reconnect(MIN_CHALLENGE + 5).await?;
+        let _second = exit.next_session().await?;
+        let _ = exit.originated(Duration::from_millis(50)).await;
+        let asked = admission.requests();
+        assert_eq!(2, asked, "the establishment and the takeover asked");
+
+        let request = match why {
+            Refuse::OlderChallenge => exit.request(MIN_CHALLENGE + 3)?,
+            Refuse::SameChallenge => exit.request(MIN_CHALLENGE + 5)?,
+            Refuse::OtherParams => exit.request_with(
+                MIN_CHALLENGE + 6,
+                PixParams::try_new(50, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?,
+                exit.capabilities,
+                true,
+            )?,
+            Refuse::OtherCapabilities => exit.request_with(
+                MIN_CHALLENGE + 6,
+                exit.params,
+                exit.capabilities | Capability::NoDelay,
+                true,
+            )?,
+            _ => {
+                exit.additional_bits = INITIATION_BEHAVIOUR_BITS;
+                exit.request(MIN_CHALLENGE + 6)?
+            }
+        };
+        exit.mgr
+            .handle_incoming_session_initiation(exit.pseudonym, request)
+            .await?;
+
+        assert_eq!(asked, admission.requests(), "the admission server was not asked");
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        let expected = if matches!(why, Refuse::SameChallenge) {
+            StartErrorReason::NoSlotsAvailable
+        } else {
+            StartErrorReason::NotResumable
+        };
+        assert_eq!(vec![expected], seen.errors, "{seen:?}");
+        Ok(())
+    }
+
+    /// Behaviour bits of the initiation are part of the terms a takeover must match.
+    #[rstest]
+    #[case::equal_bits_are_taken_over(INITIATION_BEHAVIOUR_BITS, INITIATION_BEHAVIOUR_BITS, true)]
+    #[case::bits_added_are_refused(0, INITIATION_BEHAVIOUR_BITS, false)]
+    #[case::bits_dropped_are_refused(INITIATION_BEHAVIOUR_BITS, 0, false)]
+    #[test_log::test(tokio::test)]
+    async fn a_takeover_must_carry_the_behaviour_bits_of_the_establishment(
+        #[case] established_with: u128,
+        #[case] resumed_with: u128,
+        #[case] taken_over: bool,
+    ) -> anyhow::Result<()> {
+        let (mut exit, _first) = paid_exit(PaidExitOptions {
+            additional_bits: established_with,
+            ..Default::default()
+        })
+        .await?;
+        let before = exit.instance()?;
+        exit.additional_bits = resumed_with;
+        exit.reconnect(MIN_CHALLENGE + 1).await?;
+
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        let after = exit.instance()?;
+        if taken_over {
+            assert_eq!(1, seen.resumed.len(), "{seen:?}");
+            assert!(!Arc::ptr_eq(&before, &after));
+        } else {
+            assert_eq!(vec![StartErrorReason::NotResumable], seen.errors, "{seen:?}");
+            assert!(Arc::ptr_eq(&before, &after), "the held slot is untouched");
+        }
         Ok(())
     }
 
