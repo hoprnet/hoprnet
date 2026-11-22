@@ -29843,7 +29843,7 @@ mod tests {
         assert!(wait_for_no_active_sessions(&mgr).await);
         let mut old = real.clone();
         old.pix_supervisor = Default::default();
-        let (old_handle, _old_commands) = SessionPixSupervisorHandle::observable();
+        let (old_handle, old_commands) = SessionPixSupervisorHandle::observable();
         let _ = old.pix_supervisor.set(old_handle);
         old.abort_handles = Default::default();
         old.admission_token = Default::default();
@@ -29916,6 +29916,25 @@ mod tests {
             .send(SessionPixAction::ResendSsaRequest { ssa_ids: vec![ssa_id] })
             .await
             .map_err(|_| anyhow!("the driver must accept the action"))?;
+        // The driver handles actions in order, so a failed `RequestSsa` queued after the re-send shows
+        // that the re-send was handled too.
+        let ssa_id_4 = SsaId::new(pseudonym, SsaIndex::new(4).context("index four is non-zero")?);
+        action_tx
+            .send(SessionPixAction::RequestSsa {
+                ssa_ids: vec![ssa_id_4],
+                params: fill_pix_params(),
+            })
+            .await
+            .map_err(|_| anyhow!("the driver must accept the action"))?;
+
+        // Wait until the driver has acted: it reports each stale request as failed to its own
+        // supervisor. The timeout only bounds a failure.
+        for _ in [ssa_id_3, ssa_id_4] {
+            tokio::time::timeout(Duration::from_secs(10), old_commands.recv())
+                .await
+                .context("the stale driver must report to its own supervisor")?
+                .map_err(|_| anyhow!("the old supervisor's channel closed"))?;
+        }
 
         let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
         assert!(
