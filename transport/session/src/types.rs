@@ -51,11 +51,19 @@ impl HoprSessionCapabilities {
     }
 }
 
+/// Bits that no known [`Capability`] uses are ignored, but a malformed combination of known flags is still rejected.
 impl TryFrom<u8> for HoprSessionCapabilities {
     type Error = GeneralError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Capabilities::new(value)
+        let known = value & Capabilities::full().bits();
+        if known != value {
+            debug!(
+                dropped_bits = format!("{:#010b}", value & !known),
+                "ignoring unknown session capabilities"
+            );
+        }
+        Capabilities::new(known)
             .map(Self)
             .map_err(|_| GeneralError::ParseError("capabilities".into()))
     }
@@ -1169,9 +1177,33 @@ mod tests {
     }
 
     #[test]
-    fn byte_capabilities_invalid_bits_are_rejected() {
-        // 0xFF has bits set that don't correspond to any Capability
-        assert!(HoprSessionCapabilities::try_from(0xFF_u8).is_err());
+    fn byte_capabilities_unknown_bits_alone_are_empty() -> anyhow::Result<()> {
+        for bits in [0b0100_0000_u8, 0b1000_0000, 0b1100_0000] {
+            assert_eq!(HoprSessionCapabilities::try_from(bits)?.0, Capabilities::empty());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn byte_capabilities_unknown_bits_are_dropped_from_known_flags() -> anyhow::Result<()> {
+        let known: Capabilities = Capability::Segmentation | Capability::UsePIX;
+        let bits = u8::from(HoprSessionCapabilities::from(known)) | 0b1000_0000;
+        assert_eq!(HoprSessionCapabilities::try_from(bits)?.0, known);
+        Ok(())
+    }
+
+    #[test]
+    fn byte_capabilities_all_bits_set_is_full() -> anyhow::Result<()> {
+        assert_eq!(HoprSessionCapabilities::try_from(0xFF_u8)?.0, Capabilities::full());
+        Ok(())
+    }
+
+    #[test]
+    fn byte_capabilities_malformed_known_combination_is_rejected() {
+        // Modifier bits without `Segmentation`
+        for bits in [0b0000_0100_u8, 0b0000_0010, 0b0000_0001] {
+            assert!(HoprSessionCapabilities::try_from(bits).is_err(), "{bits:#010b}");
+        }
     }
 
     #[test]
