@@ -10956,6 +10956,13 @@ where
         routing: DestinationRouting,
         instance: &Arc<SlotInstance>,
     ) {
+        // The scoped close comes first, and the notice goes only if it acted: a handler of a predecessor that is no
+        // longer current must not have the Exit close its successor. A `SessionId` notice cannot name the instance,
+        // so a successor installed between the close and the notice is still exposed to it.
+        if !self.close_session_scoped(&session_id, ClosureReason::Eviction, CloseScope::Instance(instance)) {
+            return;
+        }
+        error!(%session_id, "closed session after refusing the Exit's SSA request");
         self.notify_session_error(
             session_id,
             ErrorIdentifier::SessionId(session_id),
@@ -10964,12 +10971,6 @@ where
             "session error due to a refused SSA request",
         )
         .await;
-
-        // Only the Session the request was for: a successor installed under the pseudonym while the
-        // notice was in flight is not ours to close.
-        if self.close_session_scoped(&session_id, ClosureReason::Eviction, CloseScope::Instance(instance)) {
-            error!(%session_id, "closed session after refusing the Exit's SSA request");
-        }
     }
 
     /// Handled by the Entry, when the Exit says it never received parts of a commitment this node
@@ -33446,6 +33447,32 @@ mod tests {
             "the successor survives"
         );
         assert!(!successor.is_superseded());
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(
+            rig.session_errors.lock().is_empty(),
+            "no notice goes out for a predecessor, which would have the Exit close the successor"
+        );
+
+        // The control: for the current instance the Session is closed and the Exit is told.
+        let current_routing = rig.mgr.sessions.get(&pseudonym).context("slot")?.routing_opts.clone();
+        rig.mgr.refuse_ssa_request(pseudonym, current_routing, &successor).await;
+        assert!(
+            rig.mgr.sessions.get(&pseudonym).is_none(),
+            "the current Session is closed"
+        );
+        assert!(
+            eventually(Duration::from_secs(2), || {
+                matches!(
+                    rig.session_errors.lock()[..],
+                    [StartErrorType {
+                        identifier: ErrorIdentifier::SessionId(_),
+                        reason: StartErrorReason::UnacceptablePixParams,
+                    }]
+                )
+            })
+            .await,
+            "the Exit is told once, by the session id"
+        );
         Ok(())
     }
 
