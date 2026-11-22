@@ -10513,9 +10513,9 @@ where
                     %session_id, %reason,
                     "received post-establishment session error — closing session"
                 );
-                // Best-effort close; the session may have already been removed. An Entry without resume
-                // capability can still lose a successor to a stale error of this kind: the wire format
-                // cannot name the instance.
+                // Best-effort close; the session may have already been removed. An error about a Session that is
+                // not resumable (a non-PIX Session, or one whose Exit predates resumption) names it by Session ID,
+                // so a stale one can still close a successor: the wire format cannot name the instance.
                 self.close_session(&session_id);
             }
         }
