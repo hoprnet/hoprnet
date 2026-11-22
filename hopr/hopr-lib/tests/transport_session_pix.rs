@@ -2270,8 +2270,8 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
 /// A client reconnecting under the pseudonym it used before, after the Exit has forgotten the old
 /// Session, is refused as not resumable, without retries; a fresh pseudonym is served.
 ///
-/// The Entry still holds PIX state for the pseudonym and so asks to resume. This Exit cannot resume a
-/// Session: it answers every attempt with `NotResumable`, which `connect_to` does not retry.
+/// The Entry still holds PIX state for the pseudonym and so asks to resume. An Exit that lost the
+/// Session cannot, and answers `NotResumable`, which `connect_to` does not retry.
 ///
 /// ## Steps
 /// 1. A Session is opened and its first deposit, `(p, 1)`, is signalled on the Exit.
