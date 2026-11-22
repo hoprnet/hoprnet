@@ -1595,8 +1595,10 @@ impl SlotInstance {
     }
 
     /// Counts an Entry data write as activity: reads the slot (which resets its `time_to_idle`), at
-    /// most once per `period`. Call only after the `is_superseded` check: removal supersedes inside the
-    /// compute, so a successor under the same pseudonym exists only once this instance is superseded.
+    /// most once per `period`. With `period = idle_timeout / 4`, an Entry that stops writing can
+    /// expire as early as ¾ of the idle timeout after its last write. Call only after the `is_superseded` check:
+    /// removal supersedes inside the compute, so a successor under the same pseudonym exists only once this
+    /// instance is superseded.
     fn touch_slot_on_write(
         &self,
         sessions: &moka::sync::Cache<SessionId, SessionSlot>,
