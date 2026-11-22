@@ -364,8 +364,10 @@ where
                                 previous_hop: incoming.previous_hop,
                                 received_acks: incoming.plain_text
                                     [size_of::<u16>()..size_of::<u16>() + num_acks as usize * Acknowledgement::SIZE]
-                                    .chunks_exact(Acknowledgement::SIZE)
-                                    .map(Acknowledgement::try_from)
+                                    .as_chunks::<{ Acknowledgement::SIZE }>()
+                                    .0
+                                    .iter()
+                                    .map(|c| Acknowledgement::try_from(c.as_slice()))
                                     .collect::<Result<Vec<_>, _>>()
                                     .map_err(|e: GeneralError| IncomingPacketError::Undecodable(e.into()))?,
                             }
