@@ -29,12 +29,16 @@ const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
 const DEFAULT_STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 131_072;
 const DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_secs(2);
+const DEFAULT_EGRESS_COALESCE_DELAY: Duration = Duration::from_millis(8);
 
 /// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
 pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
 
 /// Minimum accepted value for [`StreamProtocolConfig::egress_backpressure_timeout`].
 pub const MIN_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_millis(1);
+
+/// Maximum accepted value for [`StreamProtocolConfig::egress_coalesce_delay`].
+pub const MAX_EGRESS_COALESCE_DELAY: Duration = Duration::from_millis(100);
 
 fn default_per_peer_channel_capacity() -> usize {
     DEFAULT_PER_PEER_CHANNEL_CAPACITY
@@ -51,6 +55,11 @@ fn default_frame_writer_backpressure_bytes() -> usize {
 #[inline]
 fn default_egress_backpressure_timeout() -> Duration {
     DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT
+}
+
+#[inline]
+fn default_egress_coalesce_delay() -> Duration {
+    DEFAULT_EGRESS_COALESCE_DELAY
 }
 
 fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError> {
@@ -70,6 +79,14 @@ fn validate_egress_backpressure_timeout(value: &Duration) -> Result<(), Validati
         Err(ValidationError::new(
             "egress backpressure timeout must be at least 1 ms",
         ))
+    }
+}
+
+fn validate_egress_coalesce_delay(value: &Duration) -> Result<(), ValidationError> {
+    if *value <= MAX_EGRESS_COALESCE_DELAY {
+        Ok(())
+    } else {
+        Err(ValidationError::new("egress coalesce delay must be at most 100 ms"))
     }
 }
 
@@ -128,11 +145,12 @@ pub struct StreamProtocolConfig {
 
     /// Pending-write-buffer byte threshold on the framed writer before a flush is forced.
     ///
-    /// A value of `1` flushes on every encoded frame (one syscall per message).
-    /// Larger values coalesce adjacent small frames into a single quinn write call,
-    /// reducing connection-mutex acquisitions and driver wake-ups on the hot path.
-    /// A HOPR packet is ~1 440 bytes; at the default 128 KiB threshold roughly 91
-    /// packets are coalesced per write, cutting driver wake frequency ~30×.
+    /// A value of `1` flushes on every encoded frame (one syscall per message) and also caps the
+    /// per-peer egress coalescing target byte threshold (`min(frame_writer_backpressure_bytes,
+    /// 4 × HOPR_PACKET_SIZE)`).
+    /// Larger values coalesce adjacent frames into a single quinn write call,
+    /// reducing connection-mutex acquisitions, driver wake-ups, and reverse QUIC ACKs on the hot
+    /// path.
     ///
     /// Defaults to 131 072 bytes (128 KiB).
     #[validate(range(min = 1))]
@@ -155,6 +173,22 @@ pub struct StreamProtocolConfig {
     #[default(default_egress_backpressure_timeout())]
     #[cfg_attr(feature = "serde", serde(default = "default_egress_backpressure_timeout"))]
     pub egress_backpressure_timeout: Duration,
+
+    /// Maximum coalesce wait for bursting per-peer egress HOPR packets before flushing into QUIC.
+    ///
+    /// Only engages when a peer is actively bursting (a previous packet arrived within
+    /// `egress_coalesce_delay`), so probes and sparse traffic flush immediately with zero
+    /// added latency. Set to `Duration::ZERO` to disable coalescing completely. Must be at most
+    /// [`MAX_EGRESS_COALESCE_DELAY`] (100 ms).
+    ///
+    /// Defaults to 8 ms.
+    #[validate(custom(function = "validate_egress_coalesce_delay"))]
+    #[default(default_egress_coalesce_delay())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_egress_coalesce_delay", with = "humantime_serde")
+    )]
+    pub egress_coalesce_delay: Duration,
 }
 
 fn default_counter_flush_interval() -> Duration {
@@ -2628,5 +2662,33 @@ mod tests {
             ..Default::default()
         };
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_coalesce_delay_upper_bound_is_enforced() {
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_delay: Duration::ZERO,
+                ..Default::default()
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_delay: MAX_EGRESS_COALESCE_DELAY,
+                ..Default::default()
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_delay: MAX_EGRESS_COALESCE_DELAY + Duration::from_millis(1),
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
     }
 }
