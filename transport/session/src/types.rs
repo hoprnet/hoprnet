@@ -609,6 +609,15 @@ pub struct HoprSessionConfig {
     /// may still arrive, this bounds how much already-received data is held while it waits. `None`
     /// keeps the timeout as the only rule.
     pub max_frames_behind_gap: Option<usize>,
+    /// Optional coalesce window for whole-message datagram packing on stateless `NoDelay` sockets.
+    ///
+    /// When `Some`, burst datagrams are packed into a single HOPR packet payload (up to
+    /// `ApplicationData::PAYLOAD_SIZE`) without splitting messages across packets, while isolated
+    /// datagrams flush immediately. Skipped on [`Capability::UsePIX`] sessions. `None` (default)
+    /// disables packing.
+    #[default(None)]
+    #[serde(with = "humantime_serde")]
+    pub datagram_pack_delay: Option<Duration>,
 }
 
 /// Represents the Session protocol socket over HOPR.
@@ -824,20 +833,59 @@ impl HoprSession {
             } else {
                 // Stateless (unreliable) sockets support datagram-boundary preservation, driven by
                 // `NoDelay` (UDP-like framing). See `Capability::NoDelay`.
+                //
+                // When datagram packing is configured on a non-PIX stateless datagram socket,
+                // pack burst `SessionMessage`s into one HOPR packet payload without splitting
+                // messages across packet boundaries. Forward-routed (entry) sessions reserve
+                // headroom for any SURBs the balancer wants to piggyback so packing never starves
+                // organic SURB delivery.
+                let datagram = cfg.capabilities.contains(Capability::NoDelay);
+                let pack_delay = if datagram && !cfg.capabilities.contains(Capability::UsePIX) {
+                    cfg.datagram_pack_delay
+                } else {
+                    None
+                };
+                let pack_budget: Option<hopr_protocol_session::PackPayloadBudget> =
+                    if pack_delay.is_some() && matches!(routing, DestinationRouting::Forward { .. }) {
+                        // A data packet carrying a non-empty SessionMessage can hold at most
+                        // `MAX_SURBS_IN_PACKET - 1` (7) SURBs beside its payload. Even when SURB
+                        // management is disabled (`surb_mgmt` is `None`), a default
+                        // `BalancerStateValues` reads as disabled (`organic_surbs_deficit() == 1`)
+                        // so forward bursts still reserve room for one SURB per packet, while
+                        // balanced sessions reserve `min(deficit, 7)` SURBs until the exit reaches
+                        // target.
+                        let state = surb_mgmt.clone().unwrap_or_default();
+                        let max_data_surbs = hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET - 1;
+                        let budget: hopr_protocol_session::PackPayloadBudget = Arc::new(move || {
+                            let reserved_surbs = state
+                                .organic_surbs_deficit()
+                                .max(usize::from(state.silence_sustain()))
+                                .min(max_data_surbs);
+                            ApplicationData::PAYLOAD_SIZE
+                                .saturating_sub(reserved_surbs * hopr_crypto_packet::prelude::HoprSurb::SIZE)
+                        });
+                        Some(budget)
+                    } else {
+                        None
+                    };
                 let socket_cfg = SessionSocketConfig {
-                    datagram: cfg.capabilities.contains(Capability::NoDelay),
+                    datagram,
+                    pack_delay,
                     ..socket_cfg
                 };
                 debug!(?socket_cfg, "opening new stateless session socket");
 
-                Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
-                    id,
-                    transport,
-                    socket_cfg,
-                    loss_signal,
-                    #[cfg(feature = "telemetry")]
-                    NoopTracker,
-                )?)
+                Box::new(
+                    UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless_with_pack_budget(
+                        id,
+                        transport,
+                        socket_cfg,
+                        loss_signal,
+                        pack_budget,
+                        #[cfg(feature = "telemetry")]
+                        NoopTracker,
+                    )?,
+                )
             }
         } else {
             debug!("opening raw session socket");
@@ -1775,6 +1823,244 @@ mod tests {
         assert_eq!(alice_sent, bob_recv);
         assert_eq!(bob_sent, alice_recv);
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stateless_nodelay_session_packs_on_return_and_skips_use_pix() -> anyhow::Result<()> {
+        let id = SessionId::random();
+        let (tx_normal, mut rx_normal) = futures::channel::mpsc::unbounded();
+        let mut normal_session = HoprSession::new(
+            id,
+            DestinationRouting::Return(id.into()),
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation | Capability::NoDelay,
+                datagram_pack_delay: Some(Duration::from_millis(20)),
+                ..Default::default()
+            },
+            (tx_normal, futures::stream::pending()),
+            None,
+        )?;
+
+        for i in 0..5u8 {
+            normal_session.write_all(&vec![i; SESSION_MTU]).await?;
+        }
+        normal_session.close().await?;
+
+        let mut normal_pkts = Vec::new();
+        while let Some((_, out)) = rx_normal.next().await {
+            normal_pkts.push(out.data.plain_text.len());
+        }
+        assert!(
+            normal_pkts.iter().any(|&len| len >= 2 * SESSION_MTU),
+            "non-PIX return session must pack burst datagrams, got {normal_pkts:?}"
+        );
+
+        // PIX session must skip packing even when `datagram_pack_delay` is configured.
+        let (tx_pix, mut rx_pix) = futures::channel::mpsc::unbounded();
+        let mut pix_session = HoprSession::new(
+            id,
+            DestinationRouting::Return(id.into()),
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation | Capability::NoDelay | Capability::UsePIX,
+                datagram_pack_delay: Some(Duration::from_millis(20)),
+                ..Default::default()
+            },
+            (tx_pix, futures::stream::pending()),
+            None,
+        )?;
+
+        for i in 0..4u8 {
+            pix_session.write_all(&vec![i; SESSION_MTU]).await?;
+        }
+        pix_session.close().await?;
+
+        let mut pix_pkts = Vec::new();
+        while let Some((_, out)) = rx_pix.next().await {
+            pix_pkts.push(out.data.plain_text.len());
+        }
+        assert!(
+            pix_pkts.iter().all(|&len| len < 2 * SESSION_MTU),
+            "UsePIX session must not pack multiple datagrams into one reply packet, got {pix_pkts:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn forward_session_without_surb_management_still_reserves_one_surb() -> anyhow::Result<()> {
+        let id = SessionId::random();
+        let dst = *OffchainKeypair::random().public();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded();
+
+        // `HoprSession::new` passes `surb_mgmt = None` (matching the `surb_management = None`
+        // path in `SessionManager`). Forward bursts must still leave at least `HoprSurb::SIZE`
+        // free in every packet so `cap_organic_surbs` can attach 1 SURB.
+        let mut session = HoprSession::new(
+            id,
+            DestinationRouting::forward_only(dst, RoutingOptions::Hops(1.try_into()?)),
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation | Capability::NoDelay,
+                datagram_pack_delay: Some(Duration::from_millis(20)),
+                ..Default::default()
+            },
+            (tx, futures::stream::pending()),
+            None,
+        )?;
+
+        for i in 0..5u8 {
+            session.write_all(&[i; SESSION_MTU]).await?;
+        }
+        session.close().await?;
+
+        let mut total_lens = Vec::new();
+        while let Some((_, out)) = rx.next().await {
+            total_lens.push(out.data.total_len());
+        }
+        assert!(
+            total_lens.len() >= 5,
+            "expected 1 full-MTU datagram per packet, got {total_lens:?}"
+        );
+        assert!(
+            total_lens
+                .iter()
+                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 1),
+            "forward session without surb_management must preserve room for >=1 SURB per packet, got lengths \
+             {total_lens:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn forward_packing_reserves_surb_headroom_while_below_target_and_packs_full_when_full() -> anyhow::Result<()>
+    {
+        use std::sync::atomic::Ordering;
+
+        let id = SessionId::random();
+        let dst = *OffchainKeypair::random().public();
+        let surb_state = Arc::new(BalancerStateValues::default());
+        surb_state.target_surb_buffer_size.store(100, Ordering::Relaxed);
+        surb_state.buffer_level.store(20, Ordering::Relaxed); // deficit = 80 -> reserve 7 SURBs (473 B budget)
+
+        let (tx, mut rx) = futures::channel::mpsc::unbounded();
+        let mut session = HoprSession::new_with_surb_state(
+            id,
+            DestinationRouting::forward_only(dst, RoutingOptions::Hops(1.try_into()?)),
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation | Capability::NoDelay,
+                datagram_pack_delay: Some(Duration::from_millis(20)),
+                ..Default::default()
+            },
+            (tx, futures::stream::pending()),
+            None,
+            Some(surb_state.clone()),
+            None,
+            None,
+        )?;
+
+        // While deficit > 0: 148 B ACKs still leave room for 7 SURBs per packet, and full-MTU
+        // datagrams stay 1/pkt so each carries 4 SURBs instead of starving SURB piggybacking.
+        for i in 0..6u8 {
+            session.write_all(&[i; 148]).await?;
+        }
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        let mut ack_pkts = Vec::new();
+        while let Ok((_, out)) = rx.try_recv() {
+            ack_pkts.push(out.data.total_len());
+        }
+        assert!(!ack_pkts.is_empty());
+        assert!(
+            ack_pkts
+                .iter()
+                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 7),
+            "forward ACK packets must preserve room for 7 SURBs while deficit>0, got lengths {ack_pkts:?}"
+        );
+
+        for i in 0..4u8 {
+            session.write_all(&[0x10 + i; SESSION_MTU]).await?;
+        }
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        let mut mtu_deficit_pkts = Vec::new();
+        while let Ok((_, out)) = rx.try_recv() {
+            mtu_deficit_pkts.push(out.data.total_len());
+        }
+        assert_eq!(4, mtu_deficit_pkts.len(), "full-MTU while deficit>0 must stay 1/pkt");
+        assert!(
+            mtu_deficit_pkts
+                .iter()
+                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 4),
+            "each forward full-MTU packet must leave room for 4 SURBs, got {mtu_deficit_pkts:?}"
+        );
+
+        // Once SURB buffer reaches target (deficit == 0), forward full-MTU bursts pack 2/pkt.
+        surb_state.buffer_level.store(100, Ordering::Relaxed);
+        for i in 0..5u8 {
+            session.write_all(&[0x20 + i; SESSION_MTU]).await?;
+        }
+        session.close().await?;
+        let mut mtu_full_pkts = Vec::new();
+        while let Some((_, out)) = rx.next().await {
+            mtu_full_pkts.push(out.data.plain_text.len());
+        }
+        assert!(
+            mtu_full_pkts.iter().any(|&len| len >= 2 * SESSION_MTU),
+            "when SURB buffer is full, forward full-MTU bursts must pack 2/pkt, got {mtu_full_pkts:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn forward_packing_reserves_one_surb_during_silence_sustain() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering;
+
+        let id = SessionId::random();
+        let dst = *OffchainKeypair::random().public();
+        // Level is at target (`deficit == 0`), yet the session is in `silence_sustain` (heard
+        // 10 s ago, sending unanswered since 5 s ago): forward packing must still reserve room for
+        // 1 sustain SURB per packet so `cap_organic_surbs`'s sustain SURB is never dropped.
+        let surb_state = BalancerStateValues::default()
+            .last_heard_ago(Duration::from_secs(10))
+            .sending_since_ago(Duration::from_secs(5))
+            .last_sent_ago(Duration::from_secs(1));
+        surb_state.target_surb_buffer_size.store(100, Ordering::Relaxed);
+        surb_state.buffer_level.store(100, Ordering::Relaxed);
+        assert_eq!(0, surb_state.organic_surbs_deficit());
+        assert!(surb_state.silence_sustain());
+
+        let (tx, mut rx) = futures::channel::mpsc::unbounded();
+        let mut session = HoprSession::new_with_surb_state(
+            id,
+            DestinationRouting::forward_only(dst, RoutingOptions::Hops(1.try_into()?)),
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation | Capability::NoDelay,
+                datagram_pack_delay: Some(Duration::from_millis(20)),
+                ..Default::default()
+            },
+            (tx, futures::stream::pending()),
+            None,
+            Some(Arc::new(surb_state)),
+            None,
+            None,
+        )?;
+
+        for i in 0..5u8 {
+            session.write_all(&[0x30 + i; SESSION_MTU]).await?;
+        }
+        session.close().await?;
+
+        let mut total_lens = Vec::new();
+        while let Some((_, out)) = rx.next().await {
+            total_lens.push(out.data.total_len());
+        }
+        assert!(
+            total_lens.len() >= 5,
+            "silence sustain must not pack 2 full-MTU datagrams: {total_lens:?}"
+        );
+        assert!(
+            total_lens
+                .iter()
+                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 1),
+            "every forward packet during silence_sustain must preserve room for >=1 SURB, got {total_lens:?}"
+        );
         Ok(())
     }
 }

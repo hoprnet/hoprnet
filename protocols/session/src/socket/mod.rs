@@ -3,7 +3,10 @@
 pub mod ack_state;
 mod loss_report;
 pub mod loss_signal;
+mod packing;
 pub mod state;
+
+pub use packing::PackPayloadBudget;
 
 /// Contains socket statistics types.
 #[cfg(feature = "telemetry")]
@@ -128,7 +131,22 @@ pub struct SessionSocketConfig {
     /// Default is true.
     #[default(true)]
     pub adapt_gap_wait: bool,
+    /// Optional coalesce window for packing multiple complete `SessionMessage`s into one
+    /// transport write of at most `C` bytes on stateless sockets.
+    ///
+    /// Unlike `max_buffered_segments` (which applies only when `pack_delay` is `None`), messages
+    /// are never split across transport writes: when the next message would overflow `C`, the
+    /// buffered whole messages are flushed first, so packet loss drops only the messages in the
+    /// lost packet and unmodified receivers decode them unchanged. Isolated datagrams arriving
+    /// after an idle gap flush immediately without waiting. `None` (default) writes each message
+    /// immediately.
+    #[default(None)]
+    pub pack_delay: Option<Duration>,
 }
+
+type BoxedWrite = Pin<Box<dyn futures::AsyncWrite + Send>>;
+type BoxedMessageStream<const C: usize> =
+    Pin<Box<dyn futures::Stream<Item = Result<SessionMessage<C>, SessionError>> + Send>>;
 
 /// Logs a failed update of the socket state.
 ///
@@ -204,35 +222,79 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
+        Self::new_stateless_with_pack_budget(
+            id,
+            transport,
+            cfg,
+            loss_signal,
+            None,
+            #[cfg(feature = "telemetry")]
+            stats,
+        )
+    }
+
+    /// Like [`Self::new_stateless`], with an optional dynamic [`PackPayloadBudget`] bounding each
+    /// packed write when [`SessionSocketConfig::pack_delay`] is `Some`.
+    pub fn new_stateless_with_pack_budget<T, I>(
+        id: I,
+        transport: T,
+        cfg: SessionSocketConfig,
+        loss_signal: Option<Arc<FrameLossSignal>>,
+        pack_budget: Option<PackPayloadBudget>,
+        #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
+    ) -> Result<Self, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+    {
         let span = tracing::debug_span!("session.socket");
         let _entered = span.enter();
         // Preserve frame boundaries within the number of segments SeqIndicator can enumerate.
         let frame_size = session_frame_size::<C>(cfg.frame_size, (SeqIndicator::MAX + 1) as usize);
 
-        // Segment data incoming/outgoing using underlying transport
-        let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
-
-        // Check if we allow sending multiple segments to downstream in a single write
-        // The HWM cannot be 0 bytes
-        framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
-
-        // Downstream transport
-        let (packets_out, packets_in) = framed.split();
-        let packets_in = stop_on_invalid_header(packets_in);
-
         // If needed, add also stats to individual stages.
         #[cfg(feature = "telemetry")]
         let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
-        // Pipeline IN: Data incoming from Upstream
-        let upstream_frames_in = packets_out
-            .with(move |segment| {
-                #[cfg(feature = "telemetry")]
-                s0.outgoing_message(SessionMessageDiscriminants::Segment);
+        let (upstream_frames_in, packets_in): (BoxedWrite, BoxedMessageStream<C>) =
+            if let Some(pack_delay) = cfg.pack_delay {
+                let (transport_rx, transport_tx) = futures::AsyncReadExt::split(transport);
+                let packets_in =
+                    stop_on_invalid_header(asynchronous_codec::FramedRead::new(transport_rx, SessionCodec::<C>));
+                let packets_out =
+                    packing::WholeMessagePackingSink::<C>::new(transport_tx, pack_delay, pack_budget, span.clone());
+                let upstream = packets_out
+                    .with(move |segment| {
+                        #[cfg(feature = "telemetry")]
+                        s0.outgoing_message(SessionMessageDiscriminants::Segment);
 
-                future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
-            })
-            .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
+                        future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
+                    })
+                    .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
+                (Box::pin(upstream), Box::pin(packets_in))
+            } else {
+                // Segment data incoming/outgoing using underlying transport
+                let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
+
+                // Check if we allow sending multiple segments to downstream in a single write
+                // The HWM cannot be 0 bytes
+                framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
+
+                // Downstream transport
+                let (packets_out, packets_in) = framed.split();
+                let packets_in = stop_on_invalid_header(packets_in);
+
+                // Pipeline IN: Data incoming from Upstream
+                let upstream = packets_out
+                    .with(move |segment| {
+                        #[cfg(feature = "telemetry")]
+                        s0.outgoing_message(SessionMessageDiscriminants::Segment);
+
+                        future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
+                    })
+                    .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
+                (Box::pin(upstream), Box::pin(packets_in))
+            };
 
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
@@ -373,7 +435,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         Ok(Self {
             state: Stateless::new(id),
             span: span.clone(),
-            upstream_frames_in: Box::pin(upstream_frames_in),
+            upstream_frames_in,
             downstream_frames_out: Box::pin(downstream_frames_out),
             write_state: if cfg.flush_immediately {
                 WriteState::Writing
