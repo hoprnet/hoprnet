@@ -9639,7 +9639,8 @@ where
     ///    scoped to its instance, and nothing is sent).
     /// 5. `SessionResumed`, naming the stream base, is sent in place of `SessionEstablished`. If the send fails the new
     ///    instance is *detached* (the window applies again) rather than closing the funded control plane with it.
-    /// 6. The plane is delivered to the session server, with the same outcome on failure.
+    /// 6. Unless the instance has been replaced meanwhile, the plane is delivered to the session server. On failure the
+    ///    instance is detached as above and the Entry is sent a `Busy` error addressed by its challenge.
     /// 7. Only then is the data plane attached, which lets the supervisor issue the successor requests it deferred.
     async fn take_over_session(
         &self,
@@ -9816,7 +9817,7 @@ where
             ExitSessionKind::of(session_req.capabilities.0),
             send_via_msg_sender(
                 &mut msg_sender,
-                reply_routing,
+                reply_routing.clone(),
                 established,
                 "session resumption message of a taken over session",
             )
@@ -9829,6 +9830,23 @@ where
             self.detach_taken_over(&session_id, &instance);
             drop(session);
             return Err(error);
+        }
+
+        // The send may have been pending while another takeover, a close or an eviction replaced this instance: its
+        // plane is then not handed out, as with a lost swap, and the replacement is left to answer for the Session.
+        if instance.is_superseded()
+            || !self
+                .sessions
+                .get(&session_id)
+                .is_some_and(|slot| Arc::ptr_eq(&slot.instance, &instance))
+        {
+            warn!(
+                %session_id,
+                challenge = session_req.challenge,
+                "the taken over session was replaced while it was being answered — not delivering it"
+            );
+            drop(session);
+            return Ok(());
         }
 
         let incoming_session = IncomingSession {
@@ -9859,6 +9877,15 @@ where
             #[cfg(feature = "telemetry")]
             telemetry::pix::record_resumption(telemetry::pix::PixResumption::Refused);
             self.detach_taken_over(&session_id, &instance);
+            // The Entry closes exactly this instance and can reconnect, which can take over the detached Session.
+            self.notify_session_error(
+                session_id,
+                ErrorIdentifier::Challenge(instance.challenge),
+                reply_routing,
+                StartErrorReason::Busy,
+                "session error due to a taken over session that could not be delivered",
+            )
+            .await;
             return Err(failure);
         }
 
@@ -35833,7 +35860,14 @@ mod tests {
         assert!(outcome.is_err());
         let seen = exit.originated(Duration::from_millis(300)).await;
         assert_eq!(1, seen.resumed.len(), "the Entry was answered first: {seen:?}");
-        assert!(seen.errors.is_empty(), "{seen:?}");
+        assert_eq!(vec![StartErrorReason::Busy], seen.errors, "the Entry is told: {seen:?}");
+        assert!(
+            matches!(
+                seen.error_identifiers[..],
+                [ErrorIdentifier::Challenge(challenge)] if challenge == MIN_CHALLENGE + 1
+            ),
+            "addressed by the new instance's challenge: {seen:?}"
+        );
         assert_eq!(0, seen.ssa_requests, "{seen:?}");
         let slot = exit.slot()?;
         assert!(!Arc::ptr_eq(&slot.instance, &original));
@@ -35870,18 +35904,27 @@ mod tests {
         admission.hold_next.store(true, Ordering::SeqCst);
         let loser = exit.reconnect(MIN_CHALLENGE + 1);
         let rival = async {
-            assert!(
-                eventually(Duration::from_secs(2), || admission.requests() == asked + 1).await,
-                "the first request reaches the admission server"
-            );
-            if close {
-                assert!(exit.mgr.close_session(&exit.pseudonym));
-            } else {
-                exit.reconnect(MIN_CHALLENGE + 2).await.expect("the rival takes over");
+            let rivalled = async {
+                anyhow::ensure!(
+                    eventually(Duration::from_secs(2), || admission.requests() == asked + 1).await,
+                    "the first request reaches the admission server"
+                );
+                if close {
+                    anyhow::ensure!(exit.mgr.close_session(&exit.pseudonym), "the close finds the session");
+                } else {
+                    exit.reconnect(MIN_CHALLENGE + 2)
+                        .await
+                        .context("the rival takes over")?;
+                }
+                Ok(())
             }
+            .await;
+            // Released on the error path too, so that the first request is not left waiting for its timeout.
             admission.release.notify_one();
+            rivalled
         };
-        let (outcome, ()) = tokio::join!(loser, rival);
+        let (outcome, rivalled) = tokio::join!(loser, rival);
+        rivalled?;
         outcome?;
 
         let seen = exit.originated(Duration::from_millis(500)).await;
