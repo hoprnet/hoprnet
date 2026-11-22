@@ -2242,15 +2242,15 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
     Ok(())
 }
 
-/// A client reconnecting under the pseudonym it used before, after the Exit has idle-evicted the old
-/// Session, is refused as not resumable, without retries; a fresh pseudonym is served.
+/// A client reconnecting under the pseudonym it used before, after the Exit has closed the old Session,
+/// is refused as not resumable, without retries; a fresh pseudonym is served.
 ///
-/// The Entry still holds PIX state for the pseudonym and so asks to resume. An Exit that lost the
-/// Session cannot, and answers `NotResumable`, which `connect_to` does not retry.
+/// The Entry still holds PIX state for the pseudonym and so asks to resume. This Exit cannot resume a
+/// Session: it answers every attempt with `NotResumable`, which `connect_to` does not retry.
 ///
 /// ## Steps
 /// 1. A Session is opened and its first deposit, `(p, 1)`, is signalled on the Exit.
-/// 2. The Session is dropped, and the Exit left to evict it on its short `idle_timeout`.
+/// 2. The Session is dropped and its close ends it on the Exit, which is given time to process it.
 /// 3. A Session is opened under `p`: it fails with `Rejected(NotResumable)`. The Entry's retry delay is far beyond the
 ///    connect timeout, so a retry would show as a timeout rather than as a slow success.
 /// 4. A Session under a fresh pseudonym `p'` is funded at `(p', 1)` and echoes.
@@ -2260,7 +2260,7 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session_is_refused_as_not_resumable(
+async fn a_reconnect_under_the_same_pseudonym_after_the_exit_closed_the_session_is_refused_as_not_resumable(
     #[case] hops: usize,
 ) -> anyhow::Result<()> {
     use hopr_lib::{
@@ -2268,7 +2268,7 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session
         exports::transport::{StartErrorReason, TransportSessionError},
     };
 
-    // Short, so that the Exit evicts the first Session within the test. Applies to both ends.
+    // Applies to both ends; the wait below is a multiple of it.
     const IDLE_TIMEOUT: Duration = Duration::from_secs(20);
 
     let exit_pix = fill_pix_config(Default::default());
@@ -2299,7 +2299,7 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session
     );
 
     drop(first);
-    tracing::info!(%pseudonym, "first Session dropped; waiting for the Exit to evict it");
+    tracing::info!(%pseudonym, "first Session dropped; waiting for the Exit to close it");
     tokio::time::sleep(IDLE_TIMEOUT * 2).await;
     while milestones.try_recv().is_ok() {}
 
