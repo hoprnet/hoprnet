@@ -2555,7 +2555,10 @@ async fn a_reconnect_under_the_same_pseudonym_takes_over_the_paid_session(
     assert_eq!(pseudonym, *first.id());
 
     // Echo until the first cycle is funded.
-    let funded = |tally: &std::sync::Mutex<PixTally>| tally.lock().unwrap().exit_addresses.contains(&1);
+    let funded = |tally: &std::sync::Mutex<PixTally>| {
+        let t = tally.lock().unwrap();
+        t.exit_addresses.contains(&1) && t.entry_deposits.contains(&1)
+    };
     let started = std::time::Instant::now();
     while !funded(&tally) && started.elapsed() < Duration::from_secs(60) {
         echo_n(&mut first, 1, Duration::from_millis(200)).await;
@@ -2712,11 +2715,15 @@ async fn a_closed_session_that_never_returns_ends_at_the_window_and_funds_no_suc
     let mut session =
         establish_pix_session_under_with(&cluster, hops, Some(pseudonym), Some(idle_surb_balancer()), true).await?;
     let started = std::time::Instant::now();
-    while !tally.lock().unwrap().exit_addresses.contains(&1) && started.elapsed() < Duration::from_secs(60) {
+    let funded = |tally: &std::sync::Mutex<PixTally>| {
+        let t = tally.lock().unwrap();
+        t.exit_addresses.contains(&1) && t.entry_deposits.contains(&1)
+    };
+    while !funded(&tally) && started.elapsed() < Duration::from_secs(60) {
         echo_n(&mut session, 1, Duration::from_millis(200)).await;
     }
     anyhow::ensure!(
-        tally.lock().unwrap().exit_addresses.contains(&1),
+        funded(&tally),
         "the first cycle was never funded: {:?}",
         tally.lock().unwrap()
     );
