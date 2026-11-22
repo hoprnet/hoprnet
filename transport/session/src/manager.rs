@@ -29929,14 +29929,26 @@ mod tests {
             .await
             .map_err(|_| anyhow!("the driver must accept the action"))?;
 
-        // Wait until the driver has acted: it reports each stale request as failed to its own
-        // supervisor. The timeout only bounds a failure.
-        for _ in [ssa_id_3, ssa_id_4] {
-            tokio::time::timeout(Duration::from_secs(10), old_commands.recv())
-                .await
-                .context("the stale driver must report to its own supervisor")?
-                .map_err(|_| anyhow!("the old supervisor's channel closed"))?;
-        }
+        // Wait for the stale driver's failed `RequestSsa` results for both `ssa_id_3` and `ssa_id_4`, which it
+        // reports to its own supervisor. Other commands, such as the `SsaRequestSent` left from the live
+        // phase, are skipped. The driver handles actions in order, so `ssa_id_4`'s failure proves the
+        // re-send before it was handled. The timeout only bounds a failure.
+        let (mut seen_3, mut seen_4) = (false, false);
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while !(seen_3 && seen_4) {
+                let command = old_commands
+                    .recv()
+                    .await
+                    .map_err(|_| anyhow!("the old supervisor's channel closed"))?;
+                if let Some(ids) = command.failed_request_ssa_ids() {
+                    seen_3 |= ids == [ssa_id_3];
+                    seen_4 |= ids == [ssa_id_4];
+                }
+            }
+            anyhow::Ok(())
+        })
+        .await
+        .context("the stale driver must report its failed requests to its own supervisor")??;
 
         let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
         assert!(

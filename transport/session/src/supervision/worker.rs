@@ -161,6 +161,20 @@ pub enum WorkerCommand {
     ActionResult { action: SessionPixAction, ok: bool },
 }
 
+#[cfg(test)]
+impl WorkerCommand {
+    /// The SSA ids of a failed `RequestSsa` result, or `None` for any other command.
+    pub(crate) fn failed_request_ssa_ids(&self) -> Option<&[hopr_protocol_pix::SsaId<HoprPseudonym>]> {
+        match self {
+            Self::ActionResult {
+                action: SessionPixAction::RequestSsa { ssa_ids, .. },
+                ok: false,
+            } => Some(ssa_ids),
+            _ => None,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // spawn_supervisor_worker
 // ---------------------------------------------------------------------------
