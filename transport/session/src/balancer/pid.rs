@@ -128,7 +128,14 @@ impl SurbBalancerController for PidBalancerController {
     }
 
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
-        self.0.next_control_output(current_buffer_level as f64).output.max(0.0) as u64
+        let step = self.0.next_control_output(current_buffer_level as f64);
+        // A negative integral would ask the Entry to take SURBs back, which it can't, and would hold off the refill
+        // once the level drops below target.
+        if step.i < 0.0 {
+            self.0.reset_integral_term();
+            return (step.p + step.d).clamp(0.0, self.0.output_limit) as u64;
+        }
+        step.output.max(0.0) as u64
     }
 }
 
@@ -213,6 +220,24 @@ mod tests {
         // The return path breaks and the buffer drains.
         let out = c.next_control_output(0);
         assert!(out > 0, "an emptied buffer after a healthy period produced {out}");
+    }
+
+    /// A long stretch above target must not leave the integral wound below zero. The first level below
+    /// target afterwards has to command a refill straight away, not after the integral unwinds.
+    #[test]
+    fn pid_should_refill_at_once_after_a_long_stretch_above_target() {
+        let mut c = PidBalancerController::from_gains(PidControllerGains::default());
+        c.set_target_and_limit(BalancerControllerBounds::new(11, 5_000));
+
+        for _ in 0..1000 {
+            c.next_control_output(23);
+        }
+
+        let out = c.next_control_output(5);
+        assert!(
+            out > 0,
+            "level below target after a long stretch above it produced {out}"
+        );
     }
 
     // --- PidControllerGains tests ---
