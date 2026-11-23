@@ -221,7 +221,7 @@ impl SurbAdmissionControl for StoreSurbAdmission {
 const COUNTER_FLUSH_ACK_GRACE_DIVISOR: u32 = 3;
 
 /// How long each protocol-conformance report waits for acknowledgments of the packets it counts.
-fn counter_flush_ack_grace(flush_interval: Duration) -> Duration {
+pub(crate) fn counter_flush_ack_grace(flush_interval: Duration) -> Duration {
     flush_interval / COUNTER_FLUSH_ACK_GRACE_DIVISOR
 }
 

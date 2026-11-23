@@ -25,8 +25,9 @@ pub struct AcknowledgementPipelineConfig {
     /// Maximum interval to wait for per-peer acknowledgements before flushing a partial batch.
     ///
     /// Full batches of `MAX_ACKNOWLEDGEMENTS_BATCH_SIZE` (33) flush immediately without waiting;
-    /// low-rate peers wait at most this interval before their partial batch flushes. Retains the
-    /// `ack_buffer_interval` field/YAML key name for configuration backwards compatibility.
+    /// low-rate peers wait at most this interval before their partial batch flushes. Must stay
+    /// strictly below the counter-flush acknowledgement grace (`counter_flush_interval / 3`) so
+    /// sparse-link acknowledgements land inside the network graph's `ack_rate` window.
     ///
     /// Default is 200 ms.
     #[default(default_ack_buffer_interval())]

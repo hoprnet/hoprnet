@@ -667,18 +667,20 @@ impl<S: futures::Stream + Unpin> futures::Stream for AbortOnDropStream<S> {
     }
 }
 
+type PeerAckGroups = halfbrown::HashMap<
+    OffchainPublicKey,
+    (Option<std::time::Instant>, Vec<WithContext<VerifiedAcknowledgement>>),
+    ahash::RandomState,
+>;
+
 async fn flush_expired_ack_groups(
-    groups: &mut halfbrown::HashMap<
-        OffchainPublicKey,
-        (std::time::Instant, Vec<WithContext<VerifiedAcknowledgement>>),
-        ahash::RandomState,
-    >,
+    groups: &mut PeerAckGroups,
     batch_tx: &mut futures::channel::mpsc::Sender<(OffchainPublicKey, Vec<WithContext<VerifiedAcknowledgement>>)>,
     now: std::time::Instant,
 ) -> bool {
     let expired: Vec<OffchainPublicKey> = groups
         .iter()
-        .filter_map(|(k, (d, _))| (*d <= now).then_some(*k))
+        .filter_map(|(k, (d, _))| d.is_some_and(|deadline| deadline <= now).then_some(*k))
         .collect();
     for dst in expired {
         if let Some((_, acks)) = groups.remove(&dst)
@@ -705,11 +707,7 @@ where
     let (mut batch_tx, batch_rx) = futures::channel::mpsc::channel(64);
     let (fut, abort_handle) = futures::future::abortable(async move {
         let mut ack_stream = std::pin::pin!(ack_stream);
-        let mut groups = halfbrown::HashMap::<
-            OffchainPublicKey,
-            (std::time::Instant, Vec<WithContext<VerifiedAcknowledgement>>),
-            ahash::RandomState,
-        >::with_capacity_and_hasher(grouping_capacity, ahash::RandomState::default());
+        let mut groups = PeerAckGroups::with_capacity_and_hasher(grouping_capacity, ahash::RandomState::default());
         let mut active_timer: Option<(std::time::Instant, std::pin::Pin<Box<futures_time::task::Sleep>>)> = None;
 
         loop {
@@ -721,7 +719,7 @@ where
                 return;
             }
 
-            let earliest = groups.values().map(|(deadline, _)| *deadline).min();
+            let earliest = groups.values().filter_map(|(deadline, _)| *deadline).min();
             match earliest {
                 None => {
                     active_timer = None;
@@ -760,9 +758,12 @@ where
                 }
                 Some(Some((dst, ack))) => {
                     let now = std::time::Instant::now();
-                    let entry = groups
-                        .entry(dst)
-                        .or_insert_with(|| (now + max_wait, Vec::with_capacity(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE)));
+                    let entry = groups.entry(dst).or_insert_with(|| {
+                        (
+                            now.checked_add(max_wait),
+                            Vec::with_capacity(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE),
+                        )
+                    });
                     entry.1.push(ack);
                     if entry.1.len() >= MAX_ACKNOWLEDGEMENTS_BATCH_SIZE
                         && let Some((_, acks)) = groups.remove(&dst)
@@ -828,17 +829,20 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                         let ack_chunk_len = ack_chunk.len() as u64;
                         match hopr_utils::parallelize::cpu::spawn_fifo_blocking(move || encoder.encode_acknowledgements(&ack_chunk, &destination), "ack_encode").await {
                             Ok(Ok(ack_packet)) => {
-                                wire_outgoing
+                                match wire_outgoing
                                     .feed((ack_packet.next_hop.into(), ack_packet.data))
                                     .await
-                                    .unwrap_or_else(|error| {
-                                        tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
-                                    });
-
-                                #[cfg(all(feature = "telemetry", not(test)))]
                                 {
-                                    METRIC_SENT_ACKS.increment_by(ack_chunk_len);
-                                    METRIC_SENT_ACK_BATCHES.increment();
+                                    Ok(()) => {
+                                        #[cfg(all(feature = "telemetry", not(test)))]
+                                        {
+                                            METRIC_SENT_ACKS.increment_by(ack_chunk_len);
+                                            METRIC_SENT_ACK_BATCHES.increment();
+                                        }
+                                    }
+                                    Err(error) => {
+                                        tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
+                                    }
                                 }
                             }
                             Ok(Err(error)) => tracing::error!(%error, "failed to encode acknowledgements"),
@@ -1915,11 +1919,94 @@ mod tests {
         let key = OffchainKeypair::random();
         let hot_peer = *OffchainKeypair::random().public();
         let cold_peer = *OffchainKeypair::random().public();
-        let (mut ack_tx, ack_rx) = mpsc::channel(256);
         let (wire_tx, mut wire_rx) = mpsc::channel(64);
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let deadline_cutoff = std::time::Instant::now() + std::time::Duration::from_secs(2);
+
+        // Stream that yields one ack for `cold_peer` and then keeps `hot_peer` continuously
+        // `Poll::Ready` (never returning `Poll::Pending`) until stopped, so `select_biased!`
+        // cannot fall through to the timer arm and only the pre-poll expiry flush can emit
+        // `cold_peer`.
+        struct ContinuousHotStream {
+            cold_peer: Option<OffchainPublicKey>,
+            hot_peer: OffchainPublicKey,
+            stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+            cutoff: std::time::Instant,
+        }
+        impl futures::Stream for ContinuousHotStream {
+            type Item = WithContext<(OffchainPublicKey, Option<HalfKey>)>;
+
+            fn poll_next(
+                mut self: std::pin::Pin<&mut Self>,
+                _cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<Option<Self::Item>> {
+                if let Some(cold) = self.cold_peer.take() {
+                    return std::task::Poll::Ready(Some(WithContext::new(
+                        (cold, Some(HalfKey::default())),
+                        tracing::Span::none(),
+                    )));
+                }
+                if self.stop.load(std::sync::atomic::Ordering::Relaxed) || std::time::Instant::now() >= self.cutoff {
+                    return std::task::Poll::Ready(None);
+                }
+                std::task::Poll::Ready(Some(WithContext::new(
+                    (self.hot_peer, Some(HalfKey::default())),
+                    tracing::Span::none(),
+                )))
+            }
+        }
 
         let cfg = AcknowledgementPipelineConfig {
             ack_buffer_interval: std::time::Duration::from_millis(80),
+            ..Default::default()
+        };
+
+        let ack_stream = ContinuousHotStream {
+            cold_peer: Some(cold_peer),
+            hot_peer,
+            stop: stop.clone(),
+            cutoff: deadline_cutoff,
+        };
+
+        let pipeline = tokio::spawn(start_outgoing_ack_pipeline(
+            ack_stream,
+            std::sync::Arc::new(PerPeerAckCountEncoder),
+            cfg,
+            key,
+            wire_tx,
+        ));
+
+        let cold_peer_id: PeerId = cold_peer.into();
+        let found_cold = tokio::time::timeout(std::time::Duration::from_millis(500), async {
+            while let Some((peer, payload)) = wire_rx.next().await {
+                if peer == cold_peer_id {
+                    return Some(payload);
+                }
+            }
+            None
+        })
+        .await
+        .map_err(|_| anyhow::anyhow!("cold_peer deadline batch starved under hot_peer load"))?;
+
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(found_cold.as_deref(), Some(&[1u8][..]));
+
+        // Drain any already-buffered hot batches so the pipeline exits cleanly.
+        drop(wire_rx);
+        pipeline.await?;
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn unrepresentable_ack_buffer_interval_does_not_panic_and_still_flushes_full_and_eof() -> anyhow::Result<()> {
+        let key = OffchainKeypair::random();
+        let peer_a = *OffchainKeypair::random().public();
+        let peer_b = *OffchainKeypair::random().public();
+        let (mut ack_tx, ack_rx) = mpsc::channel(64);
+        let (wire_tx, mut wire_rx) = mpsc::channel(16);
+
+        let cfg = AcknowledgementPipelineConfig {
+            ack_buffer_interval: std::time::Duration::MAX,
             ..Default::default()
         };
 
@@ -1931,49 +2018,37 @@ mod tests {
             wire_tx,
         ));
 
-        // Queue one ack for `cold_peer`, then continuously flood `hot_peer` so `ack_stream` is
-        // never idle. `cold_peer` must still flush promptly once its 80 ms deadline expires.
         ack_tx
             .send(WithContext::new(
-                (cold_peer, Some(HalfKey::default())),
+                (peer_b, Some(HalfKey::default())),
                 tracing::Span::none(),
             ))
             .await?;
+        for _ in 0..MAX_ACKNOWLEDGEMENTS_BATCH_SIZE {
+            ack_tx
+                .send(WithContext::new(
+                    (peer_a, Some(HalfKey::default())),
+                    tracing::Span::none(),
+                ))
+                .await?;
+        }
 
-        let feeder = tokio::spawn(async move {
-            let mut tx = ack_tx;
-            for _ in 0..200 {
-                if tx
-                    .send(WithContext::new(
-                        (hot_peer, Some(HalfKey::default())),
-                        tracing::Span::none(),
-                    ))
-                    .await
-                    .is_err()
-                {
-                    break;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-            }
-            tx
-        });
+        let first = tokio::time::timeout(std::time::Duration::from_millis(500), wire_rx.next())
+            .await
+            .map_err(|_| anyhow::anyhow!("full batch did not flush with Duration::MAX interval"))?
+            .ok_or_else(|| anyhow::anyhow!("wire_rx closed early"))?;
+        assert_eq!(first.0, peer_a.into());
+        assert_eq!(first.1.as_ref(), &[MAX_ACKNOWLEDGEMENTS_BATCH_SIZE as u8]);
 
-        let cold_peer_id: PeerId = cold_peer.into();
-        let found_cold = tokio::time::timeout(std::time::Duration::from_millis(350), async {
-            while let Some((peer, payload)) = wire_rx.next().await {
-                if peer == cold_peer_id {
-                    return Some(payload);
-                }
-            }
-            None
-        })
-        .await
-        .map_err(|_| anyhow::anyhow!("cold_peer deadline batch starved under hot_peer load"))?;
+        // Closing the input must still flush the partial batch for peer B.
+        drop(ack_tx);
+        let second = tokio::time::timeout(std::time::Duration::from_millis(500), wire_rx.next())
+            .await
+            .map_err(|_| anyhow::anyhow!("partial batch did not flush on EOF with Duration::MAX interval"))?
+            .ok_or_else(|| anyhow::anyhow!("wire_rx closed early"))?;
+        assert_eq!(second.0, peer_b.into());
+        assert_eq!(second.1.as_ref(), &[1u8]);
 
-        assert_eq!(found_cold.as_deref(), Some(&[1u8][..]));
-
-        let tx = feeder.await?;
-        drop(tx);
         pipeline.await?;
         Ok(())
     }
