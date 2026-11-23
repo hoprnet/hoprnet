@@ -123,13 +123,14 @@ where
         max_item_age: Option<Duration>,
         max_frames_behind_gap: Option<usize>,
         reorder: Option<SharedReorder>,
+        first_frame_id: FrameId,
     ) -> Self {
         assert!(capacity > 0, "capacity should be positive");
         Self {
             inner,
             buffer: BinaryHeap::with_capacity(capacity),
             timer: futures_time::task::sleep(max_wait.max(MIN_GAP_WAIT).into()),
-            next_id: 1,
+            next_id: first_frame_id,
             max_wait,
             max_item_age: max_item_age.filter(|age| !age.is_zero()),
             // Zero would abandon the frame due next before anything had arrived to justify it,
@@ -384,6 +385,12 @@ pub struct SequencerConfig {
     /// milliseconds of each other holds everything behind it for seconds, waiting for something
     /// that is never coming. A frame that comes after its gap was given up lengthens the wait.
     pub adapt_to_reordering: bool,
+    /// The first frame id of the sequence; `None` (the default) starts at 1.
+    ///
+    /// Everything below it is an old item and is dropped (terminating frames included, see
+    /// [`SessionSocketConfig::stream_base`](crate::SessionSocketConfig::stream_base)). Must lie in
+    /// `1..=`[`MAX_STREAM_BASE`](crate::MAX_STREAM_BASE); the socket validates it.
+    pub stream_base: Option<FrameId>,
 }
 
 /// Stream extensions methods for item sequencing.
@@ -395,7 +402,7 @@ pub trait SequencerExt: futures::Stream {
         Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity, None, None, None)
+        Sequencer::new(self, timeout, capacity, None, None, None, 1)
     }
 
     /// As [`SequencerExt::sequencer`], but discards items buffered longer than `max_item_age`
@@ -410,7 +417,7 @@ pub trait SequencerExt: futures::Stream {
         Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity, max_item_age, None, None)
+        Sequencer::new(self, timeout, capacity, max_item_age, None, None, 1)
     }
 
     /// As [`SequencerExt::sequencer`], with every stopping rule stated explicitly.
@@ -438,6 +445,7 @@ pub trait SequencerExt: futures::Stream {
             cfg.max_item_age,
             cfg.max_frames_behind_gap,
             cfg.adapt_to_reordering.then(|| reorder.unwrap_or_default()),
+            cfg.stream_base.unwrap_or(1),
         )
     }
 }
@@ -587,6 +595,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: Some(2),
             adapt_to_reordering: false,
+            stream_base: None,
         });
         pin_mut!(seq_stream);
 
@@ -635,6 +644,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: Some(4),
             adapt_to_reordering: false,
+            stream_base: None,
         });
         pin_mut!(seq_stream);
 
@@ -680,6 +690,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: Some(3),
             adapt_to_reordering: false,
+            stream_base: None,
         });
         pin_mut!(seq_stream);
 
@@ -716,6 +727,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: None,
             adapt_to_reordering: false,
+            stream_base: None,
         });
         pin_mut!(seq_stream);
 
@@ -1022,6 +1034,7 @@ mod tests {
             max_item_age: None,
             max_frames_behind_gap: None,
             adapt_to_reordering: true,
+            stream_base: None,
         }
     }
 
@@ -1138,6 +1151,80 @@ mod tests {
         let took = time_to_abandon(&mut sink, &mut seq, 5, 6).await?;
         assert!(took >= Duration::from_millis(1150), "{took:?}");
         assert!(took < Duration::from_secs(3), "{took:?}");
+        Ok(())
+    }
+
+    fn based(base: FrameId, max_wait: Duration) -> SequencerConfig {
+        SequencerConfig {
+            max_wait,
+            capacity: 4096,
+            max_item_age: None,
+            max_frames_behind_gap: Some(256),
+            adapt_to_reordering: false,
+            stream_base: Some(base),
+        }
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_with_a_stream_base_should_start_there_and_drop_everything_below() -> anyhow::Result<()> {
+        // Predecessor frames (900 and 6 are the reviewer's) before, between and after the new ones.
+        let out: Vec<u32> = futures::stream::iter(vec![900, 6, 1000, 999, 1002, 1, 1001, 5, 1003])
+            .sequencer_with(based(1000, Duration::from_secs(30)))
+            .try_collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
+        assert_eq!(vec![1000, 1001, 1002, 1003], out);
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_with_a_stream_base_should_not_let_a_predecessor_frame_discard_the_new_stream()
+    -> anyhow::Result<()> {
+        // Old frame 900 first, then 899 new frames: nothing may be reported discarded.
+        let frames: Vec<u32> = std::iter::once(900).chain(1000..1900).collect();
+        let out: Vec<Result<u32, SessionError>> = futures::stream::iter(frames)
+            .sequencer_with(based(1000, Duration::from_secs(30)))
+            .collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
+        assert_eq!(
+            (1000..1900).collect::<Vec<_>>(),
+            out.into_iter().collect::<Result<Vec<_>, _>>()?
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_with_a_stream_base_should_give_up_a_missing_first_frame_by_the_gap_rule() -> anyhow::Result<()> {
+        let mut cfg = based(50, Duration::from_secs(30));
+        cfg.max_frames_behind_gap = Some(2);
+        // The input stays open (the sender lives to the end of the test), so neither the end of the stream nor
+        // the 30 s wait can give frame 50 up within the deadline: only the gap rule can.
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+        for frame in [49, 51, 52, 53, 54] {
+            tx.unbounded_send(frame)?;
+        }
+        let out: Vec<Result<u32, SessionError>> = rx
+            .sequencer_with(cfg)
+            .take(5)
+            .collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
+        assert!(matches!(out[0], Err(SessionError::FrameDiscarded(50))), "{out:?}");
+        let delivered: Vec<u32> = out.into_iter().filter_map(Result::ok).collect();
+        assert_eq!(vec![51, 52, 53, 54], delivered);
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_with_the_highest_stream_base_should_not_end_the_sequence() -> anyhow::Result<()> {
+        let base = crate::MAX_STREAM_BASE;
+        let out: Vec<u32> = futures::stream::iter(vec![base + 1, base - 1, base, base + 2])
+            .sequencer_with(based(base, Duration::from_secs(30)))
+            .try_collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
+        assert_eq!(vec![base, base + 1, base + 2], out);
         Ok(())
     }
 }
