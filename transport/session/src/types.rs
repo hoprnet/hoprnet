@@ -611,6 +611,93 @@ pub struct HoprSessionConfig {
     pub max_frames_behind_gap: Option<usize>,
 }
 
+/// Converts a transport sink error into an [`std::io::Error`], keeping an `io::Error` (and its kind) as is.
+fn into_io_error<E: std::error::Error + Send + Sync + 'static>(error: E) -> std::io::Error {
+    let boxed: Box<dyn std::error::Error + Send + Sync> = Box::new(error);
+    match boxed.downcast::<std::io::Error>() {
+        Ok(io) => *io,
+        Err(other) => std::io::Error::other(other),
+    }
+}
+
+/// A write sink that stays failed once it has failed.
+///
+/// futures-util's `SinkExt::with` (`With::poll`, 0.3.34) drives its pending future with
+/// `ready!(fut.poll(cx))?` and clears it only afterwards. When the closure's future resolves to `Err`,
+/// the `?` returns early and the completed future stays in place, so the next `poll_ready` /
+/// `poll_flush` / `poll_close` polls it again and panics (`Ready polled after completion`). The
+/// Session's write path has several `.with` closures that rightly fail a cut write, so the outermost
+/// sink is wrapped in this adapter: after the first error it never polls the inner sink again and
+/// repeats the same error kind and message.
+#[pin_project::pin_project]
+pub(crate) struct FailedStaysFailed<S> {
+    #[pin]
+    inner: S,
+    failed: Option<(std::io::ErrorKind, String)>,
+}
+
+impl<S> FailedStaysFailed<S> {
+    pub(crate) fn new(inner: S) -> Self {
+        Self { inner, failed: None }
+    }
+}
+
+impl<S, T> futures::Sink<T> for FailedStaysFailed<S>
+where
+    S: futures::Sink<T, Error = std::io::Error>,
+{
+    type Error = std::io::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let this = self.project();
+        if let Some((kind, msg)) = this.failed {
+            return Poll::Ready(Err(std::io::Error::new(*kind, msg.clone())));
+        }
+        let res = this.inner.poll_ready(cx);
+        if let Poll::Ready(Err(e)) = &res {
+            *this.failed = Some((e.kind(), e.to_string()));
+        }
+        res
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        let this = self.project();
+        if let Some((kind, msg)) = this.failed {
+            return Err(std::io::Error::new(*kind, msg.clone()));
+        }
+        let res = this.inner.start_send(item);
+        if let Err(e) = &res {
+            *this.failed = Some((e.kind(), e.to_string()));
+        }
+        res
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let this = self.project();
+        if let Some((kind, msg)) = this.failed {
+            return Poll::Ready(Err(std::io::Error::new(*kind, msg.clone())));
+        }
+        let res = this.inner.poll_flush(cx);
+        if let Poll::Ready(Err(e)) = &res {
+            *this.failed = Some((e.kind(), e.to_string()));
+        }
+        res
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let this = self.project();
+        // Nothing more can be flushed after a failure; dropping the inner sink releases it.
+        if this.failed.is_some() {
+            return Poll::Ready(Ok(()));
+        }
+        let res = this.inner.poll_close(cx);
+        if let Poll::Ready(Err(e)) = &res {
+            *this.failed = Some((e.kind(), e.to_string()));
+        }
+        res
+    }
+}
+
 /// Represents the Session protocol socket over HOPR.
 ///
 /// This is essentially a HOPR-specific wrapper for [`ReliableSocket`] and [`UnreliableSocket`]
@@ -624,6 +711,8 @@ pub struct HoprSession {
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
+    /// The slot instance the manager built this Session for; see [`HoprSession::slot_instance`].
+    slot_instance: Option<u64>,
 }
 
 pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
@@ -646,7 +735,7 @@ impl HoprSession {
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
-        Tx::Error: std::error::Error + Send + Sync,
+        Tx::Error: std::error::Error + Send + Sync + 'static,
     {
         Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None)
     }
@@ -674,7 +763,7 @@ impl HoprSession {
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
-        Tx::Error: std::error::Error + Send + Sync,
+        Tx::Error: std::error::Error + Send + Sync + 'static,
     {
         // Keep the same parent for socket workers and every later IO poll.
         let span = tracing::debug_span!("session", session_id = %id);
@@ -697,8 +786,8 @@ impl HoprSession {
 
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
         let transport = DuplexIO(
-            AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
-                move |buf: Box<[u8]>| {
+            AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(FailedStaysFailed::new(
+                hopr.0.sink_map_err(into_io_error).with(move |buf: Box<[u8]>| {
                     #[cfg(feature = "telemetry")]
                     crate::telemetry::record_session_write(&session_id_write, buf.len());
                     // The Session protocol does not set any packet info on outgoing packets.
@@ -708,7 +797,7 @@ impl HoprSession {
                             .map(|data| (routing_clone.clone(), ApplicationDataOut::with_no_packet_info(data)))
                             .map_err(std::io::Error::other),
                     )
-                },
+                }),
             )),
             // The Session protocol ignores the packet info on incoming packets.
             // It is typically SessionManager's job to interpret those.
@@ -852,7 +941,26 @@ impl HoprSession {
             routing,
             cfg,
             on_close,
+            slot_instance: None,
         })
+    }
+
+    /// Binds this Session to the manager's slot instance it was built for.
+    pub(crate) fn with_slot_instance(mut self, instance_id: u64) -> Self {
+        self.slot_instance = Some(instance_id);
+        self
+    }
+
+    /// Identifies the establishment of the manager's slot this Session object belongs to.
+    ///
+    /// A pseudonym ([`SessionId`]) can be taken by a successor Session while this object still exists.
+    /// Handing this to [`SessionManager::close_session_instance`] closes only this Session, never a
+    /// successor's. `None` for a Session not built by a [`SessionManager`].
+    ///
+    /// [`SessionManager`]: crate::SessionManager
+    /// [`SessionManager::close_session_instance`]: crate::SessionManager::close_session_instance
+    pub fn slot_instance(&self) -> Option<u64> {
+        self.slot_instance
     }
 
     /// ID of this Session.
@@ -920,8 +1028,9 @@ impl futures::AsyncWrite for HoprSession {
         futures::ready!(this.inner.poll_close(cx))?;
         tracing::trace!("hopr session closed");
 
-        #[cfg(feature = "telemetry")]
-        crate::telemetry::set_session_state(this.id, crate::telemetry::SessionLifecycleState::Closing);
+        // The `Closing` telemetry state is not set here: this object may outlive its slot, and the
+        // state is keyed by pseudonym, which a successor can hold. The manager sets it when it handles
+        // the notification below, and only for the instance that sent it.
 
         if let Some(notifier) = this.on_close.take() {
             tracing::trace!("notifying write half closure of session");
@@ -974,6 +1083,36 @@ mod tests {
     use hopr_utils::network_types::prelude::SealedHost;
 
     use super::*;
+
+    #[test]
+    fn a_failed_sink_stays_failed_instead_of_repolling_its_with_future() {
+        let inner = futures::sink::drain()
+            .sink_map_err(|e: std::convert::Infallible| -> std::io::Error { match e {} })
+            .with(|_: u8| {
+                futures::future::err::<(), std::io::Error>(std::io::Error::new(std::io::ErrorKind::BrokenPipe, "cut"))
+            });
+        let mut sink = Box::pin(FailedStaysFailed::new(inner));
+
+        for _ in 0..2 {
+            let err = sink
+                .send(1u8)
+                .now_or_never()
+                .expect("ready")
+                .expect_err("the write must fail");
+            assert_eq!(err.kind(), std::io::ErrorKind::BrokenPipe);
+            assert_eq!(err.to_string(), "cut");
+            let err = sink
+                .flush()
+                .now_or_never()
+                .expect("ready")
+                .expect_err("the flush must fail");
+            assert_eq!(err.kind(), std::io::ErrorKind::BrokenPipe);
+        }
+        sink.close()
+            .now_or_never()
+            .expect("ready")
+            .expect("close after a failure is Ok");
+    }
 
     fn deposit_entry(session_id: &SessionId, ssa_index: u32, data: &[u8]) -> PixDepositData {
         PixDepositData {
