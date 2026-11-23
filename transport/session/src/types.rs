@@ -26,7 +26,7 @@ use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, FrameLossSignal, ReliableSocket,
-    SegmentRequest, SeqIndicator, SessionSocketConfig, UnreliableSocket,
+    SegmentRequest, SeqIndicator, SessionSocketConfig, StreamProgress, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
@@ -716,6 +716,8 @@ pub struct HoprSession {
     span: tracing::Span,
     #[pin]
     inner: Box<dyn AsyncReadWrite>,
+    /// The progress of the stream on the stateless socket, see [`HoprSession::stream_progress`].
+    stream_progress: Option<StreamProgress>,
     routing: DestinationRouting,
     cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
@@ -819,6 +821,7 @@ impl HoprSession {
         );
 
         // Based on the requested capabilities, see if we should use the Session protocol
+        let mut stream_progress = None;
         let inner: Box<dyn AsyncReadWrite> = if cfg.capabilities.contains(Capability::Segmentation) {
             let socket_cfg = SessionSocketConfig {
                 frame_size: cfg.frame_mtu,
@@ -928,14 +931,22 @@ impl HoprSession {
                 };
                 debug!(?socket_cfg, "opening new stateless session socket");
 
-                Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
-                    id,
-                    transport,
-                    socket_cfg,
-                    loss_signal,
-                    #[cfg(feature = "telemetry")]
-                    NoopTracker,
-                )?)
+                // Seeded from the stream base, so that a successor's base is never below this stream's own.
+                let progress = socket_cfg
+                    .stream_base
+                    .map_or_else(StreamProgress::default, |base| StreamProgress::starting_at(base, base));
+                stream_progress = Some(progress.clone());
+                Box::new(
+                    UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless_tracked(
+                        id,
+                        transport,
+                        socket_cfg,
+                        loss_signal,
+                        Some(progress),
+                        #[cfg(feature = "telemetry")]
+                        NoopTracker,
+                    )?,
+                )
             }
         } else {
             debug!("opening raw session socket");
@@ -947,6 +958,7 @@ impl HoprSession {
             id,
             span,
             inner,
+            stream_progress,
             routing,
             cfg,
             on_close,
@@ -970,6 +982,14 @@ impl HoprSession {
     /// [`SessionManager::close_session_instance`]: crate::SessionManager::close_session_instance
     pub fn slot_instance(&self) -> Option<u64> {
         self.slot_instance
+    }
+
+    /// The progress of this Session's stream, for a Session on the stateless frame-based socket.
+    ///
+    /// `None` for a raw Session (no [`Capability::Segmentation`]), which has no frames, and for a Session on the
+    /// stateful socket. The handle stays valid, and keeps reading the last values, after the Session is gone.
+    pub fn stream_progress(&self) -> Option<StreamProgress> {
+        self.stream_progress.clone()
     }
 
     /// ID of this Session.
