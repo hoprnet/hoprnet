@@ -102,7 +102,7 @@ opentelemetry-prometheus-text-exporter = { version = "0.3" }
 opentelemetry_sdk = { version = "0.32.1" }
 parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
-pcap-file = "2.0.0"
+pcap-file = "3.0.0"
 pid = "4.0.0"
 pin-project = "1.1.13"
 postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
