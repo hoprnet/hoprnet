@@ -35569,8 +35569,8 @@ mod tests {
     /// A Session on the stateful (retransmitting) socket is neither detached nor taken over: its data
     /// plane ending runs today's close, and a re-initiation is refused as ineligible.
     #[rstest]
-    #[case::acknowledging(Capability::RetransmissionAck.into())]
-    #[case::negative_acknowledging(Capability::RetransmissionNack.into())]
+    #[case::acknowledging(Capability::Segmentation | Capability::RetransmissionAck)]
+    #[case::negative_acknowledging(Capability::Segmentation | Capability::RetransmissionNack)]
     #[test_log::test(tokio::test)]
     async fn a_session_on_the_stateful_socket_is_not_detached_or_taken_over(
         #[case] capabilities: Capabilities,
