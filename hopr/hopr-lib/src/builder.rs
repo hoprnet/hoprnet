@@ -1203,22 +1203,10 @@ macro_rules! impl_build_methods {
                 None
             };
             #[cfg(feature = "session-client")]
-            let (socket, transport_processes) = pre
-                .transport_api
-                .run_relay(
-                    cover_traffic,
-                    network,
-                    network_process,
-                    tickets_tx,
-                    ticket_factory,
-                    exit_ack_share,
-                    pre.session_tx.clone(),
-                    pre.admission_tx.clone(),
-                )
-                .await?;
-            // Without the session stack a relay admits no Sessions, so the transport role takes no
-            // incoming-Session wiring either.
+            let (session_tx, admission_tx) = (Some(pre.session_tx.clone()), pre.admission_tx.clone());
+            // Without the session stack a relay admits no Sessions, so there is nothing to hand over.
             #[cfg(not(feature = "session-client"))]
+            let (session_tx, admission_tx) = (None, None);
             let (socket, transport_processes) = pre
                 .transport_api
                 .run_relay(
@@ -1228,6 +1216,8 @@ macro_rules! impl_build_methods {
                     tickets_tx,
                     ticket_factory,
                     exit_ack_share,
+                    session_tx,
+                    admission_tx,
                 )
                 .await?;
             // Drain unrelated packets to avoid missing blackhole

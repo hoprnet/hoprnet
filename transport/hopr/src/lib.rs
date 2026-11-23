@@ -802,8 +802,8 @@ where
         ticket_events: T,
         ticket_factory: TFact,
         exit_ack_share: Option<PixEvt>,
-        #[cfg(feature = "session-client")] on_incoming_session: Sender<IncomingSession>,
-        #[cfg(feature = "session-client")] on_session_admission: Option<SessionAdmissionSink>,
+        on_incoming_session: Option<Sender<IncomingSession>>,
+        on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
@@ -816,12 +816,6 @@ where
         PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
         PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
-        #[cfg(feature = "session-client")]
-        let session_wiring: (Option<Sender<IncomingSession>>, Option<SessionAdmissionSink>) =
-            (Some(on_incoming_session), on_session_admission);
-        #[cfg(not(feature = "session-client"))]
-        let session_wiring: (Option<Sender<IncomingSession>>, Option<SessionAdmissionSink>) = (None, None);
-
         self.run_inner(
             protocol::NodeType::Relay,
             cover_traffic,
@@ -830,8 +824,8 @@ where
             ticket_events,
             ticket_factory,
             exit_ack_share,
-            session_wiring.0,
-            session_wiring.1,
+            on_incoming_session,
+            on_session_admission,
         )
         .await
     }
@@ -855,8 +849,8 @@ where
         network_process: BoxedProcessFn,
         ticket_factory: TFact,
         pix_events: Option<PixEvt>,
-        #[cfg(feature = "session-client")] on_incoming_session: Sender<IncomingSession>,
-        #[cfg(feature = "session-client")] on_session_admission: Option<SessionAdmissionSink>,
+        on_incoming_session: Option<Sender<IncomingSession>>,
+        on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
@@ -867,12 +861,6 @@ where
         PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
         PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
-        #[cfg(feature = "session-client")]
-        let session_wiring: (Option<Sender<IncomingSession>>, Option<SessionAdmissionSink>) =
-            (Some(on_incoming_session), on_session_admission);
-        #[cfg(not(feature = "session-client"))]
-        let session_wiring: (Option<Sender<IncomingSession>>, Option<SessionAdmissionSink>) = (None, None);
-
         self.run_inner(
             protocol::NodeType::Exit,
             cover_traffic,
@@ -881,8 +869,8 @@ where
             futures::sink::drain(),
             ticket_factory,
             pix_events,
-            session_wiring.0,
-            session_wiring.1,
+            on_incoming_session,
+            on_session_admission,
         )
         .await
     }
