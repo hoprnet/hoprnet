@@ -209,6 +209,14 @@ pub struct StreamProtocolConfig {
     pub egress_coalesce_max_packets: usize,
 }
 
+impl StreamProtocolConfig {
+    /// Byte threshold for per-peer egress coalescing, capped by `frame_writer_backpressure_bytes`.
+    pub(crate) fn egress_coalesce_target_bytes(&self, packet_size: usize) -> usize {
+        self.frame_writer_backpressure_bytes
+            .min(self.egress_coalesce_max_packets.saturating_mul(packet_size))
+    }
+}
+
 fn default_counter_flush_interval() -> Duration {
     DEFAULT_COUNTER_FLUSH_INTERVAL
 }
@@ -2691,6 +2699,20 @@ mod tests {
             cfg.frame_writer_backpressure_bytes,
             DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
         );
+        assert_eq!(cfg.egress_coalesce_delay, DEFAULT_EGRESS_COALESCE_DELAY);
+        assert_eq!(cfg.egress_coalesce_max_packets, DEFAULT_EGRESS_COALESCE_MAX_PACKETS);
+        assert_eq!(
+            cfg.egress_coalesce_target_bytes(1000),
+            DEFAULT_EGRESS_COALESCE_MAX_PACKETS * 1000
+        );
+        assert_eq!(
+            StreamProtocolConfig {
+                frame_writer_backpressure_bytes: 500,
+                ..cfg
+            }
+            .egress_coalesce_target_bytes(1000),
+            500
+        );
         cfg.validate().expect("default StreamProtocolConfig must be valid");
     }
 
@@ -2734,7 +2756,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_protocol_config_coalesce_delay_upper_bound_is_enforced() {
+    fn stream_protocol_config_coalesce_bounds_are_enforced() {
         assert!(
             StreamProtocolConfig {
                 egress_coalesce_delay: Duration::ZERO,
@@ -2775,5 +2797,37 @@ mod tests {
             .validate()
             .is_ok()
         );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn stream_protocol_config_coalesce_fields_parse_from_yaml() -> anyhow::Result<()> {
+        let configured: StreamProtocolConfig =
+            serde_saphyr::from_str("egress_coalesce_delay: 12ms\negress_coalesce_max_packets: 8\n")
+                .context("configured coalesce fields must parse")?;
+        assert_eq!(Duration::from_millis(12), configured.egress_coalesce_delay);
+        assert_eq!(8, configured.egress_coalesce_max_packets);
+        configured
+            .validate()
+            .context("configured coalesce fields must validate")?;
+
+        let disabled: StreamProtocolConfig =
+            serde_saphyr::from_str("egress_coalesce_delay: 0s\n").context("zero coalesce delay must parse")?;
+        assert_eq!(Duration::ZERO, disabled.egress_coalesce_delay);
+        assert_eq!(
+            DEFAULT_EGRESS_COALESCE_MAX_PACKETS,
+            disabled.egress_coalesce_max_packets
+        );
+        disabled.validate().context("disabled coalescing must validate")?;
+
+        let omitted: StreamProtocolConfig = serde_saphyr::from_str("per_peer_channel_capacity: 1024\n")
+            .context("omitted coalesce fields must parse")?;
+        assert_eq!(DEFAULT_EGRESS_COALESCE_DELAY, omitted.egress_coalesce_delay);
+        assert_eq!(DEFAULT_EGRESS_COALESCE_MAX_PACKETS, omitted.egress_coalesce_max_packets);
+        omitted
+            .validate()
+            .context("config with omitted coalesce fields must validate")?;
+
+        Ok(())
     }
 }
