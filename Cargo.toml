@@ -17,6 +17,7 @@ members = [
   "transport/tag-allocator",
   "utils-session",
   "utils-tracing",
+  "misc/platform",
 ]
 
 [workspace.package]
