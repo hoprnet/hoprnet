@@ -235,9 +235,12 @@ hopr-utils = { workspace = true, features = [
 ] }
 # `default-features = false` so the entity features below are the only way a role gets compiled in:
 # a default-on role in `hopr-transport` would come back for every build and silently undo the fence.
-# The two defaults it drops, `pix-bjj` and `p2p-announce-quic`, are forwarded by this crate's own
-# `pix-bjj` and `transport-announce-quic` features, both of which are in `default`.
-hopr-transport = { workspace = true, default-features = false }
+# Of the three defaults it drops, `pix-bjj` and `p2p-announce-quic` are forwarded by this crate's
+# own `pix-bjj` and `transport-announce-quic` features (both in `default`), and `tracing-context`
+# is listed here because every build needs it.
+hopr-transport = { workspace = true, default-features = false, features = [
+  "tracing-context",
+] }
 
 # Concrete components for the emulated-node testing feature only.
 hopr-chain-connector = { workspace = true, optional = true }

@@ -4542,6 +4542,7 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-ticket-manager",
+ "hopr-transport",
  "hopr-transport-mixer",
  "hopr-transport-probe",
  "hopr-transport-session",

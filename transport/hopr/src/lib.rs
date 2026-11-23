@@ -431,9 +431,6 @@ async fn dispatch_incoming_messages<G, In, Out>(
 
 #[cfg(feature = "session-client")]
 /// HOPR protocol specific instantiation of the SessionManager.
-///
-/// Named whether or not the session stack is compiled, so the wiring below can pass an absent
-/// manager as `None` instead of carrying two signatures.
 type HoprSessionManager = SessionManager<HoprMessageSender>;
 
 /// Allows configuration of one specific [`HoprSession`].
@@ -793,8 +790,8 @@ where
     /// processing and require a [`futures::Sink`] for ticket events as well as an
     /// `on_incoming_session` channel from the SessionManager (they can accept incoming sessions).
     ///
-    /// The Relay node may also opt in to allow itself to use the PIX protocol by setting
-    /// the `exit_ack_share` if it wishes to also act as an Exit node.
+    /// With the `exit` feature the Relay node may also opt in to the PIX protocol by setting
+    /// the `exit_ack_share`; without it the sink is ignored.
     #[cfg(feature = "relay")]
     #[allow(clippy::too_many_arguments)]
     pub async fn run_relay<T, TFact, Ct, PixEvt>(
@@ -930,7 +927,7 @@ where
     /// Internal worker driving all node-type variants of `HoprTransport::run_*`.
     ///
     /// Branches on `role`:
-    /// - `protocol::NodeType::Relay`: full packet pipeline + SessionManager.
+    /// - `protocol::NodeType::Relay`: full packet pipeline (+ SessionManager when `session-client` is on).
     /// - `protocol::NodeType::Exit`: ack-drain pipeline + incoming Sessions.
     /// - `protocol::NodeType::Entry`: no ack pipeline, no incoming Sessions.
     #[allow(clippy::too_many_arguments)]

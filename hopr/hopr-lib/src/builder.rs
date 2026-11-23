@@ -6,7 +6,8 @@
 //! 2. **Configuration** — `HoprBuilderWithIdentity::with_config`
 //! 3. **Component factories** — chain API, graph, network, and cover-traffic
 //! 4. **Session server** (when the `session-server` feature is enabled) — `HoprBuilderConfigured::with_session_server`
-//! 5. **Build** — `build_edge` for the source edge, `build_relay` for a relay, `build_exit` for a non-relaying exit.
+//! 5. **Build** — `build_edge` for the source edge, `build_relay` for a relay, `build_exit` for an exit (a relay that
+//!    also terminates Sessions).
 //!
 //! # Example
 //!
@@ -50,7 +51,7 @@ use hopr_api::{
     types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection},
 };
 use hopr_transport::HoprTransport;
-#[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+#[cfg(any(feature = "session-server", all(feature = "session-client", feature = "relay")))]
 use hopr_transport::IncomingSession;
 use hopr_utils::{
     network_types::{
