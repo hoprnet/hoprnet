@@ -20,6 +20,11 @@
     allow(dead_code, unused_imports, unused_variables)
 )]
 
+// Only the exit entity has the Session exit (server) capability; an entry establishes Sessions and a
+// relay neither establishes nor admits them.
+#[cfg(all(feature = "session-exit", not(feature = "exit")))]
+compile_error!("the `session-exit` feature belongs to the `exit` entity: enable `exit` instead");
+
 /// Helper functions.
 mod helpers;
 
