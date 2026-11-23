@@ -209,7 +209,7 @@ pub struct TransitLatencyConfig {
     derive(serde::Serialize, serde::Deserialize),
     serde(deny_unknown_fields)
 )]
-#[validate(schema(function = "validate_protocol_config_pairings", skip_on_field_errors = false))]
+#[validate(schema(function = "validate_pix_supervision_pairing", skip_on_field_errors = false))]
 pub struct HoprProtocolConfig {
     /// Libp2p-related transport configuration
     #[validate(nested)]
@@ -316,12 +316,6 @@ fn validate_relayer_health_weight(value: f64) -> Result<(), ValidationError> {
     }
 }
 
-/// Runs cross-field validations on [`HoprProtocolConfig`] where sibling fields constrain each other.
-fn validate_protocol_config_pairings(cfg: &HoprProtocolConfig) -> Result<(), ValidationError> {
-    validate_pix_supervision_pairing(cfg)?;
-    validate_ack_buffer_within_counter_flush_grace(cfg)
-}
-
 /// Rejects a supervisor whose deadlines its own node's reconstructor cannot honour.
 ///
 /// The deadlines the Exit-side supervisor derives from `incoming_session_pix_config` have to agree
@@ -348,30 +342,6 @@ fn validate_pix_supervision_pairing(cfg: &HoprProtocolConfig) -> Result<(), Vali
         e.message = Some(error.to_string().into());
         e
     })
-}
-
-/// Rejects an `ack_buffer_interval` that equals or exceeds the counter-flush acknowledgment grace.
-///
-/// Each protocol-conformance report waits [`crate::counter_flush_ack_grace`] (`counter_flush_interval / 3`)
-/// for in-flight acknowledgments before snapshotting `acks_received` into the network graph. A
-/// partial-batch deadline at or beyond that grace risks pushing sparse-link acknowledgments past the
-/// report boundary and artificially depressing first-hop `ack_rate`.
-fn validate_ack_buffer_within_counter_flush_grace(cfg: &HoprProtocolConfig) -> Result<(), ValidationError> {
-    let ack_buffer_interval = cfg.packet.pipeline.ack_config.ack_buffer_interval;
-    let ack_grace = crate::counter_flush_ack_grace(cfg.counter_flush_interval);
-    if ack_buffer_interval >= ack_grace {
-        let mut e = ValidationError::new("ack_buffer_interval_exceeds_counter_flush_ack_grace");
-        e.message = Some(
-            format!(
-                "ack_buffer_interval ({ack_buffer_interval:?}) must be strictly less than counter_flush_ack_grace \
-                 ({ack_grace:?}, one third of counter_flush_interval {:?})",
-                cfg.counter_flush_interval
-            )
-            .into(),
-        );
-        return Err(e);
-    }
-    Ok(())
 }
 
 /// Rejects an [`IncomingSessionPixConfig`] that cannot work.
@@ -2712,21 +2682,37 @@ mod tests {
     }
 
     #[test]
-    fn protocol_config_rejects_ack_buffer_interval_at_or_above_counter_flush_ack_grace() {
-        let mut cfg = HoprProtocolConfig::default();
-        let grace = crate::counter_flush_ack_grace(cfg.counter_flush_interval);
+    fn protocol_config_accepts_short_counter_flush_interval_with_default_ack_buffer_interval() {
+        // `ack_buffer_interval` governs outgoing ACKs sent back to peers while `counter_flush_interval`
+        // governs incoming ACK grace on this node, so a 500 ms `counter_flush_interval` with the
+        // default 200 ms `ack_buffer_interval` must remain valid.
+        let cfg = HoprProtocolConfig {
+            counter_flush_interval: Duration::from_millis(500),
+            ..Default::default()
+        };
+        assert_eq!(
+            Duration::from_millis(200),
+            cfg.packet.pipeline.ack_config.ack_buffer_interval
+        );
+        assert!(
+            cfg.validate().is_ok(),
+            "500 ms counter_flush_interval with default 200 ms ack_buffer_interval must validate"
+        );
 
-        // Strictly below grace is valid.
-        cfg.packet.pipeline.ack_config.ack_buffer_interval = grace - Duration::from_millis(1);
-        assert!(cfg.validate().is_ok());
+        // Independent field validation (10 ms minimum) still applies.
+        let mut too_short_ack = cfg.clone();
+        too_short_ack.packet.pipeline.ack_config.ack_buffer_interval = Duration::from_millis(9);
+        assert!(
+            too_short_ack.validate().is_err(),
+            "ack_buffer_interval below 10 ms must still fail validation"
+        );
 
-        // Equal to grace is rejected.
-        cfg.packet.pipeline.ack_config.ack_buffer_interval = grace;
-        assert!(cfg.validate().is_err());
-
-        // Shrinking counter_flush_interval so its grace drops to ack_buffer_interval is rejected.
-        let mut shrunk = HoprProtocolConfig::default();
-        shrunk.counter_flush_interval = shrunk.packet.pipeline.ack_config.ack_buffer_interval * 3;
-        assert!(shrunk.validate().is_err());
+        // Schema-level PIX supervision pairing validation still applies.
+        let mut bad_pix = cfg;
+        bad_pix.pix.reconstructor.unused_verifier_lifetime = Duration::from_secs(30);
+        assert!(
+            bad_pix.validate().is_err(),
+            "PIX supervision pairing must still be enforced by HoprProtocolConfig::validate"
+        );
     }
 }

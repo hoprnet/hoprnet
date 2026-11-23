@@ -25,9 +25,11 @@ pub struct AcknowledgementPipelineConfig {
     /// Maximum interval to wait for per-peer acknowledgements before flushing a partial batch.
     ///
     /// Full batches of `MAX_ACKNOWLEDGEMENTS_BATCH_SIZE` (33) flush immediately without waiting;
-    /// low-rate peers wait at most this interval before their partial batch flushes. Must stay
-    /// strictly below the counter-flush acknowledgement grace (`counter_flush_interval / 3`) so
-    /// sparse-link acknowledgements land inside the network graph's `ack_rate` window.
+    /// low-rate peers wait at most this interval before their partial batch flushes. A node's
+    /// `ack_buffer_interval` controls outgoing acknowledgements it sends back to peers, whereas a
+    /// receiver's `counter_flush_interval` controls its grace window for incoming acknowledgements
+    /// (the two knobs govern opposite sides of a link rather than constraining each other on the
+    /// same node).
     ///
     /// Default is 200 ms.
     #[default(default_ack_buffer_interval())]
@@ -36,10 +38,11 @@ pub struct AcknowledgementPipelineConfig {
         serde(default = "default_ack_buffer_interval", with = "humantime_serde")
     )]
     pub ack_buffer_interval: std::time::Duration,
-    /// Initial capacity when grouping outgoing acknowledgements.
+    /// Initial capacity of the per-peer map holding buffered partial acknowledgement batches.
     ///
-    /// If set too low, it causes additional reallocations in the outgoing acknowledgement processing pipeline.
-    /// The value should grow if `ack_buffer_interval` grows.
+    /// Each peer's buffered batch `Vec` is pre-allocated to `MAX_ACKNOWLEDGEMENTS_BATCH_SIZE` (33),
+    /// so this only sizes the map of concurrently buffered peers (avoiding map reallocations when
+    /// a node simultaneously buffers partial batches for many peers).
     ///
     /// Default is 5.
     #[default(default_ack_grouping_capacity())]
