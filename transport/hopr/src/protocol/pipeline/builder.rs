@@ -359,7 +359,7 @@ where
     /// Any ticket processor or ticket events sink previously set via
     /// [`PacketPipelineBuilder::with_ticket_processing`] is ignored.
     #[must_use]
-    #[cfg(feature = "exit")]
+    #[cfg(feature = "raw-exit")]
     pub fn build_for_exit(self) -> AbortableList<PacketPipelineProcesses> {
         run_packet_pipeline_inner(
             NodeType::Exit,

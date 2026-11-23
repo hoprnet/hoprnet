@@ -14,9 +14,9 @@
 //! choice.
 // A build that enables no entity feature has no node to assemble, so the pieces that exist only to
 // build one are unused by design. Only that combination is affected; consumers that build a node
-// enable one of `edge`, `relay`, `exit` or `raw-exit`.
+// enable one of `edge`, `relay` or `exit`.
 #![cfg_attr(
-    not(any(feature = "edge", feature = "relay", feature = "exit", feature = "raw-exit")),
+    not(any(feature = "edge", feature = "relay", feature = "exit")),
     allow(dead_code, unused_imports, unused_variables)
 )]
 
@@ -400,14 +400,6 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
 /// Produced by [`builder::HoprBuilder`]'s `build_edge`.
 pub type HoprEntry<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
 
-/// An exit that terminates Sessions without processing tickets.
-///
-/// The `raw-exit` entity: a Session server with no ticket manager, so — like [`HoprEntry`] — it
-/// cannot process tickets. `Chain`, `Graph` and `Net` carry the same requirements as there.
-///
-/// Produced by [`builder::HoprBuilder`]'s `build_exit`.
-pub type HoprExit<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
-
 /// A relay: full ticket processing and forwarding, no Session server of its own.
 ///
 /// `TMgr` is the node's ticket manager and must implement [`TicketManagement`]; without one the
@@ -417,11 +409,13 @@ pub type HoprExit<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
 /// Produced by [`builder::HoprBuilder`]'s `build_relay`.
 pub type HoprRelay<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
 
-/// An exit that both relays and terminates Sessions: ticket processing plus the Session server.
+/// An exit: a relay that also terminates Sessions and resolves PIX shares.
 ///
-/// Same parameters and the same `TMgr` requirement as [`HoprRelay`]; named for what the node is
-/// when it also terminates Sessions.
-pub type HoprRelayExit<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
+/// For now an exit keeps the relay capacity, so it has the same parameters and the same `TMgr`
+/// requirement as [`HoprRelay`].
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_exit`.
+pub type HoprExit<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
 
 impl<Chain, Graph, Net, TMgr> std::fmt::Debug for Hopr<Chain, Graph, Net, TMgr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

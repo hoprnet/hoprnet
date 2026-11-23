@@ -1,7 +1,7 @@
 [package]
 name = "hopr-transport"
 description = "Implements the main HOPR transport interface for the core library"
-version = "0.54.2"
+version = "0.55.0"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -43,7 +43,8 @@ tracing-context = ["hopr-utils-tracing/tracing-context"]
 # side of the entity split, whose entity sets in `hopr-lib` are `edge`, `relay` and `exit`.
 relay = []
 entry = ["session-client"]
-exit = ["session-server"]
+exit = ["relay", "session-server"]
+raw-exit = ["session-server"]
 # The session stack: the `SessionManager` wiring, incoming-Session admission and the client-side
 # Session API. `session-server` implies `session-client` because both are served by one manager and
 # an Exit establishes Sessions on its return path too.
@@ -78,6 +79,7 @@ testing = [
   "dep:tokio",
   "entry",
   "exit",
+  "raw-exit",
   "relay",
   "hopr-utils/runtime-tokio",
 ]

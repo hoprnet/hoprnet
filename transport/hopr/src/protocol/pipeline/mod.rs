@@ -20,7 +20,7 @@ use hopr_protocol_pix::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PolynomialIndex,
     SsaCommitmentProof, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
-#[cfg(feature = "exit")]
+#[cfg(feature = "raw-exit")]
 use hopr_protocol_pix::{PixSpec, ShareResolution};
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
@@ -749,7 +749,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 ///
 /// Used by Exit nodes: they do not receive any incoming tickets but still use the incoming acknowledgements
 /// to recover SSAs and forward them to the `recovered_ssa` sink.
-#[cfg(feature = "exit")]
+#[cfg(feature = "raw-exit")]
 async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
     ack_incoming: AckIn,
     exit_proc: A,
@@ -1009,7 +1009,7 @@ pub enum NodeType {
     Relay,
     #[cfg(feature = "entry")]
     Entry,
-    #[cfg(feature = "exit")]
+    #[cfg(feature = "raw-exit")]
     Exit,
 }
 
@@ -1213,7 +1213,7 @@ where
     let ticket_events = ticket_events.with_timeout(QUEUE_SEND_TIMEOUT);
     let ssa_events = ssa_events.with_timeout(QUEUE_SEND_TIMEOUT);
     // Only a relay or an exit hands recovered SSA shares to a sink; a source node produces them.
-    #[cfg(not(any(feature = "relay", feature = "exit")))]
+    #[cfg(not(any(feature = "exit", feature = "raw-exit")))]
     let _ = &ssa_events;
 
     let encoder = std::sync::Arc::new(codec.0);
@@ -1290,7 +1290,7 @@ where
         .filter(|&n| n > 0)
         .unwrap_or(DEFAULT_ACK_INPUT_CONCURRENCY);
 
-    #[cfg(any(feature = "relay", feature = "entry", feature = "exit"))]
+    #[cfg(any(feature = "relay", feature = "entry", feature = "exit", feature = "raw-exit"))]
     match node_type {
         #[cfg(feature = "relay")]
         NodeType::Relay => {
@@ -1310,7 +1310,7 @@ where
                 ),
             );
         }
-        #[cfg(feature = "exit")]
+        #[cfg(feature = "raw-exit")]
         NodeType::Exit => {
             // Exit nodes still run the incoming acknowledgement pipeline (for future PIX use),
             // but only drain the stream — incoming acknowledgements are NOT forwarded to the
@@ -1349,7 +1349,7 @@ where
 
     // A build without any role has no packet pipeline to feed, but the channels above are still
     // constructed; naming them keeps that combination warning-free.
-    #[cfg(not(any(feature = "relay", feature = "entry", feature = "exit")))]
+    #[cfg(not(any(feature = "relay", feature = "entry", feature = "exit", feature = "raw-exit")))]
     let _ = (
         incoming_ack_rx,
         ssa_events,

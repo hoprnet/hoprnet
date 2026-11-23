@@ -922,7 +922,14 @@ enum RawRoleNode {
         TestingConnector,
     ),
     Exit(
-        Arc<crate::HoprExit<TestingConnector, hopr_network_graph::SharedChannelGraph, hopr_transport_p2p::HoprNetwork>>,
+        Arc<
+            crate::HoprExit<
+                TestingConnector,
+                hopr_network_graph::SharedChannelGraph,
+                hopr_transport_p2p::HoprNetwork,
+                crate::testing::wiring::SharedTicketManager,
+            >,
+        >,
         TestingConnector,
     ),
 }
@@ -930,7 +937,7 @@ enum RawRoleNode {
 enum RoleThreadNode {
     Entry(TestedHopr<()>),
     Relay(TestedHopr),
-    Exit(TestedHopr<()>),
+    Exit(TestedHopr),
 }
 
 /// A guard for role-typed clusters (Entry + Relays + Exit).
@@ -941,7 +948,7 @@ enum RoleThreadNode {
 pub struct RoleClusterGuard {
     pub entry: TestedHopr<()>,
     pub relays: Vec<TestedHopr>,
-    pub exit: TestedHopr<()>,
+    pub exit: TestedHopr,
     pub chain_client: BlokliTestClient<FullStateEmulator>,
 }
 
@@ -1120,7 +1127,7 @@ where
                         RoleThreadNode::Entry(TestedHopr::<()>::new(runtime, instance, connector))
                     }
                     RawRoleNode::Exit(instance, connector) => {
-                        RoleThreadNode::Exit(TestedHopr::<()>::new(runtime, instance, connector))
+                        RoleThreadNode::Exit(TestedHopr::new(runtime, instance, connector))
                     }
                     RawRoleNode::Relay(instance, connector) => {
                         RoleThreadNode::Relay(TestedHopr::new(runtime, instance, connector))
@@ -1132,7 +1139,7 @@ where
 
     let mut entry: Option<TestedHopr<()>> = None;
     let mut relays: Vec<TestedHopr> = Vec::new();
-    let mut exit: Option<TestedHopr<()>> = None;
+    let mut exit: Option<TestedHopr> = None;
 
     for handle in handles {
         let thread_result = handle

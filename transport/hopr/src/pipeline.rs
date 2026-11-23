@@ -368,7 +368,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     /// Optional: when not called, the builder defaults to [`NopExitAcknowledgementShareProcessor`]
     /// and a draining sink ([`futures::sink::drain`]).
     #[must_use]
-    #[cfg(any(feature = "relay", feature = "exit"))]
+    #[cfg(any(feature = "exit", feature = "raw-exit"))]
     pub fn with_exit_ack_share_processing<A2, SEvt2>(
         self,
         exit_ack_proc: A2,
@@ -717,7 +717,7 @@ where
     ///
     /// The incoming acknowledgement pipeline is started but its acknowledgements are drained
     /// (never forwarded to a ticket processor); ticket events (if any) are ignored.
-    #[cfg(feature = "exit")]
+    #[cfg(feature = "raw-exit")]
     pub fn build_for_exit(self) -> AbortableList<HoprTransportProcess> {
         let (
             packet_key,

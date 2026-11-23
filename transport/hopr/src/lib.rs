@@ -16,7 +16,7 @@
 // wires that would have fed it are unused by construction. Only that combination is affected; any
 // real build enables one of `relay`, `entry` or `exit`.
 #![cfg_attr(
-    not(any(feature = "relay", feature = "entry", feature = "exit")),
+    not(any(feature = "relay", feature = "entry", feature = "exit", feature = "raw-exit")),
     allow(dead_code, unused_imports, unused_mut, unused_variables, unreachable_code)
 )]
 
@@ -57,7 +57,7 @@ use std::{
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender};
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 pub use hopr_api::{
     Multiaddr, PeerId,
@@ -86,7 +86,7 @@ pub use hopr_protocol_hopr::{MIN_TRACKED_PACKETS, MemorySurbStore, SurbStore};
 /// until deposits stop happening at runtime.
 pub use hopr_protocol_pix::PixSpec;
 pub use hopr_protocol_pix::RecoveredSsa;
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 use hopr_protocol_pix::ShareResolution;
 /// Packet mixing API, re-exported whole so a consumer of the transport object can configure and
 /// inspect the mixer without pinning `hopr-transport-mixer` itself.
@@ -102,11 +102,16 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_session as session;
-#[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+#[cfg(all(feature = "session-client", any(feature = "exit", feature = "raw-exit")))]
 use hopr_transport_session::HoprSessionInPixEvent;
+// Named by the PIX toolbox slot in `run_inner`, which a pure relay always leaves empty.
+use hopr_transport_session::PixToolbox;
+#[cfg(feature = "session-client")]
+use hopr_transport_session::SessionManager;
 #[cfg(feature = "session-client")]
 use hopr_transport_session::{AdmissionToken, DispatchResult, SessionManagerConfig, SurbAdmissionControl};
-use hopr_transport_session::{AgreedSsaQuota, HoprSessionOutPixEvent, PixToolbox, SessionManager};
+#[cfg(any(feature = "entry", feature = "exit", feature = "raw-exit"))]
+use hopr_transport_session::{AgreedSsaQuota, HoprSessionOutPixEvent};
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, InvalidPixParams, LOCAL_PIX_SUITE, PixParams, SESSION_MTU, SURB_SIZE, ServiceId,
@@ -119,7 +124,7 @@ pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::{transfer_session, transfer_session_datagram};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 use hopr_utils::network_types::crossfire_sink::CrossfireSink;
 use hopr_utils::{
     network_types::{crossfire_sink::bounded_sink_channel, prelude::*},
@@ -128,6 +133,8 @@ use hopr_utils::{
 pub use multiaddr::Protocol;
 use tracing::{Instrument, debug, warn};
 
+#[cfg(any(feature = "entry", feature = "exit", feature = "raw-exit"))]
+use crate::config::PixGlobalConfig;
 #[cfg(feature = "session-client")]
 use crate::constants::{SESSION_INITIATION_MAX_RESENDS, SESSION_INITIATION_RESEND_INTERVAL, SESSION_INITIATION_TIMEOUT_BASE};
 #[cfg(feature = "runtime-tokio")]
@@ -138,7 +145,6 @@ pub use crate::{
     protocol::PeerProtocolCounterRegistry,
 };
 use crate::{
-    config::PixGlobalConfig,
     errors::HoprTransportError,
     multiaddrs::strip_p2p_protocol,
     path::{HoprGraphPathSelector, PathPlanner},
@@ -149,15 +155,17 @@ use crate::{
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
 pub use hopr_api as api;
+#[cfg(any(feature = "entry", feature = "exit", feature = "raw-exit"))]
+use hopr_api::node::{PixDepositAddressReceived, PixNewDepositAddress};
 use hopr_api::{
     chain::{ChainReadTicketOperations, ChainWriteTicketOperations, PixDepositSecret},
-    node::{PixAddressId, PixDepositAddressReceived, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
+    node::{PixAddressId, PixEvent, PixPrivateKeyRecovered},
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 use hopr_crypto_packet::HoprShareResolution;
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 lazy_static::lazy_static! {
@@ -421,6 +429,7 @@ async fn dispatch_incoming_messages<G, In, Out>(
         .await;
 }
 
+#[cfg(feature = "session-client")]
 /// HOPR protocol specific instantiation of the SessionManager.
 ///
 /// Named whether or not the session stack is compiled, so the wiring below can pass an absent
@@ -837,7 +846,7 @@ where
     ///
     /// The Exit nodes also work with the PIX protocol, so they process incoming acknowledgements
     /// to decrypt PIX shares.
-    #[cfg(feature = "exit")]
+    #[cfg(feature = "raw-exit")]
     #[allow(
         clippy::too_many_arguments,
         reason = "each argument is a distinct wiring point supplied by hopr-lib"
@@ -1248,7 +1257,7 @@ where
         // reconstructor) to handle SsaRequest, but do not use the
         // reconstructor for SSA recovery.
         let pix_toolbox: Option<PixToolbox> = match (role, exit_ack_share) {
-            #[cfg(feature = "exit")]
+            #[cfg(feature = "raw-exit")]
             (protocol::NodeType::Exit, Some(ref ssa_events)) => {
                 let (pix_tools, pipeline_builder) = wire_exit_pix(
                     pipeline_builder,
@@ -1263,7 +1272,15 @@ where
                 processes.extend_from(pipeline_processes);
                 Some(pix_tools)
             }
-            #[cfg(feature = "relay")]
+            // A pure relay takes no part in PIX, so a build without the `exit` entity ignores any
+            // sink it is handed; with `exit` only the `None` form is a pure relay.
+            #[cfg(all(feature = "relay", not(feature = "exit")))]
+            (protocol::NodeType::Relay, _) => {
+                let pipeline_processes = pipeline_builder.with_ticket_events(ticket_events).build_for_relay();
+                processes.extend_from(pipeline_processes);
+                None
+            }
+            #[cfg(feature = "exit")]
             (protocol::NodeType::Relay, None) => {
                 // Pure relay nodes do not participate in PIX — do not create a
                 // PixToolbox so the SessionManager rejects UsePIX
@@ -1272,7 +1289,7 @@ where
                 processes.extend_from(pipeline_processes);
                 None
             }
-            #[cfg(feature = "relay")]
+            #[cfg(feature = "exit")]
             (protocol::NodeType::Relay, Some(ref ssa_events)) => {
                 // A relay that also acts as an Exit (has exit_ack_share) needs
                 // a full PixToolbox to handle the PIX handshake — the same wiring as the
@@ -1331,7 +1348,7 @@ where
                 let pipeline_processes = match role {
                     #[cfg(feature = "relay")]
                     protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
-                    #[cfg(feature = "exit")]
+                    #[cfg(feature = "raw-exit")]
                     protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
                     #[cfg(feature = "entry")]
                     protocol::NodeType::Entry => pipeline_builder.build_for_entry(),
@@ -1664,15 +1681,9 @@ where
     ///
     /// PIX share resolution and the incoming-packet dispatch have a manager to talk to only on such
     /// a build; the wiring around them takes `None` and forwards the upper-layer events anyway.
-    #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+    #[cfg(any(feature = "exit", feature = "raw-exit"))]
     fn session_manager(&self) -> Option<Arc<HoprSessionManager>> {
         Some(self.smgr.clone())
-    }
-
-    /// The node's Session manager, absent because the session stack is not compiled in.
-    #[cfg(all(not(feature = "session-client"), any(feature = "relay", feature = "exit")))]
-    fn session_manager(&self) -> Option<Arc<HoprSessionManager>> {
-        None
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -1838,7 +1849,7 @@ where
 ///
 /// Only a role that resolves PIX shares reaches this in production; the test below exercises the
 /// mapping on every build.
-#[cfg_attr(not(any(feature = "relay", feature = "exit")), allow(dead_code))]
+#[cfg_attr(not(any(feature = "exit", feature = "raw-exit")), allow(dead_code))]
 pub(crate) fn recovered_ssa_to_pix_event(
     rec: &RecoveredSsa<SimplePseudonym, <HoprPixSpec as PixSpec>::AddressPrivateKey>,
 ) -> PixEvent {
@@ -1854,9 +1865,10 @@ pub(crate) fn recovered_ssa_to_pix_event(
 /// channel, so a session whose supervisor is busy backpressures its sender. All sessions share this
 /// one stream, so dispatching sequentially would let one such session hold up PIX progress — and
 /// therefore the pipelined next-SSA request — for every other session on the node.
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 const PIX_EVENT_DISPATCH_CONCURRENCY: usize = 64;
 
+#[cfg(any(feature = "entry", feature = "exit", feature = "raw-exit"))]
 /// Maps a [`HoprSessionOutPixEvent`] into the upper-layer [`PixEvent`] carrying the deposit
 /// instruction for the funding strategy.
 fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
@@ -1902,7 +1914,7 @@ fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
 
 /// Notifies the [`SessionManager`] about a single PIX share resolution and returns the
 /// upper-layer [`PixEvent`] it produces, if any.
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 async fn dispatch_share_resolution(
     smgr: Option<Arc<HoprSessionManager>>,
     resolution: HoprShareResolution,
@@ -1983,6 +1995,7 @@ async fn dispatch_share_resolution(
     }
 }
 
+#[cfg(any(feature = "entry", feature = "exit", feature = "raw-exit"))]
 /// Builds the Exit-side SSA reconstructor from operator configuration.
 ///
 /// The single place `PixReconstructorConfig` becomes an `SsaReconstructorConfig`, called once per
@@ -2007,7 +2020,7 @@ fn ssa_reconstructor(cfg: &PixGlobalConfig) -> errors::Result<Arc<hopr_protocol_
 /// The one-slot channel carries only wake-ups, never resolutions. A full channel therefore means a
 /// wake-up is already pending and can be safely coalesced; the resolutions themselves remain in the
 /// reconstructor until this stream or the acknowledgement fallback atomically takes them.
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 fn commitment_resolution_stream(
     ssa_reconstructor: Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
 ) -> impl futures::Stream<Item = HoprShareResolution> + Send + 'static {
@@ -2048,7 +2061,7 @@ fn commitment_resolution_stream(
 /// The caller keeps the terminal, so this returns the builder rather than the built processes.
 /// Only the `exit_ack_proc` and `ssa_events` type parameters change; the rest pass through
 /// untouched, which is why none of them carry bounds here.
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 #[allow(clippy::type_complexity)]
 fn wire_exit_pix<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, PixEvt>(
     pipeline_builder: HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt>,
@@ -2110,7 +2123,7 @@ where
 /// phase and whose counters are absolute rather than incremental. Of the events belonging to one
 /// cycle exactly one advances it and the rest are recognised as stale, whatever order they arrive
 /// in.
-#[cfg(any(feature = "relay", feature = "exit"))]
+#[cfg(any(feature = "exit", feature = "raw-exit"))]
 fn pix_event_stream(
     session_pix_events: impl futures::Stream<Item = HoprSessionOutPixEvent> + Send + 'static,
     ssa_share_resolutions: impl futures::Stream<Item = HoprShareResolution> + Send + 'static,

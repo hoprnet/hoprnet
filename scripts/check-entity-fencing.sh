@@ -5,12 +5,15 @@
 # The fence is a set of `cfg`s in `hopr-lib` and `hopr-transport`, so a positive build proves only
 # that a set compiles, not that it is smaller than the others. This script proves the negative half:
 # for each entity it writes a one-line crate that names an item the entity must not have, and
-# requires `cargo check` to reject it.
+# requires `cargo check` to reject it because that very item is missing.
+#
+# Every absence check has a control: the same source, built with an entity that does have the item,
+# must NOT be rejected for that item. Without the control a typo in the fixture would pass as a
+# fence (an unresolvable path is "absent" everywhere).
 #
 # Usage: scripts/check-entity-fencing.sh [entity ...]
-#   Without arguments it checks every entity. Entities: edge, relay, exit, raw-exit — the basic
-#   division is edge <-> relay <-> exit, and `raw-exit` is the same Session server without the
-#   relay's ticket processing.
+#   Without arguments it checks every entity. Entities: edge, relay, exit — the basic division is
+#   edge <-> relay <-> exit.
 #
 # The fixture crates live in a temporary directory and are their own workspaces, so they resolve
 # `hopr-lib` through the same path dependency this repository uses. They share the workspace target
@@ -24,16 +27,18 @@ trap 'rm -rf "$workdir"' EXIT
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${repo_root}/target}"
 export CARGO_TERM_COLOR=never
 
+failures=0
+
 # `$1`: fixture name. `$2`: the entity feature set hopr-lib is built with.
-# `$3`: the source of the fixture crate.
-write_fixture() {
+# `$3`: the source of the fixture crate. Prints the compiler's stderr and returns its status.
+build_fixture() {
   local name=$1 features=$2 code=$3
-  local dir="$workdir/$name"
+  local dir="$workdir/$name-$features"
 
   mkdir -p "$dir/src"
   cat >"$dir/Cargo.toml" <<EOF
 [package]
-name = "fence-$name"
+name = "fence-$name-$features"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -44,34 +49,59 @@ publish = false
 hopr-lib = { path = "${repo_root}/hopr/hopr-lib", default-features = false, features = ["${features}"] }
 EOF
   printf '%s\n' "$code" >"$dir/src/lib.rs"
-  echo "$dir"
+  cargo check --quiet --manifest-path "$dir/Cargo.toml" 2>&1
 }
 
-failures=0
+# The compiler error that reports `$1` as missing: an error header that names the item, such as
+# "no associated function or constant named `build_relay` found", "cannot find type `X`" or
+# "struct `Y` has no field named `z`". Anything else (a type annotation the fixture left out, a trait
+# bound) is NOT a report that the item is missing.
+reports_missing() {
+  grep -qE "^error(\[E[0-9]+\])?: .*(cannot find|no .*named|has no field|unresolved|not found).*\`$1\`" <<<"$2"
+}
 
-# `$1`: entity set. `$2`: item name used in the failure message. `$3`: source that must not compile.
+# `$1`: entity set that must lack the item. `$2`: an entity set that has it (the control).
+# `$3`: the item's name, as the compiler reports it. `$4`: source that names the item.
 expect_absent() {
-  local features=$1 item=$2 code=$3
-  local dir
-  dir=$(write_fixture "$(echo "$item" | tr -c 'a-zA-Z0-9\n' '-')" "$features" "$code")
+  local features=$1 control=$2 item=$3 code=$4
+  local name
+  name=$(echo "$item" | tr -c 'a-zA-Z0-9\n' '-')
 
-  local stderr_file="$dir/stderr"
-  if cargo check --quiet --manifest-path "$dir/Cargo.toml" 2>"$stderr_file"; then
+  local with_item
+  with_item=$(build_fixture "$name" "$control" "$code" || true)
+  if reports_missing "$item" "$with_item"; then
+    echo "FENCE CHECK ERROR: \`$item\` is reported missing even with [$control], so the fixture proves nothing:" >&2
+    echo "$with_item" >&2
+    failures=$((failures + 1))
+    return
+  fi
+
+  local without_item
+  if without_item=$(build_fixture "$name" "$features" "$code"); then
     echo "FENCE BROKEN: \`$item\` compiles with features [$features]" >&2
     failures=$((failures + 1))
     return
   fi
-
-  # A rejection for any other reason (a typo in the fixture, a missing dependency) would make
-  # this check pass for the wrong reason, so require the item to be what the compiler complains
-  # about.
-  if ! grep -qE "(cannot find|not found|no method named|no function or associated item|no field named|unknown field)" "$stderr_file"; then
-    echo "FENCE CHECK ERROR: fixture for \`$item\` failed for an unrelated reason:" >&2
-    cat "$stderr_file" >&2
+  if ! reports_missing "$item" "$without_item"; then
+    echo "FENCE CHECK ERROR: fixture for \`$item\` failed with [$features] for an unrelated reason:" >&2
+    echo "$without_item" >&2
     failures=$((failures + 1))
     return
   fi
-  echo "ok: \`$item\` is absent with features [$features]"
+  echo "ok: \`$item\` is absent with features [$features] and present with [$control]"
+}
+
+# `$1`: entity set that must have the item. `$2`: the item's name. `$3`: source that names it.
+expect_has() {
+  local features=$1 item=$2 code=$3
+  local out
+  out=$(build_fixture "has-$item" "$features" "$code" || true)
+  if reports_missing "$item" "$out"; then
+    echo "FENCE BROKEN: \`$item\` is missing with features [$features]" >&2
+    failures=$((failures + 1))
+    return
+  fi
+  echo "ok: \`$item\` is present with features [$features]"
 }
 
 # `$1`: entity set. Must compile.
@@ -86,58 +116,50 @@ expect_present() {
   echo "ok: hopr-lib builds with features [$features]"
 }
 
+# Source snippets shared between the entities.
+BUILD_RELAY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_relay; }'
+BUILD_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_exit; }'
+SESSION_BUILDER='pub fn f() -> Option<hopr_lib::builder::HoprBuilderWithSession> { None }'
+BUILD_EDGE='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_edge; }'
+RUN_RELAY='pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::run_relay; }'
+RELAY_CFG='pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { out_index_sync_period: core::time::Duration::from_secs(1), ..Default::default() } }'
+SESSION_CAP_CFG='pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { incoming_session_capacity: 1, ..Default::default() } }'
+WITH_SESSION_SERVER='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_server; }'
+
 check_edge() {
-  # An edge relays nothing and admits no Sessions.
+  # An edge relays nothing, runs no PIX exit, and admits no Sessions.
   expect_present edge
-  expect_absent edge "build_relay" \
-    'pub fn f() { let _ = hopr_lib::builder::HoprBuilder::build_relay; }'
-  expect_absent edge "HoprTransport::run_relay" \
-    'pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::run_relay; }'
-  expect_absent edge "HoprLibConfig::out_index_sync_period" \
-    'pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { out_index_sync_period: core::time::Duration::from_secs(1), ..Default::default() } }'
-  expect_absent edge "with_session_server" \
-    'pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_server; }'
-  expect_absent edge "HoprBuilderWithSession" \
-    'pub fn f() -> Option<hopr_lib::builder::HoprBuilderWithSession> { None }'
-  expect_absent edge "HoprLibConfig::incoming_session_capacity" \
-    'pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { incoming_session_capacity: 1, ..Default::default() } }'
+  expect_absent edge relay build_relay "$BUILD_RELAY"
+  expect_absent edge relay run_relay "$RUN_RELAY"
+  expect_absent edge relay out_index_sync_period "$RELAY_CFG"
+  expect_absent edge exit with_session_server "$WITH_SESSION_SERVER"
+  expect_absent edge exit HoprBuilderWithSession "$SESSION_BUILDER"
+  expect_absent edge exit incoming_session_capacity "$SESSION_CAP_CFG"
 }
 
 check_relay() {
-  # A pure relay carries no Session stack at all.
+  # A pure relay carries no Session stack, no PIX exit and no source role.
   expect_present relay
-  expect_absent relay "HoprSessionClientConfig" \
+  expect_absent relay edge build_edge "$BUILD_EDGE"
+  expect_absent relay exit HoprBuilderWithSession "$SESSION_BUILDER"
+  expect_absent relay edge HoprSessionClientConfig \
     'pub fn f() -> Option<hopr_lib::HoprSessionClientConfig> { None }'
-  expect_absent relay "HoprTransport::new_session" \
+  expect_absent relay edge new_session \
     'pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::new_session; }'
-  expect_absent relay "HoprLibConfig::incoming_session_capacity" \
-    'pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { incoming_session_capacity: 1, ..Default::default() } }'
-  expect_absent relay "with_session_server" \
-    'pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_server; }'
+  expect_absent relay exit incoming_session_capacity "$SESSION_CAP_CFG"
+  expect_absent relay exit with_session_server "$WITH_SESSION_SERVER"
 }
 
 check_exit() {
-  # The relaying exit keeps both the relay's ticket path and the Session server, but still has no
-  # source (edge) role.
+  # The exit keeps the relay's ticket path and adds the Session server, but has no source role.
   expect_present exit
-  expect_absent exit "build_edge" \
-    'pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_edge; }'
-}
-
-check_raw_exit() {
-  # The raw exit is a Session server without ticket processing.
-  expect_present raw-exit
-  expect_absent raw-exit "build_relay" \
-    'pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_relay; }'
-  expect_absent raw-exit "HoprLibConfig::out_index_sync_period" \
-    'pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { out_index_sync_period: core::time::Duration::from_secs(1), ..Default::default() } }'
-  expect_absent raw-exit "HoprTransport::run_relay" \
-    'pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::run_relay; }'
+  expect_has exit build_exit "$BUILD_EXIT"
+  expect_absent exit edge build_edge "$BUILD_EDGE"
 }
 
 entities=("$@")
 if [ ${#entities[@]} -eq 0 ]; then
-  entities=(edge relay exit raw-exit)
+  entities=(edge relay exit)
 fi
 
 for entity in "${entities[@]}"; do
@@ -145,9 +167,8 @@ for entity in "${entities[@]}"; do
   edge) check_edge ;;
   relay) check_relay ;;
   exit) check_exit ;;
-  raw-exit) check_raw_exit ;;
   *)
-    echo "unknown entity: $entity (expected one of edge, relay, exit, raw-exit)" >&2
+    echo "unknown entity: $entity (expected one of edge, relay, exit)" >&2
     exit 2
     ;;
   esac

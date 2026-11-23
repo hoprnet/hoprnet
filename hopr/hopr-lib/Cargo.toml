@@ -1,7 +1,7 @@
 [package]
 name = "hopr-lib"
 description = "HOPR library implementing the HOPR protocol"
-version = "5.0.0-rc.6"
+version = "5.0.0-rc.7"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -91,12 +91,10 @@ state-dump = [
 # Entity sets. The node split's basic functional division is `edge` <-> `relay` <-> `exit`, and each
 # set compiles in exactly one of those, fenced down into the components:
 #
-# * `edge`    — a source node: establishes Sessions, relays nothing, admits none.
-# * `relay`   — a pure relay: full ticket and acknowledgement processing, no Session stack.
-# * `exit`    — the relaying exit: `relay` with the Session server, so it accepts and terminates
-#               Sessions.
-# * `raw-exit` — the non-relaying exit: the same Session server without the relay's ticket
-#               processing.
+# * `edge`  — a source node: establishes Sessions, relays nothing, admits none.
+# * `relay` — a pure relay: ticket and acknowledgement processing, no Session stack and no PIX.
+# * `exit`  — a relay that also terminates Sessions and resolves PIX shares. For now an exit keeps the
+#             relay capacity, so it builds with `build_exit`, which takes a ticket manager like a relay.
 #
 # Like every Cargo feature the sets are additive, so nothing in Cargo stops a build from enabling
 # several of them (the `testing` utility feature below enables two); a node build still takes
@@ -104,7 +102,6 @@ state-dump = [
 edge = ["session-client", "hopr-transport/entry"]
 relay = ["hopr-transport/relay"]
 exit = ["relay", "session-server", "hopr-transport/exit"]
-raw-exit = ["session-server", "hopr-transport/exit"]
 default = ["pix-bjj", "transport-announce-quic", "relay"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]

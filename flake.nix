@@ -344,10 +344,9 @@
 
             # One library build per entity: the `hopr-lib` artifact a binary for that role links,
             # so CI compiles the fence in every combination the entity documentation promises rather
-            # than only the default one. The basic division is edge <-> relay <-> exit, with
-            # `raw-exit` as the same Session server without the relay's ticket processing.
+            # than only the default one. The basic division is edge <-> relay <-> exit.
             #
-            # All four come from this one definition, and differ only in `cargoExtraArgs`. That is
+            # All three come from this one definition, and differ only in `cargoExtraArgs`. That is
             # what keeps them off each other's toes and shared with the release library build: the
             # source, the vendored dependency tree (`depsSrc`), the toolchain and every build input
             # are the same derivation inputs, so the expensive part — compiling the dependency graph —
@@ -360,7 +359,6 @@
             library-edge = entityLibrary "--no-default-features -F edge,pix-bjj,transport-announce-quic";
             library-relay = entityLibrary "--no-default-features -F relay,pix-bjj,transport-announce-quic";
             library-exit = entityLibrary "--no-default-features -F exit,pix-bjj,transport-announce-quic";
-            library-raw-exit = entityLibrary "--no-default-features -F raw-exit,pix-bjj,transport-announce-quic";
 
             # Build all workspace benchmarks without running them; copies binaries to $out/bin
             bench-build =
