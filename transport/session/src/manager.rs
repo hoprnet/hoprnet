@@ -1797,6 +1797,15 @@ impl SlotInstance {
         self.refusal.get().copied()
     }
 
+    /// The error a setup in progress fails with: the Exit's refusal, or `Closed` if this instance was
+    /// replaced or torn down meanwhile. The refusal is checked first, as it also supersedes the instance.
+    fn setup_failure(&self) -> Option<TransportSessionError> {
+        if let Some(reason) = self.refusal() {
+            return Some(TransportSessionError::Rejected(reason));
+        }
+        self.is_superseded().then_some(TransportSessionError::Closed)
+    }
+
     /// Counts an Entry data write as activity: reads the slot (which resets its `time_to_idle`), at
     /// most once per `period`. With `period = idle_timeout / 4`, an Entry that stops writing can
     /// expire as early as ¾ of the idle timeout after its last write. Call only after the `is_superseded` check:
@@ -6385,8 +6394,8 @@ where
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
                         .await;
                     drop(slot_keepalive);
-                    if let Some(reason) = instance.refusal() {
-                        return Err(TransportSessionError::Rejected(reason));
+                    if let Some(err) = instance.setup_failure() {
+                        return Err(err);
                     }
                     match wait_result {
                         Ok(Some(surb_level)) => {
@@ -6454,8 +6463,8 @@ where
                     // the Session exists on our terms. `maximum_surb_buffer_size` is what this Entry
                     // announced as its target, so the store sizes the ring off the buffer we
                     // actually intend to fill.
-                    if let Some(reason) = instance.refusal() {
-                        return Err(TransportSessionError::Rejected(reason));
+                    if let Some(err) = instance.setup_failure() {
+                        return Err(err);
                     }
                     commit_slot_guard(
                         &mut slot_guard,
@@ -6570,8 +6579,8 @@ where
                     // Same admission point as the balanced branch above, with the same announced
                     // target: a Session without SURB balancing still holds a return path worth
                     // protecting.
-                    if let Some(reason) = instance.refusal() {
-                        return Err(TransportSessionError::Rejected(reason));
+                    if let Some(err) = instance.setup_failure() {
+                        return Err(err);
                     }
                     commit_slot_guard(
                         &mut slot_guard,
@@ -31891,6 +31900,59 @@ mod tests {
         assert!(instance.is_superseded());
         assert!(rig.mgr.sessions.get(&pseudonym).is_none(), "no slot is left");
         assert!(wait_for_no_active_sessions(&rig.mgr).await);
+        Ok(())
+    }
+
+    /// A reconnect under the same pseudonym that replaces a Session still waiting for its SURBs fails that
+    /// setup with `Closed`, and leaves the replacement in place, instead of returning a dead Session.
+    #[test_log::test(tokio::test)]
+    async fn a_setup_replaced_by_a_reconnect_fails_closed() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+
+        let first = rig.mgr.new_session(
+            (&ChainKeypair::random()).into(),
+            SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            balanced_entry_cfg(pseudonym),
+        );
+        let reconnect = async {
+            // No SURB flow, so the first setup stays in its readiness wait until the reconnect replaces it.
+            let slot = timeout(Duration::from_secs(5), async {
+                loop {
+                    if let Some(slot) = rig.mgr.sessions.get(&pseudonym)
+                        && !slot.instance.is_established()
+                    {
+                        break slot;
+                    }
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+            })
+            .await
+            .context("the slot never appeared")?;
+            let second = rig
+                .connect(entry_cfg(Capability::Segmentation.into(), Some(pseudonym)))
+                .await?;
+            assert!(slot.instance.is_superseded(), "the reconnect replaced the first setup");
+            // The teardown already ended the wait by stopping the balancer; lift the level in case it did not.
+            slot.surb_estimator
+                .produced
+                .fetch_add(1000, std::sync::atomic::Ordering::Relaxed);
+            Ok::<_, anyhow::Error>((slot.instance.clone(), second))
+        };
+        let (first, reconnected) = timeout(Duration::from_secs(8), futures::future::join(first, reconnect))
+            .await
+            .context("the first setup never finished")?;
+        let (first_instance, _second) = reconnected?;
+
+        assert!(
+            matches!(first, Err(TransportSessionError::Closed)),
+            "got {:?}",
+            first.as_ref().map(|_| ())
+        );
+        let slot = rig.mgr.sessions.get(&pseudonym).context("the second Session's slot")?;
+        assert!(!Arc::ptr_eq(&slot.instance, &first_instance));
+        assert!(!slot.instance.is_superseded());
+        assert_eq!(1, rig.mgr.num_active_sessions());
         Ok(())
     }
 
