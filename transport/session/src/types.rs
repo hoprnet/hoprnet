@@ -583,6 +583,15 @@ pub trait ForwardReceiptSink: Send + Sync + 'static {
     /// A receipt from the Exit of the Session `pseudonym`, with the `tags` it received in the intervals
     /// `first_seq..=seq`.
     fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32]);
+
+    /// A Session under `pseudonym` that asked its Exit for receipts is established, as the Session instance
+    /// `instance`: its packets are to be recorded, and whatever an earlier Session under the same pseudonym left is
+    /// to be forgotten.
+    fn session_started(&self, _pseudonym: HoprPseudonym, _instance: u64) {}
+
+    /// The Session instance `instance` under `pseudonym` has ended: its packets are no longer recorded, unless a
+    /// later instance has started under the pseudonym since.
+    fn session_ended(&self, _pseudonym: HoprPseudonym, _instance: u64) {}
 }
 
 /// Configures the Session protocol socket over HOPR.

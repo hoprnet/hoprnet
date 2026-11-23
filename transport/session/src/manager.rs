@@ -1834,6 +1834,10 @@ pub(crate) struct SlotInstance {
     /// instance is the slot's current one (a takeover delivers the new Session to the session server before
     /// it swaps the slot) is not lost: the report is dropped as stale, the mark is not.
     ended: OnceLock<ClosureReason>,
+    /// The sink to tell when this Entry instance ends, if it asked for forward receipts.
+    receipts: OnceLock<Arc<dyn ForwardReceiptSink>>,
+    /// Set by the first [`park_records`](Self::park_records), which also tells the `receipts` sink.
+    receipts_ended: std::sync::atomic::AtomicBool,
 }
 
 impl SlotInstance {
@@ -1858,6 +1862,8 @@ impl SlotInstance {
             resume_capable,
             stream_progress: OnceLock::new(),
             ended: OnceLock::new(),
+            receipts: OnceLock::new(),
+            receipts_ended: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -1949,6 +1955,13 @@ impl SlotInstance {
     fn park_records(&self, pseudonym: HoprPseudonym) {
         if self.parked.swap(true, std::sync::atomic::Ordering::AcqRel) {
             return;
+        }
+        // Every teardown path parks, so this is where the Session's receipt recording ends. The sink ends only this
+        // instance's registration: a successor under the pseudonym keeps its own.
+        if let Some(sink) = self.receipts.get()
+            && !self.receipts_ended.swap(true, std::sync::atomic::Ordering::AcqRel)
+        {
+            sink.session_ended(pseudonym, self.id);
         }
         if let Some(home) = self.ledger_home.get() {
             home.cache.insert(pseudonym, home.ledger.clone());
@@ -6869,6 +6882,11 @@ where
                     if let Some(claim) = ledger_claim.as_mut() {
                         claim.defuse();
                     }
+                    // Its packets are recorded from now on, and those of a Session it replaces are forgotten
+                    if wants_forward_receipts && let Some(sink) = self.forward_receipt_sink.get() {
+                        let _ = instance.receipts.set(sink.clone());
+                        sink.session_started(pseudonym, instance.id());
+                    }
 
                     // The slot now exists, so inbound traffic for this Session passes the dispatch
                     // filter on the session registry alone; the pending-initiation marker has served
@@ -7912,7 +7930,11 @@ where
                 } else {
                     1
                 };
-                for _ in 0..copies {
+                for copy in 0..copies {
+                    // Data sent meanwhile may have used the stock the second copy was counted on
+                    if copy > 0 && estimator.saturating_diff() <= current_keep_alive_surb_reserve(&balancer) {
+                        break;
+                    }
                     let msg = HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage {
                         session_id,
                         seq,
@@ -9013,6 +9035,14 @@ where
 
             // Forward receipts are handled here: they only feed the sink, and they cost the Entry a SURB.
             if let HoprStartProtocol::ForwardReceipts(receipts) = &msg {
+                // A receipt rides on a SURB; a packet that came over a forward path has a tag and spent none
+                if in_data.packet_info.forward_receipt_tag.is_some() {
+                    trace!(%pseudonym, "dropping forward receipts that did not arrive on a SURB");
+                    crate::counters::SESSION_STALE_START_MESSAGES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_DISPATCHED_MSGS.increment_by(&["dropped_stale_start"], 1);
+                    return Ok(DispatchResult::Dropped(DropReason::StaleStartMessage));
+                }
                 if let Some(slot) = self.sessions.get(&pseudonym) {
                     // Spent like a keep-alive, not a reply: it must not count as one heard
                     slot.surb_mgmt.note_keep_alive_consumed(&slot.surb_estimator);
@@ -36477,6 +36507,65 @@ mod tests {
         );
         assert!(FORWARD_RECEIPTS_RECEIVED.load(Relaxed) > received);
         Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_entry_should_neither_count_nor_pass_on_receipts_that_did_not_arrive_on_a_surb() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let pseudonym = HoprPseudonym::random();
+        let sink = Arc::new(RecordingSink::default());
+        let mgr = entry_with_sink(pseudonym, sink.clone())?;
+
+        let mut forward = receipts_message(pseudonym, 1, 1, vec![7])?;
+        forward.packet_info.forward_receipt_tag = Some(1);
+        let result = mgr.dispatch_message(pseudonym, forward)?;
+        assert!(matches!(result, DispatchResult::Dropped(DropReason::StaleStartMessage)));
+        assert!(sink.0.lock().is_empty());
+        let slot = mgr.sessions.get(&pseudonym).context("slot")?;
+        assert_eq!(0, slot.surb_estimator.consumed.load(Relaxed));
+        Ok(())
+    }
+
+    /// A sink that keeps what it was told about the Session lifecycle, as `(pseudonym, instance, started)`.
+    #[derive(Default)]
+    struct LifecycleSink(parking_lot::Mutex<Vec<(HoprPseudonym, u64, bool)>>);
+
+    impl ForwardReceiptSink for LifecycleSink {
+        fn receipts(&self, _: HoprPseudonym, _: u32, _: u32, _: &[u32]) {}
+
+        fn session_started(&self, pseudonym: HoprPseudonym, instance: u64) {
+            self.0.lock().push((pseudonym, instance, true));
+        }
+
+        fn session_ended(&self, pseudonym: HoprPseudonym, instance: u64) {
+            self.0.lock().push((pseudonym, instance, false));
+        }
+    }
+
+    /// Every teardown parks, which ends the receipts of its own instance once; the late teardown of a replaced
+    /// instance names the old instance, which the sink must not mistake for its successor.
+    #[test]
+    fn a_teardown_should_end_the_receipts_of_its_own_instance_once() {
+        let pseudonym = HoprPseudonym::random();
+        let sink = Arc::new(LifecycleSink::default());
+        let (old, new) = (SlotInstance::new(1), SlotInstance::new(2));
+        for instance in [&old, &new] {
+            let _ = instance.receipts.set(sink.clone());
+        }
+        // The successor starts before the old instance's late teardown
+        sink.session_started(pseudonym, new.id());
+        old.park_records(pseudonym);
+        old.park_records(pseudonym);
+        new.park_records(pseudonym);
+        assert_eq!(
+            vec![
+                (pseudonym, new.id(), true),
+                (pseudonym, old.id(), false),
+                (pseudonym, new.id(), false)
+            ],
+            *sink.0.lock()
+        );
     }
 
     #[test_log::test(tokio::test)]

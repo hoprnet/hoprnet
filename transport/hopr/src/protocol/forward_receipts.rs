@@ -13,6 +13,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use dashmap::DashMap;
 use hopr_api::types::{
     crypto::types::OffchainPublicKey,
     internal::prelude::{HoprPseudonym, HoprSurbId, RoutingOptions, SURB_ID_SIZE},
@@ -54,6 +55,9 @@ struct Record {
     /// The relayers, nearest to us first.
     relayers: [Option<Key>; RoutingOptions::MAX_INTERMEDIATE_HOPS],
     sent_at: Instant,
+    /// Another packet of the pseudonym had the same tag: a receipt for it says nothing about either, so it credits
+    /// nobody and the packets are never overdue.
+    ambiguous: bool,
 }
 
 impl Record {
@@ -110,6 +114,10 @@ pub struct ForwardReceipts {
     any_verdict: AtomicBool,
     /// The relayers excluded per Exit, for the planner.
     excluded: RwLock<HashMap<Key, Vec<Key>>>,
+    /// The pseudonyms whose Session asked for receipts, with the Session instance: only theirs are recorded, so that
+    /// Sessions without receipts cannot crowd out the evidence of the others. Kept from the Session's start to its
+    /// end, however long it is idle.
+    active: DashMap<HoprPseudonym, u64>,
     state: Mutex<State>,
 }
 
@@ -136,17 +144,34 @@ impl ForwardReceipts {
         self.excluded.read().get(exit).cloned().unwrap_or_default()
     }
 
-    /// The relayers with a forward verdict for any Exit; cheap while there is none.
-    pub fn judged_relayers(&self) -> std::collections::HashSet<Key> {
+    /// The (exit, relayer) pairs with a forward verdict; cheap while there is none.
+    pub fn judged_pairs(&self) -> std::collections::HashSet<(Key, Key)> {
         if !self.any_verdict.load(Ordering::Relaxed) {
             return Default::default();
         }
-        self.excluded.read().values().flatten().copied().collect()
+        self.excluded
+            .read()
+            .iter()
+            .flat_map(|(exit, relayers)| relayers.iter().map(|relayer| (*exit, *relayer)))
+            .collect()
     }
 
-    /// Records a Session packet sent over `path`, the relayers and then the Exit.
+    /// Records a Session packet sent over `path`, the relayers and then the Exit, if its Session asked for receipts.
     pub fn record(&self, pseudonym: HoprPseudonym, tag: u32, path: &[Key]) {
+        if !self.active.contains_key(&pseudonym) {
+            return;
+        }
         self.record_at(pseudonym, tag, path, Instant::now());
+    }
+
+    /// Starts recording the packets of `pseudonym`, forgetting what an earlier Session under it left.
+    fn start_session(&self, pseudonym: HoprPseudonym, instance: u64) {
+        {
+            let mut state = self.state.lock();
+            state.remove_where_owned(pseudonym);
+            state.streams.remove(&pseudonym);
+        }
+        self.active.insert(pseudonym, instance);
     }
 
     fn record_at(&self, pseudonym: HoprPseudonym, tag: u32, path: &[Key], sent_at: Instant) {
@@ -166,16 +191,15 @@ impl ForwardReceipts {
                 state.remove(owner, tag);
             }
         }
-        state.insert(
-            pseudonym,
-            tag,
-            Record {
-                exit: *exit,
-                relayers: slots,
-                sent_at,
-            },
-        );
-        state.order.push_back((pseudonym, tag, sent_at));
+        let record = Record {
+            exit: *exit,
+            relayers: slots,
+            sent_at,
+            ambiguous: false,
+        };
+        if state.insert(pseudonym, tag, record) {
+            state.order.push_back((pseudonym, tag, sent_at));
+        }
     }
 
     /// Takes the receipt numbered `seq` for `pseudonym`, which lists the `tags` that reached the Exit in the
@@ -247,7 +271,7 @@ impl ForwardReceipts {
             let Some(record) = state.remove(pseudonym, *tag) else {
                 continue;
             };
-            if now.saturating_duration_since(record.sent_at) > RECORD_TTL {
+            if record.ambiguous || now.saturating_duration_since(record.sent_at) > RECORD_TTL {
                 continue;
             }
             matched += 1;
@@ -349,9 +373,19 @@ impl State {
             .is_some_and(|record| record.sent_at == at)
     }
 
-    fn insert(&mut self, owner: HoprPseudonym, tag: u32, record: Record) {
-        if self.records.entry(owner).or_default().insert(tag, record).is_none() {
-            self.count += 1;
+    /// Inserts the record, unless the tag is taken: then the earlier record is marked ambiguous and kept.
+    /// Returns whether it was inserted.
+    fn insert(&mut self, owner: HoprPseudonym, tag: u32, record: Record) -> bool {
+        match self.records.entry(owner).or_default().entry(tag) {
+            std::collections::hash_map::Entry::Occupied(mut taken) => {
+                taken.get_mut().ambiguous = true;
+                false
+            }
+            std::collections::hash_map::Entry::Vacant(free) => {
+                free.insert(record);
+                self.count += 1;
+                true
+            }
         }
     }
 
@@ -363,6 +397,13 @@ impl State {
         }
         self.count -= 1;
         Some(record)
+    }
+
+    /// Drops every record of `owner`.
+    fn remove_where_owned(&mut self, owner: HoprPseudonym) {
+        if let Some(records) = self.records.remove(&owner) {
+            self.count -= records.len();
+        }
     }
 
     fn remove_where(&mut self, gone: impl Fn(&Record) -> bool) {
@@ -408,7 +449,7 @@ impl State {
         let live = || {
             records
                 .iter()
-                .filter(|(_, record)| now.saturating_duration_since(record.sent_at) <= RECORD_TTL)
+                .filter(|(_, record)| !record.ambiguous && now.saturating_duration_since(record.sent_at) <= RECORD_TTL)
         };
 
         // Per (exit, relayer): the unanswered overdue packets.
@@ -533,6 +574,14 @@ fn id_of(tag: u32) -> HoprSurbId {
 impl ForwardReceiptSink for ForwardReceipts {
     fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32]) {
         self.receipts_at(pseudonym, seq, first_seq, tags, Instant::now());
+    }
+
+    fn session_started(&self, pseudonym: HoprPseudonym, instance: u64) {
+        self.start_session(pseudonym, instance);
+    }
+
+    fn session_ended(&self, pseudonym: HoprPseudonym, instance: u64) {
+        self.active.remove_if(&pseudonym, |_, current| *current == instance);
     }
 }
 
@@ -1331,6 +1380,85 @@ mod tests {
     }
 
     #[test]
+    fn two_packets_with_one_tag_should_be_ambiguous_and_credit_nobody() {
+        let [a, b, exit] = [(); 3].map(|_| key());
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        fr.receipts_at(session, 1, 1, &[], t0);
+        fr.record_at(session, 7, &[a, exit], t0 + Duration::from_millis(10));
+        fr.record_at(session, 7, &[b, exit], t0 + Duration::from_millis(20));
+        assert_eq!(1, fr.recorded(), "one record stays, marked");
+        assert_eq!(1, fr.state.lock().order.len());
+
+        // A later packet is receipted: the ambiguous ones would be overdue, if they counted
+        fr.record_at(session, 8, &[a, exit], t0 + Duration::from_secs(2));
+        fr.receipts_at(session, 2, 2, &[8], t0 + Duration::from_secs(3));
+        fr.receipts_at(session, 3, 3, &[7], t0 + Duration::from_secs(4));
+        let state = fr.state.lock();
+        assert!(state.records.is_empty(), "the receipt for the tag consumed the record");
+        assert!(state.suspected.is_empty() && state.verdicts.is_empty());
+        assert!(
+            !state.delivered.contains_key(&(exit, b)),
+            "a receipt for an ambiguous tag credits nobody"
+        );
+        assert_eq!(
+            Some(&(t0 + Duration::from_secs(2))),
+            state.delivered.get(&(exit, a)),
+            "only the packet sent later credits a"
+        );
+    }
+
+    #[test]
+    fn only_a_session_that_started_should_be_recorded_and_a_restart_should_forget_the_last() {
+        let [a, exit] = [(); 2].map(|_| key());
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        fr.record(session, 1, &[a, exit]);
+        assert_eq!(0, fr.recorded(), "no Session asked for receipts");
+
+        fr.session_started(session, 1);
+        fr.record(session, 1, &[a, exit]);
+        fr.receipts(session, 1, 1, &[]);
+        assert_eq!(1, fr.recorded());
+        assert!(fr.state.lock().streams.contains_key(&session));
+
+        // A new Session under the pseudonym starts clean
+        fr.session_started(session, 2);
+        assert_eq!(0, fr.recorded());
+        assert!(!fr.state.lock().streams.contains_key(&session));
+    }
+
+    #[test]
+    fn a_session_idle_for_longer_than_the_stream_ttl_should_still_be_recorded() {
+        let [a, exit] = [(); 2].map(|_| key());
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        fr.session_started(session, 1);
+        fr.refresh_at(Instant::now() + STREAM_TTL + Duration::from_secs(1));
+        fr.refresh_at(Instant::now() + 2 * STREAM_TTL);
+        fr.record(session, 1, &[a, exit]);
+        assert_eq!(1, fr.recorded());
+    }
+
+    /// A late end of an instance that was replaced must not deregister the instance that replaced it.
+    #[test]
+    fn session_ended_should_deregister_only_its_own_instance() {
+        let [a, exit] = [(); 2].map(|_| key());
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        fr.session_started(session, 1);
+        fr.session_started(session, 2);
+        fr.session_ended(session, 1);
+        fr.record(session, 1, &[a, exit]);
+        assert_eq!(1, fr.recorded(), "the successor is still recorded");
+
+        fr.session_ended(session, 2);
+        fr.record(session, 2, &[a, exit]);
+        assert_eq!(1, fr.recorded(), "nothing is recorded once it has ended");
+    }
+
+    #[test]
     fn a_reused_pseudonym_should_reset_its_stream() {
         let [a, exit] = [(); 2].map(|_| key());
         let fr = ForwardReceipts::default();
@@ -1494,10 +1622,10 @@ mod tests {
     }
 
     #[test]
-    fn the_judged_relayers_should_be_those_with_a_verdict_for_any_exit() -> anyhow::Result<()> {
+    fn the_judged_pairs_should_be_the_verdicts_per_exit() -> anyhow::Result<()> {
         let [a, b, c] = [(); 3].map(|_| key());
         let mut sim = Sim::new();
-        assert!(sim.fr.judged_relayers().is_empty());
+        assert!(sim.fr.judged_pairs().is_empty());
         sim.run(
             0,
             2_000,
@@ -1505,7 +1633,7 @@ mod tests {
             |path| if path.contains(&a) { None } else { FAST },
             lose_nothing,
         );
-        assert_eq!(std::collections::HashSet::from([a]), sim.fr.judged_relayers());
+        assert_eq!(std::collections::HashSet::from([(sim.exit, a)]), sim.fr.judged_pairs());
         Ok(())
     }
 

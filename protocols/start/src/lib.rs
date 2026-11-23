@@ -114,10 +114,11 @@ pub struct StartInitiation<T, C> {
     /// and the lower 32 bits of them are the SURB balancer target.
     ///
     /// The least significant 64 bits are reserved: the lowest 32 carry the sender's session idle timeout in
-    /// whole seconds (`0` if not announced), bit 32 asks the Exit for forward receipts (see [`StartProtocol::ForwardReceipts`]), and bit 33
-    /// marks an attempt to resume a Session (answered by [`StartProtocol::SessionResumed`]). Bits 34 to 63 stay
-    /// reserved (for a resume secret, see hoprnet#8723). Senders set unused bits to `0` and receivers ignore
-    /// them, so that they can be allocated later without breaking older decoders.
+    /// whole seconds (`0` if not announced), bit 32 asks the Exit for forward receipts (see
+    /// [`StartProtocol::ForwardReceipts`]), and bit 33 marks an attempt to resume a Session (answered by
+    /// [`StartProtocol::SessionResumed`]). Bits 34 to 63 stay reserved (for a resume secret, see hoprnet#8723).
+    /// Senders set unused bits to `0` and receivers ignore them, so that they can be allocated later without
+    /// breaking older decoders.
     pub additional_data: u128,
 }
 
@@ -1102,8 +1103,10 @@ where
                         seq,
                         first_seq,
                         tags: body[PREFIX..ids_end]
-                            .chunks_exact(size_of::<u32>())
-                            .map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]]))
+                            .as_chunks::<{ size_of::<u32>() }>()
+                            .0
+                            .iter()
+                            .map(|c| u32::from_be_bytes(*c))
                             .collect(),
                         session_id: serde_cbor_2::from_slice(&body[ids_end..])?,
                     })
@@ -2703,6 +2706,46 @@ mod tests {
             decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
             Err(StartProtocolError::InvalidLength)
         ));
+    }
+
+    /// The fixed part of a receipt body: `seq`, `first_seq` and the number of tags.
+    fn receipts_prefix(count: u16) -> Vec<u8> {
+        let mut body = 1_u32.to_be_bytes().to_vec();
+        body.extend_from_slice(&1_u32.to_be_bytes());
+        body.extend_from_slice(&count.to_be_bytes());
+        body
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_a_forward_receipts_count_above_the_maximum() {
+        let count = MAX_FORWARD_RECEIPT_TAGS + 1;
+        let mut body = receipts_prefix(count as u16);
+        body.extend(std::iter::repeat_n(0, count * size_of::<u32>()));
+        body.push(0x0a);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
+            Err(error) if is_parse_error(&error, "fr.too_many_tags")
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_a_forward_receipts_body_ending_after_the_tags() {
+        let mut body = receipts_prefix(2);
+        body.extend_from_slice(&[0; 8]);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_trailing_bytes_after_the_forward_receipts_session_id() {
+        let mut body = receipts_prefix(1);
+        body.extend_from_slice(&[0; 4]);
+        body.push(0x0a);
+        assert!(decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body).is_ok());
+        body.push(0x0a);
+        assert!(decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body).is_err());
     }
 
     #[test]

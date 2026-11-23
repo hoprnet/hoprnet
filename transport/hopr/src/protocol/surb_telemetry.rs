@@ -431,8 +431,21 @@ impl SurbRoundTripRegistry {
     /// race and discards it itself. A record written off in between is still in `written_off_legs`, and
     /// its race is kept until that SURB's reply comes home and closes it (see
     /// [`SurbTelemetryCodec::on_replied`]), as one written off after the race opened is.
+    #[cfg(test)]
     fn open_race(&self, waiting: &ReturnRelayers, partner: HoprSurbId, home: &ReturnRelayers, round_trip: Duration) {
-        self.relayer_health.open_race(waiting, partner, home, round_trip);
+        self.open_race_to(0, waiting, partner, home, round_trip);
+    }
+
+    fn open_race_to(
+        &self,
+        exit_tag: u32,
+        waiting: &ReturnRelayers,
+        partner: HoprSurbId,
+        home: &ReturnRelayers,
+        round_trip: Duration,
+    ) {
+        self.relayer_health
+            .open_race_to(exit_tag, waiting, partner, home, round_trip);
         if !self.pending.contains_key(&partner) && !self.written_off_legs.contains_key(&partner) {
             self.relayer_health.discard_race(waiting, &partner);
         }
@@ -760,9 +773,17 @@ pub fn no_path_slots() -> PathSlotResolver {
 /// The relayers of a reply leg, from the first after the replier to the last before us.
 pub(crate) type ReturnRelayers = [Option<OffchainPublicKey>; PATH_ID_SLOTS];
 
+/// A fingerprint of an Exit, `0` reserved for an unknown one: it keeps what is stored per SURB small.
+fn exit_tag(exit: &OffchainPublicKey) -> u32 {
+    let bytes: &[u8] = exit.as_ref();
+    u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).max(1)
+}
+
 /// What a minted SURB is remembered by until its reply comes home.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PendingSurb {
+    /// The Exit it was minted for, see [`exit_tag`]; `0` if unknown.
+    exit_tag: u32,
     /// Legs the round-trip traverses, for the counts and graph attribution.
     paths: ForwardAndReturnPath,
     /// The session it was minted for.
@@ -826,8 +847,9 @@ pub struct RelayerHealth {
     suspected: DashMap<OffchainPublicKey, (Hop, Instant)>,
     /// Health last handed to the graph, below `1.0` only.
     published: DashMap<OffchainPublicKey, f64>,
-    /// Relayers with an active forward verdict, set by the flush: one overdue reply makes them a suspect.
-    forward_judged: parking_lot::RwLock<std::collections::HashSet<OffchainPublicKey>>,
+    /// The (exit, relayer) pairs with an active forward verdict, set by the flush: one overdue reply from that Exit
+    /// makes the relayer a suspect.
+    forward_judged: parking_lot::RwLock<std::collections::HashSet<(u32, OffchainPublicKey)>>,
     /// When a reply last came home, through any relayer, for any session.
     last_reply: LastReply,
 }
@@ -889,6 +911,8 @@ struct RaceHistory {
     /// not in it: a race is the same race over any leg, the leg only decides how long the reply is
     /// given and which reply answers it (see [`unanswered`](Self::unanswered)).
     open_legs: HashMap<HoprSurbId, (ReturnRelayers, usize)>,
+    /// The Exit each of those replies is out from, where it is known.
+    open_exits: HashMap<HoprSurbId, u32>,
     /// How far back its races count, set when it is judged; zero until then.
     memory: Duration,
     /// When a reply last came home through this relayer over each of its two hops, whether or not it
@@ -1328,6 +1352,7 @@ impl RelayerHealth {
             if let Some(mut history) = self.relayers.get_mut(&relayer) {
                 history.open.remove(&later_surb);
                 history.open_legs.remove(&later_surb);
+                history.open_exits.remove(&later_surb);
             }
             if !earlier.contains(&Some(relayer)) {
                 self.record(relayer, race(by.as_secs_f64()));
@@ -1338,10 +1363,23 @@ impl RelayerHealth {
         }
     }
 
-    /// Records that the reply over `home` came home in `winning_round_trip` while `surb`, over
-    /// `waiting`, is still out.
+    /// [`open_race_to`](Self::open_race_to) for a reply whose Exit is not known.
+    #[cfg(test)]
     pub(crate) fn open_race(
         &self,
+        waiting: &ReturnRelayers,
+        surb: HoprSurbId,
+        home: &ReturnRelayers,
+        winning_round_trip: Duration,
+    ) {
+        self.open_race_to(0, waiting, surb, home, winning_round_trip);
+    }
+
+    /// Records that the reply over `home` came home in `winning_round_trip` while `surb`, over
+    /// `waiting`, is still out, the reply of the Exit `exit`.
+    pub(crate) fn open_race_to(
+        &self,
+        exit_tag: u32,
         waiting: &ReturnRelayers,
         surb: HoprSurbId,
         home: &ReturnRelayers,
@@ -1361,6 +1399,9 @@ impl RelayerHealth {
             let mut history = self.relayers.entry(relayer).or_default();
             history.open.insert(surb, race);
             history.open_legs.insert(surb, (*waiting, position));
+            if exit_tag != 0 {
+                history.open_exits.insert(surb, exit_tag);
+            }
         }
     }
 
@@ -1371,6 +1412,7 @@ impl RelayerHealth {
             if let Some(mut history) = self.relayers.get_mut(&relayer) {
                 history.open.remove(surb);
                 history.open_legs.remove(surb);
+                history.open_exits.remove(surb);
             }
         }
     }
@@ -1382,6 +1424,7 @@ impl RelayerHealth {
             if let Some(mut history) = self.relayers.get_mut(&relayer) {
                 history.open.remove(surb);
                 history.open_legs.remove(surb);
+                history.open_exits.remove(surb);
             }
         }
     }
@@ -1609,29 +1652,51 @@ impl RelayerHealth {
             let RaceHistory {
                 open,
                 open_legs,
+                open_exits,
                 last_home,
                 ..
             } = &mut *entry;
             open_legs.retain(|surb, _| open.contains_key(surb));
+            open_exits.retain(|surb, _| open.contains_key(surb));
             // No race stays open for longer than that, so an older reply answers none.
             last_home.retain(|_, home| home.elapsed() <= PENDING_SURB_TTL);
             let unanswered = entry.unanswered(last_reply, fallback_usual, &bars);
-            // A relayer the forward receipts have judged is a suspect on one overdue reply
-            let (min_races, min_over_one_hop) = if forward_judged.contains(entry.key()) {
-                (1, 1)
+            // The overdue replies of an Exit that the forward receipts have judged this relayer for count alone too
+            let judged_replies: Vec<(HoprSurbId, Instant)> = if forward_judged.is_empty() {
+                Vec::new()
             } else {
-                (MIN_RACES, MIN_RACES_OVER_ONE_HOP)
+                unanswered
+                    .iter()
+                    .filter(|(surb, _)| {
+                        entry
+                            .open_exits
+                            .get(surb)
+                            .is_some_and(|exit| forward_judged.contains(&(*exit, *entry.key())))
+                    })
+                    .copied()
+                    .collect()
             };
-            let (unanswered, needed): (Vec<HoprSurbId>, usize) = match entry.hop_at_fault(&unanswered) {
-                // Delivering over its other hop, and enough overdue over this one to suspect it over it.
-                Some(hop) if unanswered.len() >= min_over_one_hop => {
+            let assess = |replies: &[(HoprSurbId, Instant)], min_races: usize, min_over_one_hop: usize| {
+                let (hop, (ids, needed)) = match entry.hop_at_fault(replies) {
+                    // Delivering over its other hop, and enough overdue over this one to suspect it over it.
+                    Some(hop) if replies.len() >= min_over_one_hop => (
+                        Some(hop),
+                        (replies.iter().map(|(surb, _)| *surb).collect(), min_over_one_hop),
+                    ),
+                    // As a whole it is judged on the replies that nothing through it has come home after.
+                    _ => (None, (entry.unanswered_at_all(replies), min_races)),
+                };
+                (ids.len() >= needed).then_some((hop, ids, needed))
+            };
+            let verdict = assess(&unanswered, MIN_RACES, MIN_RACES_OVER_ONE_HOP).or_else(|| {
+                (!judged_replies.is_empty())
+                    .then(|| assess(&judged_replies, 1, 1))
+                    .flatten()
+            });
+            if let Some((hop, unanswered, needed)) = verdict {
+                if let Some(hop) = hop {
                     hop_at_fault.insert(*entry.key(), hop);
-                    (unanswered.iter().map(|(surb, _)| *surb).collect(), min_over_one_hop)
                 }
-                // As a whole it is judged on the replies that nothing through it has come home after.
-                _ => (entry.unanswered_at_all(&unanswered), min_races),
-            };
-            if unanswered.len() >= needed {
                 let open = entry
                     .open
                     .keys()
@@ -1978,7 +2043,11 @@ where
     if let Some(forward) = registry.forward() {
         // Lifts the forward verdicts past their TTL first: only an active one lowers the reply threshold
         forward.refresh();
-        *health.forward_judged.write() = forward.judged_relayers();
+        *health.forward_judged.write() = forward
+            .judged_pairs()
+            .into_iter()
+            .map(|(exit, relayer)| (exit_tag(&exit), relayer))
+            .collect();
     }
     let changed = health.refresh(memory);
     // The verdicts themselves are logged where they are reached, in `refresh`.
@@ -2137,6 +2206,7 @@ impl<C> SurbTelemetryCodec<C> {
             self.registry.remember(
                 *surb_id,
                 PendingSurb {
+                    exit_tag: exit_tag(&destination),
                     paths,
                     pseudonym: *pseudonym,
                     return_relayers: return_relayers[i],
@@ -2211,7 +2281,8 @@ impl<C> SurbTelemetryCodec<C> {
                 if !self.registry.judges(waiting.pair_index) {
                     return;
                 }
-                self.registry.open_race(
+                self.registry.open_race_to(
+                    waiting.exit_tag,
                     &waiting.return_relayers,
                     partner,
                     &pending.return_relayers,
@@ -2396,11 +2467,13 @@ mod tests {
     fn only_session_data_should_be_recorded_for_receipts() -> anyhow::Result<()> {
         let (graph, _, peers) = graph_with(1);
         let me = *graph.identity();
-        let routing = || ResolvedTransportRouting::Forward {
-            pseudonym: HoprPseudonym::random(),
+        let asking = HoprPseudonym::random();
+        let routing_of = |pseudonym| ResolvedTransportRouting::Forward {
+            pseudonym,
             forward_path: ValidatedPath::direct(peers[0], address()),
             return_paths: vec![],
         };
+        let routing = || routing_of(asking);
         let data = |tag: ReservedTag| [Tag::from(tag).to_be_bytes().as_slice(), b"payload"].concat();
         let codec = |enabled| {
             SurbTelemetryCodec::new(
@@ -2412,6 +2485,18 @@ mod tests {
         };
 
         let on = codec(true);
+        let forward = on.registry.forward().context("receipts on")?;
+        // Nothing is recorded for a Session that did not ask for receipts
+        on.encode_packet(data(ReservedTag::Session), routing(), PacketSignals::empty(), None)?;
+        assert_eq!(0, forward.recorded());
+        hopr_transport_session::ForwardReceiptSink::session_started(forward.as_ref(), asking, 1);
+        on.encode_packet(
+            data(ReservedTag::Session),
+            routing_of(HoprPseudonym::random()),
+            PacketSignals::empty(),
+            None,
+        )?;
+        assert_eq!(0, forward.recorded(), "nor for another pseudonym");
         for other in [ReservedTag::SessionStart, ReservedTag::Ping] {
             on.encode_packet(data(other), routing(), PacketSignals::empty(), None)?;
         }
@@ -2565,6 +2650,7 @@ mod tests {
 
     fn pending_to(relayers: &[OffchainPublicKey], partner: Option<HoprSurbId>, pair_index: usize) -> PendingSurb {
         PendingSurb {
+            exit_tag: 0,
             paths: ForwardAndReturnPath {
                 forward: [0; PATH_ID_SLOTS],
                 reply: [0; PATH_ID_SLOTS],
@@ -2621,6 +2707,15 @@ mod tests {
                 },
             );
             history.open_legs.insert(surb_id(seed), (leg(&[relayer]), 0));
+        }
+    }
+
+    /// [`open_since`] with the replies out from `exit`.
+    fn open_since_from(health: &RelayerHealth, exit: u32, relayer: OffchainPublicKey, count: u8, since: Instant) {
+        open_since(health, relayer, count, since);
+        let mut history = health.relayers.entry(relayer).or_default();
+        for seed in 1..=count {
+            history.open_exits.insert(surb_id(seed), exit);
         }
     }
 
@@ -2826,7 +2921,8 @@ mod tests {
             jitter(0),
         );
         for seed in 1..=count {
-            health.open_race(
+            health.open_race_to(
+                exit_tag(&exit),
                 &leg(&[entry, black_hole, exit]),
                 surb_id(seed),
                 &leg(&[entry, healthy, exit]),
@@ -2838,8 +2934,40 @@ mod tests {
         (health, black_hole)
     }
 
+    /// The Exit the open replies of `relayer` are out from.
+    fn exit_of(health: &RelayerHealth, relayer: &OffchainPublicKey) -> u32 {
+        *health
+            .relayers
+            .get(relayer)
+            .expect("the relayer has a history")
+            .open_exits
+            .values()
+            .next()
+            .expect("an open reply with a known Exit")
+    }
+
+    /// Judges the `relayers` for the Exit their open replies are out from.
     fn forward_judged(health: &RelayerHealth, relayers: &[OffchainPublicKey]) {
-        *health.forward_judged.write() = relayers.iter().copied().collect();
+        *health.forward_judged.write() = relayers
+            .iter()
+            .map(|relayer| (exit_of(health, relayer), *relayer))
+            .collect();
+    }
+
+    /// A verdict for one Exit does not lower the threshold for the same relayer on a leg to another.
+    #[test]
+    fn a_forward_verdict_for_one_exit_should_not_lower_the_threshold_on_a_leg_to_another() {
+        let (health, relayer) = black_hole_candidate(1);
+        let exit_a = exit_of(&health, &relayer);
+        let exit_b = exit_tag(&key());
+        *health.forward_judged.write() = [(exit_b, relayer)].into_iter().collect();
+        assert!(judged_dead(&health.refresh(4)).is_empty(), "judged for another Exit");
+        *health.forward_judged.write() = [(exit_a, relayer)].into_iter().collect();
+        assert_eq!(
+            vec![relayer],
+            judged_dead(&health.refresh(4)),
+            "judged for its own Exit"
+        );
     }
 
     /// A forward verdict makes one overdue reply enough, then the usual confirmation applies.
@@ -2898,12 +3026,13 @@ mod tests {
             let registry = SurbRoundTripRegistry::default().with_forward_receipts(true);
             let health = registry.relayer_health();
             settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
-            open_since(&health, relayer, 1, ago(Duration::from_secs(5))?);
+            let exit = key();
+            open_since_from(&health, exit_tag(&exit), relayer, 1, ago(Duration::from_secs(5))?);
             health.record_reply();
             registry
                 .forward()
                 .context("forward receipts on")?
-                .judge_at(key(), relayer, ago(age)?);
+                .judge_at(exit, relayer, ago(age)?);
             refresh_relayer_health(&registry, &graph, 4, 1.0, || async {}).await;
             assert_eq!(judged, health.is_known_dead(&relayer), "a forward verdict {age:?} old");
         }
@@ -4219,6 +4348,7 @@ mod tests {
         let dead = key();
         let unreached = HoprPseudonym::random();
         let probe_for = |pseudonym| PendingSurb {
+            exit_tag: 0,
             pseudonym,
             ..pending_to(&[dead], None, 0)
         };
@@ -4228,6 +4358,7 @@ mod tests {
         registry.pending.insert(
             surb_id(1),
             PendingSurb {
+                exit_tag: 0,
                 minted_at: ago(Duration::from_secs(5))?,
                 ..pending_to(&[dead], None, 0)
             },
@@ -4359,6 +4490,7 @@ mod tests {
         let minted_at = Instant::now();
         let first_spent = FIRST_SPENT_INDEX;
         let pending_via = |relayer, partner| PendingSurb {
+            exit_tag: 0,
             minted_at,
             ..pending_to(
                 &[relayer],
@@ -4419,6 +4551,7 @@ mod tests {
         registry.pending.insert(
             surb_id(5),
             PendingSurb {
+                exit_tag: 0,
                 pseudonym: other,
                 ..pending_to(&[dead], None, 0)
             },
@@ -4625,6 +4758,7 @@ mod tests {
         registry.pending.insert(
             surb_id(2),
             PendingSurb {
+                exit_tag: 0,
                 pseudonym: other,
                 ..pending_to(&[dead], None, 0)
             },
@@ -5973,6 +6107,7 @@ mod tests {
                 registry.remember(
                     wide_id(tick),
                     PendingSurb {
+                        exit_tag: 0,
                         pseudonym: session,
                         ..pending_to(&[], None, 0)
                     },
@@ -6036,6 +6171,7 @@ mod tests {
             registry.remember(
                 wide_id(n),
                 PendingSurb {
+                    exit_tag: 0,
                     pseudonym: quiet,
                     ..pending_to(&[dead], None, 0)
                 },
@@ -6048,6 +6184,7 @@ mod tests {
             registry.remember(
                 wide_id(QUIET_STOCK + tick),
                 PendingSurb {
+                    exit_tag: 0,
                     pseudonym: busy,
                     ..pending_to(&[alive], None, 0)
                 },
@@ -6425,6 +6562,7 @@ mod tests {
         registry.pending.insert(
             surb_id(1),
             PendingSurb {
+                exit_tag: 0,
                 minted_at: ago(Duration::from_secs(5))?,
                 ..pending_to(&[dead], None, 0)
             },
@@ -6432,6 +6570,7 @@ mod tests {
         registry.pending.insert(
             surb_id(2),
             PendingSurb {
+                exit_tag: 0,
                 pseudonym: unreached,
                 ..pending_to(&[dead], None, 0)
             },
@@ -6488,6 +6627,7 @@ mod tests {
         registry.pending.insert(
             surb_id(1),
             PendingSurb {
+                exit_tag: 0,
                 pseudonym: unreached,
                 ..pending_to(&[dead], None, 0)
             },
