@@ -29197,7 +29197,10 @@ mod tests {
         }
         // The predecessor's own object reports the same way once it is read to its end.
         let mut buf = [0u8; 16];
-        let _ = timeout(Duration::from_millis(500), predecessor.session.read(&mut buf)).await;
+        let read = timeout(Duration::from_millis(500), predecessor.session.read(&mut buf))
+            .await
+            .context("the predecessor's read must end")??;
+        assert_eq!(0, read, "the predecessor must read to its end");
         assert!(
             !mgr.close_session_instance(&pseudonym, old_instance.id()),
             "a configurator of the predecessor must not close the successor"
@@ -29279,13 +29282,36 @@ mod tests {
             assert_eq!(mgr.get_surb_balancer_config(&pseudonym)?, Some(new_cfg));
         }
 
-        // Ping: stale sends nothing, current sends a keep-alive.
+        // Ping: stale sends nothing, current sends one manual keep-alive back over the reply route.
         while msg_rx.try_recv().is_ok() {}
         assert!(matches!(
             mgr.ping_session_instance(&pseudonym, old_id).await,
             Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
         ));
+        // The Exit also sends keep-alives of its own, so only manual pings are counted, each with its route.
+        let manual_pings = |sent: Vec<(DestinationRouting, ApplicationDataOut)>| {
+            sent.into_iter()
+                .filter(|(_, d)| {
+                    matches!(
+                        HoprStartProtocol::decode(d.data.application_tag, &d.data.plain_text),
+                        Ok(StartProtocol::KeepAlive(KeepAliveMessage { flags, .. })) if flags.contains(KeepAliveFlag::ManualPing)
+                    )
+                })
+                .map(|(routing, _)| {
+                    matches!(&routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &pseudonym)
+                })
+                .collect::<Vec<_>>()
+        };
+        assert!(
+            manual_pings(originated_during(&mut msg_rx, Duration::from_millis(200)).await).is_empty(),
+            "a stale ping must send nothing"
+        );
         mgr.ping_session_instance(&pseudonym, new_id).await?;
+        assert_eq!(
+            vec![true],
+            manual_pings(originated_during(&mut msg_rx, Duration::from_millis(500)).await),
+            "a ping on the current instance must send one manual keep-alive, back over the reply route"
+        );
         assert!(mgr.close_session_instance(&pseudonym, new_id));
         Ok(())
     }
@@ -29657,6 +29683,7 @@ mod tests {
         );
 
         // And a fresh write on the superseded instance is refused before anything is counted.
+        let counted = (estimator.estimate_surbs_consumed(), estimator.estimate_surbs_refunded());
         let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
         let mut sink = Box::pin(exit_data_egress(
             tx.sink_map_err(std::io::Error::other),
@@ -29670,9 +29697,9 @@ mod tests {
         assert!(sink.send(data_packet()?).await.is_err());
         assert!(forwarded.try_recv().is_err());
         assert_eq!(
-            0,
-            estimator.estimate_surbs_consumed() - estimator.estimate_surbs_refunded(),
-            "the refused write counted nothing the first one had not already given back"
+            counted,
+            (estimator.estimate_surbs_consumed(), estimator.estimate_surbs_refunded()),
+            "the refused write neither books nor refunds a SURB"
         );
         Ok(())
     }
