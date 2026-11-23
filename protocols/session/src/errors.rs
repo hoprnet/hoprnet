@@ -8,6 +8,9 @@ pub enum SessionError {
     #[error("error while processing frame or segment: {0}")]
     ProcessingError(String),
 
+    #[error("invalid socket configuration: {0}")]
+    InvalidConfig(String),
+
     #[error("socket is in invalid state: {0}")]
     InvalidState(String),
 
