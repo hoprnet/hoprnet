@@ -178,7 +178,7 @@ hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-alloca
 hopr-chain-connector = { version = "0.36.1" }
 
 # referential implementations (published to crates.io)
-hopr-session-server-forwarder = { version = "0.8.0", default-features = false }
+hopr-session-exit-forwarder = { version = "0.8.0", default-features = false }
 hopr-transport-p2p = { version = "0.15.0", features = ["transport-quic"] }
 hopr-ct-full-network = { version = "0.12.0", default-features = false }
 hopr-network-graph = { version = "0.13.0", default-features = false }
@@ -251,4 +251,9 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
+ignored = ["oas3", "hopr-session-exit-forwarder", "hopr-utils-session"]
+
+# Temporary: hopr-api's entry/exit naming (hoprnet/hopr-api#181, 6.2.0) is not released yet. Drop this
+# patch and use the published version once it is; CI's no-git-dependencies check fails until then.
+[patch.crates-io]
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "3794cecf182503b24f9de18188cf63856aadb573" }

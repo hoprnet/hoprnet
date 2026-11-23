@@ -51,7 +51,7 @@ use crate::telemetry::{
 };
 use crate::{
     AdmissionToken, AgreedSsaQuota, Capabilities, Capability, ForwardReceiptSink, HoprSession, HoprSessionOutPixEvent,
-    IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget, SurbAdmissionControl,
+    IncomingSession, SESSION_MTU, SessionEntryConfig, SessionId, SessionTarget, SurbAdmissionControl,
     SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, MAX_WAIT_CHUNK, RateController, RateLimitSinkExt, SurbBalancer,
@@ -671,7 +671,7 @@ fn close_session(
 /// Deferring is only safe because the retire carries the [`AdmissionToken`] its `admit` returned and
 /// the store honours it only while it still names the pseudonym's current admission. Without that
 /// guard, a retire landing in the window could invalidate a *successor* Session's ring: the
-/// pseudonym is client-chosen ([`SessionClientConfig::pseudonym`]) and freely reusable, so a Session
+/// pseudonym is client-chosen ([`SessionEntryConfig::pseudonym`]) and freely reusable, so a Session
 /// can be re-established on the same one while the previous teardown is still waiting. That failure
 /// is worse than the one being fixed — the successor would go on inserting its SURBs into the small
 /// un-admitted quarantine with nothing logged anywhere — which is why the token is load-bearing here
@@ -689,7 +689,7 @@ fn close_session(
 /// — pays a no-op here rather than needing a separate "was it admitted?" flag threaded through the
 /// guard.
 ///
-/// [`SessionClientConfig::pseudonym`]: crate::SessionClientConfig::pseudonym
+/// [`SessionEntryConfig::pseudonym`]: crate::SessionEntryConfig::pseudonym
 #[tracing::instrument(level = "debug", skip(session_data, admission))]
 fn release_session_slot(
     session_id: SessionId,
@@ -846,7 +846,7 @@ const START_SESSION_LANE_DEPTH_FACTOR: usize = 2;
 /// figure is not reachable from [`SessionManagerConfig`].
 const MAX_CONCURRENT_START_SESSIONS: usize = 256;
 
-/// Concurrent session-server admission waits, held below the lane size so a slow server refuses
+/// Concurrent session-exit admission waits, held below the lane size so a slow server refuses
 /// with `Busy` instead of parking every handler.
 ///
 /// The session server bounds its own worker pool by the same figure: a permit is released when the
@@ -3783,7 +3783,7 @@ pub struct IncomingSessionPixConfig {
     /// How long a paid PIX Session is kept after its data plane ends, awaiting its client's return.
     ///
     /// A client that reconnects under its paid pseudonym (see
-    /// [`SessionClientConfig::pseudonym`](crate::SessionClientConfig::pseudonym)) would otherwise be
+    /// [`SessionEntryConfig::pseudonym`](crate::SessionEntryConfig::pseudonym)) would otherwise be
     /// refused for as long as the old slot lives, and would then pay a second deposit for a quota it
     /// has not used up. When the data plane of an Exit-side PIX Session ends because the client closed
     /// or dropped it (`EmptyRead`), and a cycle of the Session is paid for or the
@@ -4542,7 +4542,7 @@ impl PixToolbox {
 /// from the counterparty overrides the estimate and restores production immediately, which is what
 /// makes it safe to act on an estimate that forward-path loss can inflate.
 ///
-/// This mechanism is configurable via the `surb_management` field in [`SessionClientConfig`].
+/// This mechanism is configurable via the `surb_management` field in [`SessionEntryConfig`].
 ///
 /// ### Possible scenarios
 ///
@@ -6565,7 +6565,7 @@ where
         &self,
         destination: Address,
         target: SessionTarget,
-        mut cfg: SessionClientConfig,
+        mut cfg: SessionEntryConfig,
     ) -> errors::Result<HoprSession> {
         // Every PIX Session is resumable and no other is, whatever the caller passed.
         if cfg.capabilities.contains(Capability::UsePIX) {
@@ -13641,7 +13641,7 @@ mod tests {
             .new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: None.into(),
                     pseudonym: alice_pseudonym.into(),
                     surb_management: None,
@@ -13711,7 +13711,7 @@ mod tests {
             .new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: None.into(),
                     pseudonym: alice_pseudonym.into(),
                     surb_management: None,
@@ -13780,7 +13780,7 @@ mod tests {
                 .new_session(
                     self.bob,
                     SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().expect("valid address"))),
-                    SessionClientConfig {
+                    SessionEntryConfig {
                         capabilities: None.into(),
                         pseudonym: self.pseudonym.into(),
                         surb_management: None,
@@ -13855,7 +13855,7 @@ mod tests {
                 mgr.new_session(
                     bob,
                     SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    SessionClientConfig {
+                    SessionEntryConfig {
                         capabilities: None.into(),
                         pseudonym: pseudonym.into(),
                         surb_management: None,
@@ -13957,7 +13957,7 @@ mod tests {
             .new_session(
                 (&ChainKeypair::random()).into(),
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: None.into(),
                     surb_management: None,
                     ..Default::default()
@@ -14080,7 +14080,7 @@ mod tests {
         assert!(alice_mgr.is_started());
 
         let alice_pseudonym = HoprPseudonym::random();
-        let client_cfg = SessionClientConfig {
+        let client_cfg = SessionEntryConfig {
             capabilities: None.into(),
             pseudonym: alice_pseudonym.into(),
             surb_management: None,
@@ -14250,7 +14250,7 @@ mod tests {
             .new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: None.into(),
                     pseudonym: None,
                     surb_management: None,
@@ -16270,7 +16270,7 @@ mod tests {
             .new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: None.into(),
                     pseudonym: HoprPseudonym::random().into(),
                     surb_management: None,
@@ -19214,7 +19214,7 @@ mod tests {
 
     /// A teardown on a reused pseudonym must present *its own* admission's token, not the successor's.
     ///
-    /// The pseudonym is client-chosen (`SessionClientConfig::pseudonym`) and freely reusable, so
+    /// The pseudonym is client-chosen (`SessionEntryConfig::pseudonym`) and freely reusable, so
     /// "close Session A, open Session B on the same pseudonym" is a real sequence, not an exotic
     /// one. A's retire is deliberately deferred past the packet pipeline's SURB-resolution window —
     /// A's own return-routed notification needs its ring while the resolution stage looks it up — so
@@ -19786,7 +19786,7 @@ mod tests {
                 alice_mgr.new_session(
                     bob_peer,
                     SessionTarget::TcpStream(target.clone()),
-                    SessionClientConfig {
+                    SessionEntryConfig {
                         pseudonym: alice_pseudonym.into(),
                         capabilities: Capability::Segmentation.into(),
                         surb_management: Some(balancer_cfg),
@@ -20281,7 +20281,7 @@ mod tests {
                 .new_session(
                     peer_address,
                     SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    SessionClientConfig {
+                    SessionEntryConfig {
                         surb_management: None,
                         ..Default::default()
                     },
@@ -20808,7 +20808,7 @@ mod tests {
     /// An offer this node cannot read is refused before the session server is troubled with it: no
     /// decision could rescue it, and the round trip would be spent to reach the same answer.
     #[test_log::test(tokio::test)]
-    async fn an_unreadable_offer_is_refused_without_asking_the_session_server() -> anyhow::Result<()> {
+    async fn an_unreadable_offer_is_refused_without_asking_the_session_exit() -> anyhow::Result<()> {
         let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let asked_by_handler = asked.clone();
         let (admission, handler) = spawn_admission_handler(move |_| {
@@ -21084,7 +21084,7 @@ mod tests {
             .new_session(
                 (&hopr_api::types::crypto::keypairs::ChainKeypair::random()).into(),
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: Some(HoprPseudonym::random()),
                     capabilities: Capability::Segmentation.into(),
                     surb_management: None,
@@ -21655,7 +21655,7 @@ mod tests {
     /// multiplication must make an overflowing candidate a refusal rather than a wrapped match.
     #[test]
     fn dynamic_ssa_batches_choose_the_smallest_satisfying_batch() {
-        // Through `effective_for` with an empty decision, which is the no-session-server path and
+        // Through `effective_for` with an empty decision, which is the no-session-exit path and
         // so yields exactly the node's configured policy.
         let config = |quota_range, ssas_per_request| {
             IncomingSessionPixConfig {
@@ -21850,7 +21850,7 @@ mod tests {
             .new_session(
                 Address::from(&ChainKeypair::random()),
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     surb_management: None,
                     ..Default::default()
                 },
@@ -21895,7 +21895,7 @@ mod tests {
             .new_session(
                 Address::from(&ChainKeypair::random()),
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     surb_management: None,
                     ..Default::default()
                 },
@@ -21956,7 +21956,7 @@ mod tests {
             .new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: None.into(),
                     pseudonym: None,
                     surb_management: None,
@@ -24663,7 +24663,7 @@ mod tests {
             mgr.new_session(
                 (&ChainKeypair::random()).into(),
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities,
                     pseudonym: pseudonym.into(),
                     surb_management: balancer_target.map(|target_surb_buffer_size| SurbBalancerConfig {
@@ -25347,7 +25347,7 @@ mod tests {
             .new_session(
                 Address::from(&ChainKeypair::random()),
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
@@ -25406,7 +25406,7 @@ mod tests {
             .new_session(
                 Address::from(&ChainKeypair::random()),
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
@@ -27838,7 +27838,7 @@ mod tests {
             .new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: None.into(),
                     surb_management: None,
@@ -32927,7 +32927,7 @@ mod tests {
     async fn start_session_sent_by_entry(
         forward_receipts: bool,
         with_sink: bool,
-        client: SessionClientConfig,
+        client: SessionEntryConfig,
     ) -> anyhow::Result<StartInitiation<SessionTarget, HoprSessionCapabilities>> {
         let mgr = SessionManager::new(SessionManagerConfig {
             initiation_timeout_base: Duration::from_millis(100),
@@ -32964,7 +32964,7 @@ mod tests {
             .new_session(
                 peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: HoprPseudonym::random().into(),
                     ..client
                 },
@@ -32982,7 +32982,7 @@ mod tests {
 
         let one: BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }> = 1.try_into()?;
         let relay: Address = (&ChainKeypair::random()).into();
-        let client = || SessionClientConfig {
+        let client = || SessionEntryConfig {
             capabilities: None.into(),
             forward_path_options: RoutingOptions::Hops(one),
             ..Default::default()
@@ -32995,7 +32995,7 @@ mod tests {
                 "no SURB management",
                 true,
                 true,
-                SessionClientConfig {
+                SessionEntryConfig {
                     surb_management: None,
                     ..client()
                 },
@@ -33005,7 +33005,7 @@ mod tests {
                 "no rate control",
                 true,
                 true,
-                SessionClientConfig {
+                SessionEntryConfig {
                     capabilities: Capability::NoRateControl.into(),
                     ..client()
                 },
@@ -33015,7 +33015,7 @@ mod tests {
                 "zero hops",
                 true,
                 true,
-                SessionClientConfig {
+                SessionEntryConfig {
                     forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
                     ..client()
                 },
@@ -33025,7 +33025,7 @@ mod tests {
                 "explicit path",
                 true,
                 true,
-                SessionClientConfig {
+                SessionEntryConfig {
                     forward_path_options: RoutingOptions::IntermediatePath(vec![relay.into()].try_into()?),
                     ..client()
                 },
@@ -33259,7 +33259,7 @@ mod tests {
                 mgr.new_session(
                     (&ChainKeypair::random()).into(),
                     SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    SessionClientConfig {
+                    SessionEntryConfig {
                         capabilities: Capabilities::empty(),
                         pseudonym: pseudonym.into(),
                         surb_management: Some(initial),
@@ -33406,7 +33406,7 @@ mod tests {
                 mgr.new_session(
                     (&ChainKeypair::random()).into(),
                     SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    SessionClientConfig {
+                    SessionEntryConfig {
                         capabilities: Capabilities::empty(),
                         pseudonym: pseudonym.into(),
                         surb_management: None,
@@ -33484,7 +33484,7 @@ mod tests {
                 mgr.new_session(
                     (&ChainKeypair::random()).into(),
                     SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    SessionClientConfig {
+                    SessionEntryConfig {
                         capabilities: Capabilities::empty(),
                         pseudonym: pseudonym.into(),
                         surb_management: None,
@@ -34061,8 +34061,8 @@ mod tests {
         })
     }
 
-    fn entry_cfg(capabilities: Capabilities, pseudonym: Option<HoprPseudonym>) -> SessionClientConfig {
-        SessionClientConfig {
+    fn entry_cfg(capabilities: Capabilities, pseudonym: Option<HoprPseudonym>) -> SessionEntryConfig {
+        SessionEntryConfig {
             capabilities,
             pseudonym,
             surb_management: None,
@@ -34087,7 +34087,7 @@ mod tests {
             self.mgr.pix_ledgers.get(pseudonym)
         }
 
-        async fn connect(&self, cfg: SessionClientConfig) -> anyhow::Result<HoprSession> {
+        async fn connect(&self, cfg: SessionEntryConfig) -> anyhow::Result<HoprSession> {
             timeout(
                 Duration::from_secs(5),
                 self.mgr.new_session(
@@ -35088,8 +35088,8 @@ mod tests {
     }
 
     /// An Entry that balances SURBs, so that its setup outlasts the Exit's reply.
-    fn balanced_entry_cfg(pseudonym: HoprPseudonym) -> SessionClientConfig {
-        SessionClientConfig {
+    fn balanced_entry_cfg(pseudonym: HoprPseudonym) -> SessionEntryConfig {
+        SessionEntryConfig {
             surb_management: Some(SurbBalancerConfig {
                 target_surb_buffer_size: 100,
                 max_surbs_per_sec: 100,

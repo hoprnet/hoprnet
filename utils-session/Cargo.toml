@@ -52,10 +52,10 @@ tracing = { workspace = true }
 hopr-api = { workspace = true }
 # The workspace entry carries no defaults, so this crate states the ones it relies on: the PIX
 # curve and the announcement transport are part of the network-wide build choice, not of the
-# entity. `session-client` is the only Session surface this crate uses.
+# entity. `session-entry` is the only Session surface this crate uses.
 hopr-lib = { workspace = true, features = [
   "pix-bjj",
-  "session-client",
+  "session-entry",
   "transport-announce-quic",
 ] }
 hopr-utils = { workspace = true, features = ["network-types"] }

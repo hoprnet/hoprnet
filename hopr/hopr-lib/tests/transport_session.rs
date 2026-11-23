@@ -1,7 +1,7 @@
 use hopr_lib::testing::fixtures::{
     MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture,
 };
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 use {
     futures::future::try_join_all, hopr_chain_connector::blokli_client::BlokliQueryClient,
     hopr_lib::api::types::primitive::prelude::HoprBalance, hopr_lib::testing::hopr::ChannelGuard,
@@ -18,7 +18,7 @@ const FUNDING_AMOUNT: &str = "500 wxHOPR";
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// Tests n-hop session establishment over a fully connected channel network.
 ///
 /// Creates a cluster sized exactly to `hops + 2` nodes (0-hop: 2, 1-hop: 3, etc.)
@@ -111,7 +111,7 @@ use std::{str::FromStr, time::Duration};
 use anyhow::Context;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use hopr_lib::{
-    api::node::HoprSessionClientOperations,
+    api::node::HoprSessionEntryOperations,
     exports::{
         network::types::prelude::{IpOrHost, SealedHost},
         transport::{SessionCapability, session::counters::routing_resolution_surb_timeout_count},
@@ -144,7 +144,7 @@ async fn verify_session_echo(
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// 0-hop bidirectional data flow through a HOPR session.
 async fn capture_direct_session() -> anyhow::Result<()> {
     let cluster = cluster_fixture(vec![TestNodeConfig::default(); 2]);
@@ -159,7 +159,7 @@ async fn capture_direct_session() -> anyhow::Result<()> {
         .connect_to(
             dst.address(),
             hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            hopr_lib::HoprSessionClientConfig {
+            hopr_lib::HoprSessionEntryConfig {
                 forward_path: 0.try_into()?,
                 return_path: 0.try_into()?,
                 capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
@@ -179,7 +179,7 @@ async fn capture_direct_session() -> anyhow::Result<()> {
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// 1-hop bidirectional data flow through a HOPR session via a relay.
 ///
 /// SURB balancing is not used — with `max_surbs_per_data_packet: usize::MAX`, each small
@@ -214,7 +214,7 @@ async fn capture_one_hop_session() -> anyhow::Result<()> {
         .connect_to(
             dst.address(),
             hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            hopr_lib::HoprSessionClientConfig {
+            hopr_lib::HoprSessionEntryConfig {
                 forward_path: 1.try_into()?,
                 return_path: 1.try_into()?,
                 capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
@@ -326,8 +326,8 @@ fn surb_report_cluster(notify_period: Option<Duration>) -> hopr_lib::testing::fi
 fn surb_report_session_config(
     capabilities: hopr_lib::SessionCapabilities,
     surb_target: Option<u64>,
-) -> anyhow::Result<hopr_lib::HoprSessionClientConfig> {
-    Ok(hopr_lib::HoprSessionClientConfig {
+) -> anyhow::Result<hopr_lib::HoprSessionEntryConfig> {
+    Ok(hopr_lib::HoprSessionEntryConfig {
         forward_path: hopr_lib::HopRouting::try_from(0usize)?,
         return_path: hopr_lib::HopRouting::try_from(0usize)?,
         capabilities,
@@ -425,7 +425,7 @@ async fn open_session_without_a_balancer(
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn an_entry_without_a_balancer_triggers_no_surb_drops(
     #[case] capabilities: hopr_lib::SessionCapabilities,
 ) -> anyhow::Result<()> {
@@ -453,7 +453,7 @@ async fn an_entry_without_a_balancer_triggers_no_surb_drops(
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn an_idle_session_without_a_balancer_originates_nothing_it_cannot_pay_for(
     #[case] capabilities: hopr_lib::SessionCapabilities,
 ) -> anyhow::Result<()> {
@@ -493,7 +493,7 @@ async fn an_idle_session_without_a_balancer_originates_nothing_it_cannot_pay_for
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn a_balanced_entry_is_not_starved_by_the_exits_reports(
     #[case] capabilities: hopr_lib::SessionCapabilities,
 ) -> anyhow::Result<()> {

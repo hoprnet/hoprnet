@@ -102,20 +102,20 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_session as session;
-#[cfg(all(feature = "session-client", any(feature = "exit", feature = "raw-exit")))]
+#[cfg(all(feature = "session-entry", any(feature = "exit", feature = "raw-exit")))]
 use hopr_transport_session::HoprSessionInPixEvent;
 // Named by the PIX toolbox slot in `run_inner`, which a pure relay always leaves empty.
 use hopr_transport_session::PixToolbox;
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 use hopr_transport_session::SessionManager;
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 use hopr_transport_session::{AdmissionToken, DispatchResult, SessionManagerConfig, SurbAdmissionControl};
 #[cfg(any(feature = "entry", feature = "exit", feature = "raw-exit"))]
 use hopr_transport_session::{AgreedSsaQuota, HoprSessionOutPixEvent};
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, InvalidPixParams, LOCAL_PIX_SUITE, PixParams, SESSION_MTU, SURB_SIZE, ServiceId,
-    SessionAdmissionReply, SessionAdmissionSink, SessionClientConfig, SessionId, SessionTarget, StartErrorReason,
+    SessionAdmissionReply, SessionAdmissionSink, SessionEntryConfig, SessionId, SessionTarget, StartErrorReason,
     SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
@@ -135,7 +135,7 @@ use tracing::{Instrument, debug, warn};
 
 #[cfg(any(feature = "entry", feature = "exit", feature = "raw-exit"))]
 use crate::config::PixGlobalConfig;
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 use crate::constants::{SESSION_INITIATION_MAX_RESENDS, SESSION_INITIATION_RESEND_INTERVAL, SESSION_INITIATION_TIMEOUT_BASE};
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
@@ -195,16 +195,16 @@ lazy_static::lazy_static! {
 /// traffic far exceeds the reverse, since the Exit then drains almost nothing — turned every
 /// overshot SURB into an immediate eviction of the oldest entry. Under PIX that is a lost SSA share,
 /// not just a lost SURB, because a share reaches the reconstructor only when its SURB is used.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 const SURB_BUFFER_TARGET_NUMERATOR: usize = 2;
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 const SURB_BUFFER_TARGET_DENOMINATOR: usize = 3;
 
 /// Largest SURB buffer target a Session may request, given the ring buffer capacity backing it.
 ///
 /// Kept strictly below `rb_capacity` so the balancer has somewhere to overshoot into before the
 /// ring buffer starts overwriting. See [`SURB_BUFFER_TARGET_NUMERATOR`].
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
     // Saturating rather than wrapping: an operator-supplied capacity is only range-validated at the
     // low end, and the multiplication would otherwise overflow on an absurd value.
@@ -219,14 +219,14 @@ const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
 /// component. It is pure delegation: the manager already knows when a Session becomes established
 /// and when it is torn down, and the store already owns the sizing and the idempotency, so the
 /// adapter adds no policy of its own.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 struct StoreSurbAdmission {
     store: MemorySurbStore,
     /// Its pending SURBs are written off when a new generation wipes the counterparty's stock.
     round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl SurbAdmissionControl for StoreSurbAdmission {
     fn admit(&self, pseudonym: &SessionId, expected_surbs: usize) -> AdmissionToken {
         AdmissionToken::from_raw(self.store.admit(pseudonym, expected_surbs))
@@ -273,7 +273,7 @@ fn counter_flush_ack_grace(flush_interval: Duration) -> Duration {
 }
 
 /// The environment variable that overrides `session.surb_degraded_notify_period`, in milliseconds.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 const SURB_DEGRADED_NOTIFY_PERIOD_ENV: &str = "HOPR_SESSION_SURB_DEGRADED_NOTIFY_PERIOD_MS";
 
 /// The Exit's degraded SURB notification period: `raw` (the environment override) when it parses as
@@ -282,7 +282,7 @@ const SURB_DEGRADED_NOTIFY_PERIOD_ENV: &str = "HOPR_SESSION_SURB_DEGRADED_NOTIFY
 /// The floor is `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`, enforced once in `SessionManager::new`. A period at or
 /// above the normal one reports no faster, and `spawn_exit_keep_alive` treats it as disabled rather than
 /// switching between two equal cadences.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn surb_degraded_notify_period_override(raw: Option<&str>, configured: Option<Duration>) -> Option<Duration> {
     raw.and_then(|s| s.parse::<u64>().ok())
         .map(|ms| Some(Duration::from_millis(ms)))
@@ -338,7 +338,7 @@ async fn dispatch_incoming_messages<G, In, Out>(
     rx_from_protocol: In,
     probe_classifier: hopr_transport_probe::ProbeClassifierState<G>,
     unresolved_routing_msg_tx_for_task: HoprMessageSender,
-    #[cfg(feature = "session-client")] smgr: Arc<HoprSessionManager>,
+    #[cfg(feature = "session-entry")] smgr: Arc<HoprSessionManager>,
     on_incoming_data_tx: Out,
 ) where
     G: NetworkGraphUpdate + Clone + Send + Sync + 'static,
@@ -378,7 +378,7 @@ async fn dispatch_incoming_messages<G, In, Out>(
             // thread-local decrement on the fast path and only actually yields
             // (~every 128 polls) when the budget is exhausted, giving co-located
             // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
-            #[cfg(feature = "session-client")]
+            #[cfg(feature = "session-entry")]
             let result = match smgr.dispatch_message(pseudonym, data) {
                 Ok(DispatchResult::Processed) => {
                     tracing::trace!("message dispatch completed");
@@ -403,7 +403,7 @@ async fn dispatch_incoming_messages<G, In, Out>(
             };
             // Without the session stack nothing owns a Session, so every packet is unrelated and
             // passes straight through to the caller.
-            #[cfg(not(feature = "session-client"))]
+            #[cfg(not(feature = "session-entry"))]
             let result = {
                 let _ = pseudonym;
                 Some(data)
@@ -429,7 +429,7 @@ async fn dispatch_incoming_messages<G, In, Out>(
         .await;
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// HOPR protocol specific instantiation of the SessionManager.
 type HoprSessionManager = SessionManager<HoprMessageSender>;
 
@@ -437,7 +437,7 @@ type HoprSessionManager = SessionManager<HoprMessageSender>;
 ///
 /// The configurator does not prevent the Session from being closed
 /// or the Session manager from being dropped.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Debug, Clone)]
 pub struct HoprSessionConfigurator {
     id: SessionId,
@@ -449,7 +449,7 @@ pub struct HoprSessionConfigurator {
     smgr: std::sync::Weak<HoprSessionManager>,
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl HoprSessionConfigurator {
     /// [`SessionId`] of the session this object can configure.
     pub fn id(&self) -> &SessionId {
@@ -543,7 +543,7 @@ pub struct HoprTransport<Chain, Graph, Net> {
     /// SURB round-trip counters and per-relayer health, shared with the planner.
     surb_round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
     my_multiaddresses: Vec<Multiaddr>,
-    #[cfg(feature = "session-client")]
+    #[cfg(feature = "session-entry")]
     smgr: Arc<HoprSessionManager>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
@@ -674,7 +674,7 @@ where
         //
         // A build without the session stack never reaches this: the manager is the one object that
         // owns every Session on the node, so nothing else references it either.
-        #[cfg(feature = "session-client")]
+        #[cfg(feature = "session-entry")]
         let smgr = Arc::new(SessionManager::new(SessionManagerConfig {
             frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
                 .ok()
@@ -728,7 +728,7 @@ where
         // not — land in the store's quarantine class and are capped and expired like any
         // unauthenticated peer's (hoprnet#8515). The `let _ =` matches the seam's contract: the
         // manager is freshly constructed here, so nothing can have set it yet.
-        #[cfg(feature = "session-client")]
+        #[cfg(feature = "session-entry")]
         let _ = smgr.set_surb_admission(Arc::new(StoreSurbAdmission {
             store: path_planner.surb_store.clone(),
             round_trips: surb_round_trips.clone(),
@@ -743,7 +743,7 @@ where
         // scope. Violating it does not break the node — quarantine still resolves the SURBs — but
         // the excess Sessions would silently fall back to the 16-SURB cap, so it is surfaced loudly
         // rather than left to be diagnosed from eviction metrics later.
-        #[cfg(feature = "session-client")]
+        #[cfg(feature = "session-entry")]
         if cfg.packet.surb_store.admitted_max_pseudonyms < cfg.session.maximum_managed_sessions {
             tracing::error!(
                 admitted_max_pseudonyms = cfg.packet.surb_store.admitted_max_pseudonyms,
@@ -762,7 +762,7 @@ where
             path_planner,
             surb_round_trips,
             my_multiaddresses,
-            #[cfg(feature = "session-client")]
+            #[cfg(feature = "session-entry")]
             smgr,
             chain_api: resolver,
             session_telemetry_tag_allocator,
@@ -915,7 +915,7 @@ where
     /// Internal worker driving all node-type variants of `HoprTransport::run_*`.
     ///
     /// Branches on `role`:
-    /// - `protocol::NodeType::Relay`: full packet pipeline (+ SessionManager when `session-client` is on).
+    /// - `protocol::NodeType::Relay`: full packet pipeline (+ SessionManager when `session-entry` is on).
     /// - `protocol::NodeType::Exit`: ack-drain pipeline + incoming Sessions.
     /// - `protocol::NodeType::Entry`: no ack pipeline, no incoming Sessions.
     #[allow(clippy::too_many_arguments)]
@@ -1348,7 +1348,7 @@ where
         //
         // Absent without the session stack: a role that cannot run a Session has nothing for the
         // manager to admit or establish, so neither the manager nor its processes exist.
-        #[cfg(feature = "session-client")]
+        #[cfg(feature = "session-entry")]
         {
             let smgr_start_res = if role.accepts_incoming_sessions() {
                 self.smgr.start(
@@ -1382,7 +1382,7 @@ where
 
         // Without the session stack nothing consumes the pieces above; keep them out of the
         // unused-variable warnings rather than gating every producer of them.
-        #[cfg(not(feature = "session-client"))]
+        #[cfg(not(feature = "session-entry"))]
         let _ = (pix_toolbox, on_incoming_session, on_session_admission);
         // -- periodic counter flush
         let flush_counters = self.counters.clone();
@@ -1417,7 +1417,7 @@ where
         tracing::info!(?role, "starting surb round-trip flush task");
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
-        #[cfg(feature = "session-client")]
+        #[cfg(feature = "session-entry")]
         let surb_flush_smgr = self.smgr.clone();
         let surb_flush_planner = self.path_planner.clone();
         #[cfg(feature = "telemetry")]
@@ -1432,7 +1432,7 @@ where
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
                 let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval));
-                #[cfg(feature = "session-client")]
+                #[cfg(feature = "session-entry")]
                 let mut invalid = std::collections::HashMap::new();
                 while ticks.next().await.is_some() {
                     let now_ms = hopr_utils::platform::time::native::current_time()
@@ -1473,9 +1473,9 @@ where
                     // `REFILL_PACING_SECS`) the paths can carry. The session is asked first: a session
                     // the manager no longer knows is only forgotten, its generation is not advanced
                     // (that would leave a stray entry in the store and log a bump for a closed session).
-                    #[cfg(not(feature = "session-client"))]
+                    #[cfg(not(feature = "session-entry"))]
                     let _ = reached;
-                    #[cfg(feature = "session-client")]
+                    #[cfg(feature = "session-entry")]
                     for pseudonym in reached {
                         if !surb_flush_smgr.on_counterparty_surbs_wiped(&pseudonym) {
                             surb_round_trips.forget_session(&pseudonym);
@@ -1501,7 +1501,7 @@ where
                     //
                     // Only a build with the session stack has SURB marks to correct; the round-trip
                     // registry the flush reads from is maintained by that same stack.
-                    #[cfg(feature = "session-client")]
+                    #[cfg(feature = "session-entry")]
                     let current = if surb_round_trips.has_write_offs() {
                         let registry = surb_round_trips.clone();
                         match hopr_utils::parallelize::cpu::spawn_blocking(move || registry.invalid(), "surb_invalid")
@@ -1516,7 +1516,7 @@ where
                     } else {
                         std::collections::HashMap::new()
                     };
-                    #[cfg(feature = "session-client")]
+                    #[cfg(feature = "session-entry")]
                     for (session, (count, share)) in protocol::surb_telemetry::invalid_updates(&invalid, &current) {
                         if !surb_flush_smgr.set_invalid_surbs(&session, count, share) {
                             surb_round_trips.forget_session(&session);
@@ -1526,7 +1526,7 @@ where
                             tracing::info!(%session, "clearing invalid SURBs");
                         }
                     }
-                    #[cfg(feature = "session-client")]
+                    #[cfg(feature = "session-entry")]
                     {
                         invalid = current;
                     }
@@ -1575,7 +1575,7 @@ where
         // and actively drain the stream; see hopr-lib builder for the reference drain.
         let (on_incoming_data_tx, on_incoming_data_rx) =
             bounded_sink_channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
-        #[cfg(feature = "session-client")]
+        #[cfg(feature = "session-entry")]
         let smgr = self.smgr.clone();
         let unresolved_routing_msg_tx_for_task = unresolved_routing_msg_tx.clone();
         processes.insert(
@@ -1585,7 +1585,7 @@ where
                     rx_from_protocol,
                     probe_classifier,
                     unresolved_routing_msg_tx_for_task,
-                    #[cfg(feature = "session-client")]
+                    #[cfg(feature = "session-entry")]
                     smgr,
                     on_incoming_data_tx,
                 )
@@ -1637,15 +1637,15 @@ where
 
     /// Opens an outgoing Session towards `destination`.
     ///
-    /// Absent without the `session-client` feature: a node that does not run Sessions has nothing
+    /// Absent without the `session-entry` feature: a node that does not run Sessions has nothing
     /// to open one with.
-    #[cfg(feature = "session-client")]
+    #[cfg(feature = "session-entry")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn new_session(
         &self,
         destination: Address,
         target: SessionTarget,
-        cfg: SessionClientConfig,
+        cfg: SessionEntryConfig,
     ) -> errors::Result<(HoprSession, HoprSessionConfigurator)> {
         let session = self.smgr.new_session(destination, target, cfg).await?;
         let id = *session.id();
@@ -1905,11 +1905,11 @@ async fn dispatch_share_resolution(
     resolution: HoprShareResolution,
 ) -> Option<PixEvent> {
     // No manager means nothing owns a Session, so the resolution has no one to be reported to.
-    #[cfg(not(feature = "session-client"))]
+    #[cfg(not(feature = "session-entry"))]
     let _ = smgr;
     match resolution {
         ShareResolution::RecoveredSsa(ssa_recovery_event) => {
-            #[cfg(feature = "session-client")]
+            #[cfg(feature = "session-entry")]
             if let Some(smgr) = smgr.as_ref()
                 && let Err(error) = smgr
                     .dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_recovery_event.ssa_id))
@@ -1920,9 +1920,9 @@ async fn dispatch_share_resolution(
             Some(recovered_ssa_to_pix_event(&ssa_recovery_event))
         }
         ShareResolution::AlmostRecoveredSsa(ssa_id) => {
-            #[cfg(not(feature = "session-client"))]
+            #[cfg(not(feature = "session-entry"))]
             let _ = ssa_id;
-            #[cfg(feature = "session-client")]
+            #[cfg(feature = "session-entry")]
             if let Some(smgr) = smgr.as_ref()
                 && let Err(error) = smgr
                     .dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
@@ -1941,7 +1941,7 @@ async fn dispatch_share_resolution(
                 %peer, %ssa_id, observed_total,
                 "first RP relayer sent acknowledgement indicating invalid PIX share from Entry"
             );
-            #[cfg(feature = "session-client")]
+            #[cfg(feature = "session-entry")]
             if let Some(smgr) = smgr.as_ref()
                 && let Err(error) = smgr
                     .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
@@ -1967,7 +1967,7 @@ async fn dispatch_share_resolution(
                 recovered_polynomials = progress.recovered_polynomials,
                 "pix recovery progress"
             );
-            #[cfg(feature = "session-client")]
+            #[cfg(feature = "session-entry")]
             if let Some(smgr) = smgr.as_ref()
                 && let Err(error) = smgr
                     .dispatch_pix_event(HoprSessionInPixEvent::RecoveryProgress(progress))

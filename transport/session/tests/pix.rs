@@ -24,7 +24,7 @@ use hopr_protocol_pix::{
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
-    HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixParams, PixToolbox, SessionClientConfig,
+    HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixParams, PixToolbox, SessionEntryConfig,
     SessionManager, SessionManagerConfig, SessionTarget, SupervisorConfig, SurbBalancerConfig,
     testing::{answering_deposit_pool, answering_deposit_pool_after, mock_packet_planning, msg_type},
 };
@@ -280,7 +280,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target.clone()),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
@@ -554,7 +554,7 @@ async fn a_dropped_ssa_commit_is_repaired_by_a_scoped_retransmission() -> Result
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target.clone()),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
@@ -792,7 +792,7 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::Segmentation.into(),
                     surb_management: None,
@@ -960,7 +960,7 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target.clone()),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
@@ -1363,7 +1363,7 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
@@ -2557,7 +2557,7 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
         alice_mgr.new_session(
             bob_peer,
             SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-            SessionClientConfig {
+            SessionEntryConfig {
                 pseudonym: alice_pseudonym.into(),
                 capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                 surb_management: None,
@@ -2757,7 +2757,7 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
             alice_mgr.new_session(
                 bob_peer,
                 free_target.clone(),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: free_pseudonym.into(),
                     capabilities: Capability::Segmentation.into(),
                     surb_management: None,
@@ -2799,7 +2799,7 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
         alice_mgr.new_session(
             bob_peer,
             paid_target,
-            SessionClientConfig {
+            SessionEntryConfig {
                 pseudonym: paid_pseudonym.into(),
                 capabilities: Capability::Segmentation.into(),
                 surb_management: None,

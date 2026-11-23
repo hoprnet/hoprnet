@@ -1035,7 +1035,7 @@ impl NodeType {
     ///
     /// A source (Edge) node only establishes Sessions, so it neither admits nor is asked about
     /// them.
-    #[cfg(all(feature = "entry", feature = "session-client"))]
+    #[cfg(all(feature = "entry", feature = "session-entry"))]
     pub(crate) const fn accepts_incoming_sessions(self) -> bool {
         !matches!(self, NodeType::Entry)
     }
@@ -1043,7 +1043,7 @@ impl NodeType {
     /// Whether this role admits incoming Sessions and therefore needs a session admission channel.
     ///
     /// Without the `entry` role every compiled role does.
-    #[cfg(all(not(feature = "entry"), feature = "session-client"))]
+    #[cfg(all(not(feature = "entry"), feature = "session-entry"))]
     pub(crate) const fn accepts_incoming_sessions(self) -> bool {
         true
     }

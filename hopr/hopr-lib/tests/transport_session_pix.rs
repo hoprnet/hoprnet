@@ -13,16 +13,16 @@ use hopr_lib::testing::fixtures::{
     MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, build_role_cluster,
     build_role_cluster_with_exit_server, chain_propagation_delay,
 };
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 use {
     anyhow::Context,
     futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt},
     hopr_api::types::primitive::prelude::HoprBalance,
     hopr_chain_connector::blokli_client::BlokliQueryClient,
     hopr_lib::{
-        HoprSessionClientConfig,
+        HoprSessionEntryConfig,
         api::node::{
-            HasChainApi, HasExitIncentivization, HasTransportApi, HoprSessionClientOperations,
+            HasChainApi, HasExitIncentivization, HasTransportApi, HoprSessionEntryOperations,
             IncentiveChannelOperations, PixDepositData, PixEvent,
         },
         exports::{
@@ -88,7 +88,7 @@ const SSA_BATCH: usize = 3;
 /// [`capture_n_hop_pix_session`] case completes 3 cycles well inside a minute — because the point of
 /// the bound is not to be tight. It is to turn "the Exit stopped requesting SSAs" into a named
 /// failure instead of a bare `rstest` timeout that says only that the test did not finish.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[allow(unexpected_cfgs)]
 const BATCH_OBSERVATION_BUDGET: Duration = if cfg!(coverage) {
     Duration::from_secs(300)
@@ -107,7 +107,7 @@ const BATCH_OBSERVATION_BUDGET: Duration = if cfg!(coverage) {
 /// reset by traffic arriving on it. Leaving the Entry at the fixture default of 2.5 s therefore
 /// evicts it a few seconds into any test where the Exit is legitimately quiet — which reads exactly
 /// like the Exit tearing the Session down.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn build_pix_cluster(
     hops: usize,
     exit_pix: IncomingSessionPixConfig,
@@ -122,7 +122,7 @@ async fn build_pix_cluster(
 /// Only [`batched_ssa_request_drives_pix_cycles`] needs this. The batch size is not negotiated, so an
 /// Exit asking for more SSAs per request than the Entry accepts has every request refused — raising
 /// one side means raising the other in step, and this is the other side.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn build_pix_cluster_with_entry_cap(
     hops: usize,
     exit_pix: IncomingSessionPixConfig,
@@ -147,7 +147,7 @@ async fn build_pix_cluster_with_entry_cap(
 /// life and never hands it back, so there is no way to *close* one from a test; a
 /// [`SessionCaptureServer`](hopr_lib::testing::dummies::SessionCaptureServer) parks instead and hands
 /// the `IncomingSession` out, which is what makes the Exit-side close reachable at all.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn build_pix_cluster_with_exit_server<Srv>(
     hops: usize,
     exit_pix: IncomingSessionPixConfig,
@@ -155,7 +155,7 @@ async fn build_pix_cluster_with_exit_server<Srv>(
     exit_server: Srv,
 ) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard>
 where
-    Srv: hopr_api::node::HoprSessionServer<
+    Srv: hopr_api::node::HoprSessionExit<
             Session = hopr_lib::exports::transport::IncomingSession,
             Error: std::fmt::Display,
         > + Clone
@@ -168,7 +168,7 @@ where
 }
 
 /// The cluster the three builders above are all a special case of.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn build_pix_cluster_with<Srv>(
     hops: usize,
     exit_pix: IncomingSessionPixConfig,
@@ -178,7 +178,7 @@ async fn build_pix_cluster_with<Srv>(
     entry_establish_retry_timeout: Option<Duration>,
 ) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard>
 where
-    Srv: hopr_api::node::HoprSessionServer<
+    Srv: hopr_api::node::HoprSessionExit<
             Session = hopr_lib::exports::transport::IncomingSession,
             Error: std::fmt::Display,
         > + Clone
@@ -216,7 +216,7 @@ where
 }
 
 /// Opens bidirectional channels along Entry → relays → Exit and waits for the graph.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn open_path_channels(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
@@ -262,7 +262,7 @@ async fn open_path_channels(
 }
 
 /// Connects Entry → Exit with PIX enabled.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn establish_pix_session(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
@@ -282,7 +282,7 @@ async fn establish_pix_session(
 ///   default here and what most of these tests use, but it is the rate-controlled branch that every gnosis client opens
 ///   — and the only one on which the Entry announces its SURB buffer target, which is what fill's reserve is derived
 ///   from. [`idle_session_is_completed_by_exit_fill`] runs over both.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn establish_pix_session_with(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
@@ -293,14 +293,14 @@ async fn establish_pix_session_with(
 }
 
 /// As [`establish_pix_session_with`], but with the number of SURBs each organic data packet may carry
-/// under the caller's control (`HoprSessionClientConfig::max_surbs_per_data_packet`).
+/// under the caller's control (`HoprSessionEntryConfig::max_surbs_per_data_packet`).
 ///
 /// Everything else here pins it to `1`, which follows the Entry's SURB balancer: a packet carries a
 /// SURB only while the Exit is estimated to be below the balancer's target. `usize::MAX` lifts the cap,
 /// so every packet carries as many SURBs as fit beside its payload, whatever the balancer says. That is
 /// the production shape [`capture_n_hop_pix_session`] needs to reproduce an Entry that out-produces its
 /// Exit.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn establish_pix_session_with_surbs(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
@@ -320,7 +320,7 @@ async fn establish_pix_session_with_surbs(
         cluster.entry.inner().connect_to(
             cluster.exit.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            HoprSessionClientConfig {
+            HoprSessionEntryConfig {
                 forward_path: routing,
                 return_path: routing,
                 capabilities,
@@ -415,7 +415,7 @@ async fn try_establish_pix_session_under_with(
 /// Entry announced — a quarter of [`idle_surb_balancer`]'s 64 on the rate-controlled branch, and a
 /// quarter of the Exit's own fallback on the `NoRateControl` branch, which announces no target at
 /// all. Overriding it here would test the override rather than the derivation.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn fill_pix_config(fill: hopr_lib::exports::transport::session::PixFillConfig) -> IncomingSessionPixConfig {
     IncomingSessionPixConfig {
         resume_window: IncomingSessionPixConfig::default().resume_window,
@@ -438,7 +438,7 @@ fn fill_pix_config(fill: hopr_lib::exports::transport::session::PixFillConfig) -
 }
 
 /// A PIX lifecycle milestone the fill tests wait on, with when it happened.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PixMilestone {
     /// A deposit was asked for and signalled.
@@ -458,7 +458,7 @@ enum PixMilestone {
 /// Every deposit is signalled and every deposit-data request is answered with empty data, which is
 /// what the deposit pool this cluster does not have would do. The tests then only have to say which
 /// milestones they are waiting for.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn spawn_exit_pix_driver(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
 ) -> (
@@ -529,7 +529,7 @@ fn spawn_exit_pix_driver(
 /// round trips in a couple of seconds, which at [`PIX_PARAMS`]' 32-packet cycles is several whole
 /// cycles — enough to leave the Exit's SURB FIFO holding a run of share-less SURBs minted between one
 /// cycle and the next, which no rate of fill can get past before the idle deadline.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn echo_n(session: &mut hopr_lib::HoprSession, count: usize, pace: Duration) -> usize {
     let mut completed = 0usize;
     for _ in 0..count {
@@ -558,7 +558,7 @@ async fn echo_n(session: &mut hopr_lib::HoprSession, count: usize, pace: Duratio
 }
 
 /// Collects milestones until `done` accepts the set, or the budget expires.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn await_milestones(
     rx: &mut futures::channel::mpsc::UnboundedReceiver<(PixMilestone, std::time::Instant)>,
     budget: Duration,
@@ -591,7 +591,7 @@ async fn await_milestones(
 /// Production does not have the problem: the shipped 7 000 SURBs against a 454 656-packet cycle is
 /// one per cent of a cycle, so the share-less run between cycles is a rounding error rather than the
 /// whole buffer.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn idle_surb_balancer() -> hopr_lib::SurbBalancerConfig {
     hopr_lib::SurbBalancerConfig {
         // Two cycles at PIX_PARAMS' 8 x (2 + 2) emitted shares.
@@ -606,7 +606,7 @@ fn idle_surb_balancer() -> hopr_lib::SurbBalancerConfig {
 /// Shares only travel with data-packet acknowledgements, so a PIX cycle makes no progress without
 /// traffic. The stop *reason* is reported rather than a bare "died" flag because the three ways this
 /// loop can end are not equivalent evidence — see [`EchoStop`].
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn spawn_echo_task(
     session: hopr_lib::HoprSession,
     stopped: EchoStopCell,
@@ -648,7 +648,7 @@ fn spawn_echo_task(
 /// while the Session is very much alive. Only the write side distinguishes them — a PIX closure sends
 /// the Entry a `SessionError`, the Entry closes its own half, and the next write fails; a gate stall
 /// never fails a write.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EchoStop {
     /// The Session is closed: the write half is gone.
@@ -659,7 +659,7 @@ enum EchoStop {
     ReadTimedOut,
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl EchoStop {
     /// Whether this outcome actually establishes that the Session was closed.
     fn is_closure(self) -> bool {
@@ -668,11 +668,11 @@ impl EchoStop {
 }
 
 /// Shared slot the echo task reports its stop reason into, with the instant it happened.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Clone, Default)]
 struct EchoStopCell(std::sync::Arc<std::sync::Mutex<Option<(EchoStop, std::time::Instant)>>>);
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl EchoStopCell {
     fn set(&self, stop: EchoStop) {
         let mut guard = self.0.lock().expect("echo stop cell poisoned");
@@ -684,7 +684,7 @@ impl EchoStopCell {
     }
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1, 1)]
 #[case(1, usize::MAX)]
@@ -913,7 +913,7 @@ async fn capture_n_hop_pix_session(
 ///   against `max_deposit_wait`. Every other clock is configured far out of reach, so no other deadline can land inside
 ///   the asserted window: the commitment clock is 60 s *and* was cleared when the commitment verified, recovery
 ///   deadlines need a funded cycle, and the idle timeouts are 90 s.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -1093,7 +1093,7 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
 /// (`surb_balance_notify_period: None`) so that eviction tests can work. In production it is what
 /// keeps the Entry's own session slot from idling out while the Exit is quiet; here the long
 /// `idle_timeout` passed to `build_pix_cluster` stands in for it.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -1234,7 +1234,7 @@ async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) ->
 /// Shares only travel with data-packet acknowledgements, so the deadline is provoked by funding the
 /// SSA while no traffic is flowing and then waiting it out. Recovery makes no progress in that
 /// window, and the backstop fires. Traffic starts afterwards purely to observe the closure.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -1385,7 +1385,7 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
 /// rather than from this node's own fallback. Fill itself is unaffected by the shaping, since the
 /// keep-alive stream carries its own rate controller rather than riding the data path's, and this is
 /// what says so rather than leaving it to be inferred from the code.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1, false)]
 #[case(1, true)]
@@ -1501,7 +1501,7 @@ async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize, #[case] rat
 /// [`PIX_PARAMS`]' 32-packet cycle against the 45 s aim point, fill alone needs about forty seconds,
 /// so closing a few seconds in leaves most of the cycle outstanding — and no successor may be funded
 /// after the close, since a drained Session has no quota left to serve one with.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1, true)]
 #[case(1, false)]
@@ -1633,7 +1633,7 @@ async fn a_closed_exit_session_drains_its_surbs_into_the_funded_cycle(
 /// the start. A planner replaying its opening rate would over-send by however much the application
 /// already contributed; one that never re-planned at all would keep filling at the heartbeat it fell
 /// to while the application was busy, and the cycle would strand.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -1707,7 +1707,7 @@ async fn fill_resumes_after_organic_traffic_stops(#[case] hops: usize) -> anyhow
 /// a real cluster: an application sending far above the required rate completes its cycles and keeps
 /// echoing throughout, so the extra stream neither starves the data path of SURBs nor wedges the
 /// egress gate behind its own traffic.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -1758,7 +1758,7 @@ async fn fill_yields_to_organic_traffic(#[case] hops: usize) -> anyhow::Result<(
 /// precisely so that it cannot stall the node — sends nothing and the cycle strands exactly as it
 /// would have before. Its sibling above, with fill disabled outright, isolates the deadline itself;
 /// this one shows that turning fill *on* does not disarm it.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -1853,7 +1853,7 @@ async fn recovery_hard_deadline_closes_a_session_fill_cannot_supply(#[case] hops
 ///
 /// `SessionManager` has a unit test for the rejection itself; what this adds is that it surfaces to
 /// the client as a failed `connect_to` rather than being swallowed somewhere in the Start protocol.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -1892,7 +1892,7 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
         cluster.entry.inner().connect_to(
             cluster.exit.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            HoprSessionClientConfig {
+            HoprSessionEntryConfig {
                 forward_path: routing,
                 return_path: routing,
                 capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
@@ -1950,7 +1950,7 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
 ///     rolling.
 ///  3. **Indices are contiguous and addresses unique** across both batches — a batch is allocated as `first .. first +
 ///     batch`, and a wrapped or reused index would collide with a live cycle.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -2195,7 +2195,7 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
         cluster.entry.inner().connect_to(
             cluster.exit.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            HoprSessionClientConfig {
+            HoprSessionEntryConfig {
                 forward_path: routing,
                 return_path: routing,
                 // Rate control on, which is the branch on which the Entry announces a target at

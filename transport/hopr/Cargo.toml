@@ -43,14 +43,14 @@ tracing-context = ["hopr-utils-tracing/tracing-context"]
 # no `hopr-lib` entity enables it. They are the transport side of the entity split, whose entity
 # sets in `hopr-lib` are `edge`, `relay` and `exit`.
 relay = []
-entry = ["session-client"]
-exit = ["relay", "session-server"]
-raw-exit = ["session-server"]
+entry = ["session-entry"]
+exit = ["relay", "session-exit"]
+raw-exit = ["session-exit"]
 # The session stack: the `SessionManager` wiring, incoming-Session admission and the client-side
-# Session API. `session-server` implies `session-client` because both are served by one manager and
+# Session API. `session-exit` implies `session-entry` because both are served by one manager and
 # an Exit establishes Sessions on its return path too.
-session-client = []
-session-server = ["session-client"]
+session-entry = []
+session-exit = ["session-entry"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`, making PIX stealth addresses
 # Baby JubJub public keys instead of Ethereum addresses. Default, because it is what
 # production settles.

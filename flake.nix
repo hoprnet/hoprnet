@@ -344,7 +344,7 @@
 
             # One library build per entity: the `hopr-lib` artifact a binary for that role links,
             # so CI compiles the fence in every combination the entity documentation promises rather
-            # than only the default one. The basic division is edge <-> relay <-> exit.
+            # than only the default one. The basic division is entry <-> relay <-> exit.
             #
             # All three come from this one definition, and differ only in `cargoExtraArgs`. That is
             # what keeps them off each other's toes and shared with the release library build: the
@@ -356,7 +356,7 @@
             # The PIX curve and the announcement transport are network-wide choices, not entity ones,
             # so each set states them explicitly: the crate defaults carry them, and
             # `--no-default-features` would otherwise drop them.
-            library-edge = entityLibrary "--no-default-features -F edge,pix-bjj,transport-announce-quic";
+            library-entry = entityLibrary "--no-default-features -F entry,pix-bjj,transport-announce-quic";
             library-relay = entityLibrary "--no-default-features -F relay,pix-bjj,transport-announce-quic";
             library-exit = entityLibrary "--no-default-features -F exit,pix-bjj,transport-announce-quic";
 

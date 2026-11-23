@@ -5,8 +5,8 @@
 //! 1. **Identity** — `HoprBuilder` → `HoprBuilder::with_identity`
 //! 2. **Configuration** — `HoprBuilderWithIdentity::with_config`
 //! 3. **Component factories** — chain API, graph, network, and cover-traffic
-//! 4. **Session server** (when the `session-server` feature is enabled) — `HoprBuilderConfigured::with_session_server`
-//! 5. **Build** — `build_edge` for the source edge, `build_relay` for a relay, `build_exit` for an exit (a relay that
+//! 4. **Session server** (when the `session-exit` feature is enabled) — `HoprBuilderConfigured::with_session_exit`
+//! 5. **Build** — `build_entry` for the source edge, `build_relay` for a relay, `build_exit` for an exit (a relay that
 //!    also terminates Sessions).
 //!
 //! # Example
@@ -51,7 +51,7 @@ use hopr_api::{
     types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection},
 };
 use hopr_transport::HoprTransport;
-#[cfg(any(feature = "session-server", all(feature = "session-client", feature = "relay")))]
+#[cfg(any(feature = "session-exit", all(feature = "session-entry", feature = "relay")))]
 use hopr_transport::IncomingSession;
 use hopr_utils::{
     network_types::{
@@ -109,9 +109,9 @@ struct BuildParts<Chain, Graph, Net, Ct, Dump = ()> {
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     // Read only by the relay and exit builds; a source node hands the transport no session
     // channels at all.
-    #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
-    #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
     admission_tx: Option<hopr_transport::SessionAdmissionSink>,
     processes: AbortableList<HoprLibProcess>,
 }
@@ -198,11 +198,11 @@ impl HoprBuilderWithIdentity {
 
 /// Configured builder accepting factory closures for components.
 ///
-/// When the `session-server` feature is enabled, `with_session_server`
+/// When the `session-exit` feature is enabled, `with_session_exit`
 /// must be called before building — it returns a `HoprBuilderWithSession` which
-/// has the `build_edge` / `build_relay` / `build_exit` methods.
+/// has the `build_entry` / `build_relay` / `build_exit` methods.
 ///
-/// When the feature is disabled, `build_edge` / `build_relay` are available directly.
+/// When the feature is disabled, `build_entry` / `build_relay` are available directly.
 pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = (), Dump = ()> {
     ctx: BuildCtx,
     state_dump_factory: Dump,
@@ -333,19 +333,19 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
     /// Attaches a session server for handling incoming sessions.
     ///
     /// Eagerly spawns the server task and returns a [`HoprBuilderWithSession`]
-    /// that has the `build_edge` / `build_relay` / `build_exit` methods.
+    /// that has the `build_entry` / `build_relay` / `build_exit` methods.
     ///
     /// Two tasks are spawned, not one, because the server is consulted at two different points in a
     /// Session's life. `admit` is asked while the peer's request is still being negotiated and no
     /// Session exists yet; `process` is handed the established byte-stream. Sharing one channel
     /// would put a long-lived `process` in front of the admission decisions queued behind it.
-    #[cfg(feature = "session-server")]
-    pub fn with_session_server(
+    #[cfg(feature = "session-exit")]
+    pub fn with_session_exit(
         self,
         // `Sync` on top of what `process` alone needed: the server is now driven from two
         // independent tasks, and `admit` carries a default body, which `async_trait` can only make
         // `Send` by requiring `&Self` to cross threads.
-        server: impl hopr_api::node::HoprSessionServer<Session = IncomingSession, Error: std::fmt::Display>
+        server: impl hopr_api::node::HoprSessionExit<Session = IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -398,13 +398,13 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
 
         tracing::debug!(capacity = incoming_session_capacity, "spawning session server");
         let session_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
-            "session_server_for_each_concurrent",
+            "session_exit_for_each_concurrent",
             module_path!(),
             file!(),
             line!(),
         );
         let handle = hopr_utils::spawn_as_abortable_named!(
-            "hopr_lib_session_server",
+            "hopr_lib_session_exit",
             session_rx
                 .for_each_concurrent(None, move |session| {
                     let server = server.clone();
@@ -420,7 +420,7 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
                     })
                 })
                 .inspect(|_| tracing::warn!(
-                    task = %HoprLibProcess::SessionServer,
+                    task = %HoprLibProcess::SessionExit,
                     "long-running background task finished"
                 ))
         );
@@ -439,10 +439,10 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
 // HoprBuilderWithSession — session server attached, ready to build
 // ---------------------------------------------------------------------------
 
-/// Builder with a session server attached. Has `build_edge` / `build_relay` / `build_exit`.
+/// Builder with a session server attached. Has `build_entry` / `build_relay` / `build_exit`.
 ///
-/// Only exists when the `session-server` feature is enabled.
-#[cfg(feature = "session-server")]
+/// Only exists when the `session-exit` feature is enabled.
+#[cfg(feature = "session-exit")]
 pub struct HoprBuilderWithSession<Chain = (), Graph = (), Net = (), Ct = (), Dump = ()> {
     inner: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
@@ -480,9 +480,9 @@ struct PreHopr<Chain, Graph, Net> {
     processes: AbortableList<HoprLibProcess>,
     // Read only by the relay and exit builds; a source node hands the transport no session
     // channels at all.
-    #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
-    #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
     admission_tx: Option<hopr_transport::SessionAdmissionSink>,
 }
 
@@ -563,9 +563,9 @@ where
 {
     let BuildParts {
         configured,
-        #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+        #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
         session_tx,
-        #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+        #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
         admission_tx,
         mut processes,
     } = parts;
@@ -944,9 +944,9 @@ where
             ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
             pix_event_subscribers: (ssa_tx, ssa_rx.deactivate()),
             processes,
-            #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+            #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
             session_tx,
-            #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+            #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
             admission_tx,
         },
         (cover_traffic, network, network_process),
@@ -1001,7 +1001,7 @@ macro_rules! impl_build_methods {
         /// Body of the source-node build.
         ///
         /// Shared, not duplicated: the entity is one role, so there is one body and one log line.
-        #[cfg(feature = "edge")]
+        #[cfg(feature = "entry")]
         async fn build_source<TFact>(
             self,
             ticket_factory: TFact,
@@ -1038,8 +1038,8 @@ macro_rules! impl_build_methods {
         ///
         /// The edge entity runs the transport's Entry role: it does not process tickets, has no
         /// ticket manager state, and accepts no incoming sessions.
-        #[cfg(feature = "edge")]
-        pub async fn build_edge<TFact>(
+        #[cfg(feature = "entry")]
+        pub async fn build_entry<TFact>(
             self,
             ticket_factory: TFact,
         ) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
@@ -1202,10 +1202,10 @@ macro_rules! impl_build_methods {
                 let _ = with_pix;
                 None
             };
-            #[cfg(feature = "session-client")]
+            #[cfg(feature = "session-entry")]
             let (session_tx, admission_tx) = (Some(pre.session_tx.clone()), pre.admission_tx.clone());
             // Without the session stack a relay admits no Sessions, so there is nothing to hand over.
-            #[cfg(not(feature = "session-client"))]
+            #[cfg(not(feature = "session-entry"))]
             let (session_tx, admission_tx) = (None, None);
             let (socket, transport_processes) = pre
                 .transport_api
@@ -1242,12 +1242,12 @@ macro_rules! impl_build_methods {
     };
 }
 
-// Generate the two session-server variants with a real reporter bound when enabled,
+// Generate the two session-exit variants with a real reporter bound when enabled,
 // and specialize both directly to `()` when disabled. There is no placeholder trait.
 macro_rules! impl_node_builders {
     ([$($dump:tt)*], [$($dump_arg:tt)*]) => {
-        // When session-server is ON: build methods only on HoprBuilderWithSession
-        #[cfg(feature = "session-server")]
+        // When session-exit is ON: build methods only on HoprBuilderWithSession
+        #[cfg(feature = "session-exit")]
         impl<Chain, Graph, Net, Ct $($dump)*> HoprBuilderWithSession<Chain, Graph, Net, Ct, Dump>
         where
             Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -1262,17 +1262,17 @@ macro_rules! impl_node_builders {
 
             fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct $($dump_arg)*> {
                 let mut processes = AbortableList::<HoprLibProcess>::default();
-                processes.insert(HoprLibProcess::SessionServer, self.session_handle);
+                processes.insert(HoprLibProcess::SessionExit, self.session_handle);
                 processes.insert(HoprLibProcess::SessionAdmission, self.admission_handle);
                 BuildParts {
                     configured: self.inner,
                     #[cfg(all(
-                        feature = "session-client",
+                        feature = "session-entry",
                         any(feature = "relay", feature = "exit")
                     ))]
                     session_tx: self.session_tx,
                     #[cfg(all(
-                        feature = "session-client",
+                        feature = "session-entry",
                         any(feature = "relay", feature = "exit")
                     ))]
                     admission_tx: Some(self.admission_tx),
@@ -1281,8 +1281,8 @@ macro_rules! impl_node_builders {
             }
         }
 
-        // When session-server is OFF: build methods directly on HoprBuilderConfigured
-        #[cfg(not(feature = "session-server"))]
+        // When session-exit is OFF: build methods directly on HoprBuilderConfigured
+        #[cfg(not(feature = "session-exit"))]
         impl<Chain, Graph, Net, Ct $($dump)*> HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>
         where
             Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -1301,7 +1301,7 @@ macro_rules! impl_node_builders {
                     // No session server was attached, so nothing can ever arrive on this channel. The
                     // receiver is dropped here, which the transport treats as "no incoming Sessions".
                     #[cfg(all(
-                        feature = "session-client",
+                        feature = "session-entry",
                         any(feature = "relay", feature = "exit")
                     ))]
                     session_tx: {
@@ -1309,7 +1309,7 @@ macro_rules! impl_node_builders {
                         tx
                     },
                     #[cfg(all(
-                        feature = "session-client",
+                        feature = "session-entry",
                         any(feature = "relay", feature = "exit")
                     ))]
                     admission_tx: None,

@@ -17,12 +17,12 @@ use tracing::info;
 
 #[cfg(feature = "explicit-path")]
 #[allow(deprecated)]
-use crate::HoprSessionClientExplicitPathConfig;
+use crate::HoprSessionEntryExplicitPathConfig;
 use crate::{
-    HopRouting, HoprSessionClientConfig, SessionCapabilities, SurbBalancerConfig,
+    HopRouting, HoprSessionEntryConfig, SessionCapabilities, SurbBalancerConfig,
     api::{
         network::NetworkView,
-        node::{HasNetworkView, HoprNodeOperations, HoprSessionClientOperations, HoprState},
+        node::{HasNetworkView, HoprNodeOperations, HoprSessionEntryOperations, HoprState},
         types::{
             crypto::{
                 keypairs::Keypair,
@@ -196,7 +196,7 @@ impl ClusterGuard {
             .connect_to(
                 path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                HoprSessionClientConfig {
+                HoprSessionEntryConfig {
                     forward_path: routing,
                     return_path: routing,
                     capabilities,
@@ -245,7 +245,7 @@ impl ClusterGuard {
             .connect_to_using_explicit_path(
                 path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                HoprSessionClientExplicitPathConfig {
+                HoprSessionEntryExplicitPathConfig {
                     forward_path,
                     return_path,
                     capabilities: Default::default(),
@@ -982,7 +982,7 @@ pub async fn build_role_cluster_with_exit_server<Srv>(
     exit_server: Srv,
 ) -> anyhow::Result<RoleClusterGuard>
 where
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync

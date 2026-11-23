@@ -23,15 +23,15 @@ pub(crate) const MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE: usize = 16;
 
 /// Time within Start protocol must finish session initiation.
 /// This base value is multiplied by (forward hops + return hops + 2).
-#[cfg_attr(not(feature = "session-client"), allow(dead_code))]
+#[cfg_attr(not(feature = "session-entry"), allow(dead_code))]
 pub(crate) const SESSION_INITIATION_TIMEOUT_BASE: Duration = Duration::from_secs(5);
 
 /// First gap before an unanswered `StartSession` is repeated; each further gap doubles.
-#[cfg_attr(not(feature = "session-client"), allow(dead_code))]
+#[cfg_attr(not(feature = "session-entry"), allow(dead_code))]
 pub(crate) const SESSION_INITIATION_RESEND_INTERVAL: Duration = Duration::from_secs(1);
 
 /// How many times an unanswered `StartSession` is repeated (at +1, +3 and +7 s with the interval above).
-#[cfg_attr(not(feature = "session-client"), allow(dead_code))]
+#[cfg_attr(not(feature = "session-entry"), allow(dead_code))]
 pub(crate) const SESSION_INITIATION_MAX_RESENDS: u32 = 3;
 
 #[cfg(test)]

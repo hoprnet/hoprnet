@@ -143,7 +143,7 @@ pub type Capabilities = flagset::FlagSet<Capability>;
 /// Relevant primarily for the client, since the server is only
 /// a reactive component in regard to the session concept.
 #[derive(Debug, PartialEq, Clone, smart_default::SmartDefault)]
-pub struct SessionClientConfig {
+pub struct SessionEntryConfig {
     /// The forward path options for the session.
     #[default(RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN))]
     pub forward_path_options: RoutingOptions,

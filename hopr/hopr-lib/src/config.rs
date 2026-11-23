@@ -43,7 +43,7 @@ pub struct SafeModule {
     pub module_address: Address,
 }
 
-#[cfg(feature = "session-server")]
+#[cfg(feature = "session-exit")]
 #[inline]
 fn default_incoming_session_capacity() -> usize {
     256
@@ -100,8 +100,8 @@ pub struct HoprLibConfig {
     pub out_index_sync_period: Duration,
     /// Capacity of the incoming session channel (number of buffered sessions).
     ///
-    /// Only relevant when the `session-server` feature is enabled. Default is 256.
-    #[cfg(feature = "session-server")]
+    /// Only relevant when the `session-exit` feature is enabled. Default is 256.
+    #[cfg(feature = "session-exit")]
     #[default(default_incoming_session_capacity())]
     #[cfg_attr(feature = "serde", serde(default = "default_incoming_session_capacity"))]
     pub incoming_session_capacity: usize,

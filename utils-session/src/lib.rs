@@ -28,12 +28,12 @@ use hopr_api::{
 #[cfg(not(feature = "explicit-path"))]
 use hopr_lib::HopRouting;
 #[cfg(feature = "explicit-path")]
-use hopr_lib::HoprSessionClientExplicitPathConfig;
+use hopr_lib::HoprSessionEntryExplicitPathConfig;
 #[cfg(feature = "explicit-path")]
 use hopr_lib::api::types::internal::routing::RoutingOptions;
 use hopr_lib::{
-    Hopr, HoprSessionClientConfig,
-    api::{network::NetworkView, node::HoprSessionClientOperations, types::primitive::prelude::Address},
+    Hopr, HoprSessionEntryConfig,
+    api::{network::NetworkView, node::HoprSessionEntryOperations, types::primitive::prelude::Address},
     errors::HoprLibError,
     exports::transport::{
         HoprSession, HoprSessionConfigurator, OffchainPublicKey, SURB_SIZE, ServiceId, SessionId, SessionTarget,
@@ -326,7 +326,7 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     TMgr: Send + Sync + 'static,
 {
-    type Cfg = HoprSessionClientConfig;
+    type Cfg = HoprSessionEntryConfig;
 
     async fn create_session(
         &self,
@@ -334,7 +334,7 @@ where
         target: SessionTarget,
         cfg: Self::Cfg,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
-        Ok(HoprSessionClientOperations::connect_to(self.hopr.as_ref(), dest, target, cfg).await?)
+        Ok(HoprSessionEntryOperations::connect_to(self.hopr.as_ref(), dest, target, cfg).await?)
     }
 
     fn routing_from_cfg(&self, cfg: &Self::Cfg) -> Result<(Routing, Routing), anyhow::Error> {
@@ -400,7 +400,7 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     TMgr: Send + Sync + 'static,
 {
-    type Cfg = HoprSessionClientExplicitPathConfig;
+    type Cfg = HoprSessionEntryExplicitPathConfig;
 
     async fn create_session(
         &self,

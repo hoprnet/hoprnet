@@ -92,7 +92,7 @@ where
 /// Builds an entry (source) HOPR node with a custom chain connector.
 pub async fn build_entry_with_chain<
     Chain,
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -124,7 +124,7 @@ where
         chain_connector,
     )?;
 
-    let node = builder.with_session_server(server).build_edge(ticket_factory).await?;
+    let node = builder.with_session_exit(server).build_entry(ticket_factory).await?;
 
     Ok(Arc::new(node))
 }
@@ -132,7 +132,7 @@ where
 /// Builds a relay HOPR node with a custom chain connector.
 pub async fn build_relay_with_chain<
     Chain,
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -165,7 +165,7 @@ where
     )?;
 
     let node = builder
-        .with_session_server(server)
+        .with_session_exit(server)
         .build_relay(ticket_manager, ticket_factory)
         .await?;
 
@@ -178,7 +178,7 @@ where
 /// manager like [`build_relay_with_chain`] does.
 pub async fn build_exit_with_chain<
     Chain,
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -211,7 +211,7 @@ where
     )?;
 
     let node = builder
-        .with_session_server(server)
+        .with_session_exit(server)
         .build_exit(ticket_manager, ticket_factory)
         .await?;
 
@@ -360,8 +360,8 @@ pub(crate) mod tests {
                     graph_for_ct,
                 )
             })
-            .with_session_server(crate::testing::dummies::EchoServer::default())
-            .build_edge(ticket_factory)
+            .with_session_exit(crate::testing::dummies::EchoServer::default())
+            .build_entry(ticket_factory)
             .await?;
 
         let started = tokio::time::timeout(std::time::Duration::from_secs(5), started_rx)

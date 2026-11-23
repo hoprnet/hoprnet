@@ -37,7 +37,7 @@ const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// Funds a channel with a small budget and verifies that the relay eventually
 /// rejects tickets once the channel is exhausted by a combination of test
 /// traffic and background probing.
@@ -118,7 +118,7 @@ async fn relaying_message_rejected_when_channel_out_of_funding(
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// Sends a fixed number of messages so tickets accumulate, then calls
 /// `redeem_all_tickets` and asserts unredeemed value shrinks while redeemed grows.
 async fn redeem_ticket_on_request(
@@ -196,7 +196,7 @@ async fn redeem_ticket_on_request(
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// Demonstrates that closing channels without redeeming moves ticket value into
 /// the neglected bucket by closing both paths after traffic has flowed.
 async fn neglect_ticket_on_closing(
@@ -284,7 +284,7 @@ async fn neglect_ticket_on_closing(
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// Lowers the sender's win probability and confirms the relay receives fewer
 /// winning tickets by comparing statistics before and after traffic relay.
 async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
@@ -440,7 +440,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// Drops the cluster-wide minimum win probability threshold and asserts session
 /// creation fails when relay win probability is insufficient.
 async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
@@ -481,7 +481,7 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// Keeps relay win probability above the minimum, relays traffic, redeems all
 /// tickets and asserts the statistics reflect the successful redemptions.
 async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(

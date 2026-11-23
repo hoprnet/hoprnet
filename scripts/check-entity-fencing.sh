@@ -12,8 +12,8 @@
 # fence (an unresolvable path is "absent" everywhere).
 #
 # Usage: scripts/check-entity-fencing.sh [entity ...]
-#   Without arguments it checks every entity. Entities: edge, relay, exit — the basic division is
-#   edge <-> relay <-> exit.
+#   Without arguments it checks every entity. Entities: entry, relay, exit — the basic division is
+#   entry <-> relay <-> exit.
 #
 # The fixture crates live in a temporary directory and are their own workspaces, so they resolve
 # `hopr-lib` through the same path dependency this repository uses. They share the workspace target
@@ -48,6 +48,10 @@ publish = false
 [dependencies]
 hopr-lib = { path = "${repo_root}/hopr/hopr-lib", default-features = false, features = ["${features}"] }
 EOF
+  # The fixture is its own workspace, so it takes the repository's lockfile and `[patch]` section to
+  # resolve the same dependency versions as the real build.
+  cp "$repo_root/Cargo.lock" "$dir/Cargo.lock"
+  sed -n '/^\[patch\./,$p' "$repo_root/Cargo.toml" >>"$dir/Cargo.toml"
   printf '%s\n' "$code" >"$dir/src/lib.rs"
   cargo check --quiet --manifest-path "$dir/Cargo.toml" 2>&1
 }
@@ -120,55 +124,55 @@ expect_present() {
 BUILD_RELAY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_relay; }'
 BUILD_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_exit; }'
 SESSION_BUILDER='pub fn f() -> Option<hopr_lib::builder::HoprBuilderWithSession> { None }'
-BUILD_EDGE='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_edge; }'
+BUILD_ENTRY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_entry; }'
 RUN_RELAY='pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::run_relay; }'
 RELAY_CFG='pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { out_index_sync_period: core::time::Duration::from_secs(1), ..Default::default() } }'
 SESSION_CAP_CFG='pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { incoming_session_capacity: 1, ..Default::default() } }'
-WITH_SESSION_SERVER='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_server; }'
+WITH_SESSION_SERVER='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_exit; }'
 
-check_edge() {
-  # An edge relays nothing, runs no PIX exit, and admits no Sessions.
-  expect_present edge
-  expect_absent edge relay build_relay "$BUILD_RELAY"
-  expect_absent edge relay run_relay "$RUN_RELAY"
-  expect_absent edge relay out_index_sync_period "$RELAY_CFG"
-  expect_absent edge exit with_session_server "$WITH_SESSION_SERVER"
-  expect_absent edge exit HoprBuilderWithSession "$SESSION_BUILDER"
-  expect_absent edge exit incoming_session_capacity "$SESSION_CAP_CFG"
+check_entry() {
+  # An entry relays nothing, runs no PIX exit, and admits no Sessions.
+  expect_present entry
+  expect_absent entry relay build_relay "$BUILD_RELAY"
+  expect_absent entry relay run_relay "$RUN_RELAY"
+  expect_absent entry relay out_index_sync_period "$RELAY_CFG"
+  expect_absent entry exit with_session_exit "$WITH_SESSION_SERVER"
+  expect_absent entry exit HoprBuilderWithSession "$SESSION_BUILDER"
+  expect_absent entry exit incoming_session_capacity "$SESSION_CAP_CFG"
 }
 
 check_relay() {
   # A pure relay carries no Session stack, no PIX exit and no source role.
   expect_present relay
-  expect_absent relay edge build_edge "$BUILD_EDGE"
+  expect_absent relay entry build_entry "$BUILD_ENTRY"
   expect_absent relay exit HoprBuilderWithSession "$SESSION_BUILDER"
-  expect_absent relay edge HoprSessionClientConfig \
-    'pub fn f() -> Option<hopr_lib::HoprSessionClientConfig> { None }'
-  expect_absent relay edge new_session \
+  expect_absent relay entry HoprSessionEntryConfig \
+    'pub fn f() -> Option<hopr_lib::HoprSessionEntryConfig> { None }'
+  expect_absent relay entry new_session \
     'pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::new_session; }'
   expect_absent relay exit incoming_session_capacity "$SESSION_CAP_CFG"
-  expect_absent relay exit with_session_server "$WITH_SESSION_SERVER"
+  expect_absent relay exit with_session_exit "$WITH_SESSION_SERVER"
 }
 
 check_exit() {
   # The exit keeps the relay's ticket path and adds the Session server, but has no source role.
   expect_present exit
   expect_has exit build_exit "$BUILD_EXIT"
-  expect_absent exit edge build_edge "$BUILD_EDGE"
+  expect_absent exit entry build_entry "$BUILD_ENTRY"
 }
 
 entities=("$@")
 if [ ${#entities[@]} -eq 0 ]; then
-  entities=(edge relay exit)
+  entities=(entry relay exit)
 fi
 
 for entity in "${entities[@]}"; do
   case "$entity" in
-  edge) check_edge ;;
+  entry) check_entry ;;
   relay) check_relay ;;
   exit) check_exit ;;
   *)
-    echo "unknown entity: $entity (expected one of edge, relay, exit)" >&2
+    echo "unknown entity: $entity (expected one of entry, relay, exit)" >&2
     exit 2
     ;;
   esac

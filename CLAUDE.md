@@ -56,8 +56,8 @@ cargo nextest run -p hopr-lib --features testing --test 'cluster_throughput-size
 cargo nextest run -p hopr-lib --features testing --test 'cluster_throughput-size3' -j 1 --run-ignored all
 cargo nextest run -p hopr-lib --features testing --test 'cluster_throughput-size5' -j 1 --run-ignored all
 # OFAT matrices (all variants, ~60–120 s bootstrap). Needs `testing` too — the target declares it
-# as a required-feature, so `--features session-client` alone fails before anything is built:
-cargo nextest run -p hopr-lib --features testing,session-client --test 'cluster_throughput-matrix' -j 1 --run-ignored all
+# as a required-feature, so `--features session-entry` alone fails before anything is built:
+cargo nextest run -p hopr-lib --features testing,session-entry --test 'cluster_throughput-matrix' -j 1 --run-ignored all
 ```
 
 For profiling the packet pipeline against a real-QUIC cluster (mock chain):

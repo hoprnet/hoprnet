@@ -88,10 +88,10 @@ state-dump = [
   "hopr-network-graph?/state-dump",
   "hopr-transport-p2p?/state-dump",
 ]
-# Entity sets. The node split's basic functional division is `edge` <-> `relay` <-> `exit`, and each
+# Entity sets. The node split's basic functional division is `entry` <-> `relay` <-> `exit`, and each
 # set compiles in exactly one of those, fenced down into the components:
 #
-# * `edge`  — a source node: establishes Sessions, relays nothing, admits none.
+# * `entry` — a source node: establishes Sessions, relays nothing, admits none.
 # * `relay` — a pure relay: ticket and acknowledgement processing, no Session stack and no PIX.
 # * `exit`  — a relay that also terminates Sessions and resolves PIX shares. For now an exit keeps the
 #             relay capacity, so it builds with `build_exit`, which takes a ticket manager like a relay.
@@ -99,9 +99,9 @@ state-dump = [
 # Like every Cargo feature the sets are additive, so nothing in Cargo stops a build from enabling
 # several of them (the `testing` utility feature below enables two); a node build still takes
 # exactly one. `default` carries `relay`, which is what the workspace and its tests build today.
-edge = ["session-client", "hopr-transport/entry"]
+entry = ["session-entry", "hopr-transport/entry"]
 relay = ["hopr-transport/relay"]
-exit = ["relay", "session-server", "hopr-transport/exit"]
+exit = ["relay", "session-exit", "hopr-transport/exit"]
 default = ["pix-bjj", "transport-announce-quic", "relay"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]
@@ -142,17 +142,14 @@ serde = [
   "hopr-utils/serde",
   "hopr-transport/serde",
 ]
-session-client = [
-  "hopr-api/node-session-client",
-  "hopr-transport/session-client",
-]
-explicit-path = ["session-client"]
+session-entry = ["hopr-api/node-session-entry", "hopr-transport/session-entry"]
+explicit-path = ["session-entry"]
 # An Exit establishes Sessions on its return path, and one manager serves both directions, so the
 # server side carries the client side with it.
-session-server = [
-  "session-client",
-  "hopr-api/node-session-server",
-  "hopr-transport/session-server",
+session-exit = [
+  "session-entry",
+  "hopr-api/node-session-exit",
+  "hopr-transport/session-exit",
 ]
 transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
 
@@ -165,7 +162,7 @@ utils_parallel = [] # utility parallelization functionality
 profiling = ["dep:pprof"]
 
 testing = [
-  "edge",
+  "entry",
   "exit",
   "runtime-tokio",
   "dep:bytesize",

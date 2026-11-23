@@ -4147,9 +4147,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "6.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52fa34d384c9a17f088253c7f9292f940fef017f357f044ebcf67bb28a99ad05"
+version = "6.2.0"
+source = "git+https://github.com/hoprnet/hopr-api?rev=3794cecf182503b24f9de18188cf63856aadb573#3794cecf182503b24f9de18188cf63856aadb573"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -7497,7 +7496,7 @@ dependencies = [
  "quinn-udp 0.5.16",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -7537,7 +7536,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -7550,7 +7549,7 @@ checksum = "47091c86514c2e11452cb228dee77037334b99d92a23e4c69aa5982261f39247"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "windows-sys 0.61.2",
 ]
 
