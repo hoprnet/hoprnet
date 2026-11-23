@@ -11,9 +11,11 @@ use hopr_api::types::{
     primitive::prelude::BytesEncodable,
 };
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
+#[cfg(feature = "relay")]
+use hopr_protocol_hopr::IncomingForwardedPacket;
 use hopr_protocol_hopr::{
-    IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError,
-    OutgoingPacket, PacketDecoder, PacketEncoder,
+    IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingPacket, IncomingPacketError, OutgoingPacket,
+    PacketDecoder, PacketEncoder,
 };
 use hopr_utils::runtime::AbortHandle;
 use pcap_file::{
@@ -239,6 +241,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice((plain_text.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(plain_text.as_ref());
             }
+            #[cfg(feature = "relay")]
             PacketBeforeTransit::IncomingPacket {
                 packet: IncomingPacket::Forwarded(fwd_packet),
                 ..
@@ -355,6 +358,7 @@ impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
             tracing::debug!(%error, "failed to send incoming packet to capture");
         }
 
+        #[cfg(feature = "relay")]
         if let IncomingPacket::Forwarded(fwd_packet) = &packet {
             let IncomingForwardedPacket { next_hop, data, .. } = fwd_packet.as_ref();
 

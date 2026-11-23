@@ -1,3 +1,4 @@
+#[cfg(feature = "relaying")]
 use std::ops::Mul;
 
 use bytes::Bytes;
@@ -8,13 +9,17 @@ use hopr_api::{
 use hopr_crypto_packet::prelude::*;
 use hopr_utils::trace_timed;
 
+#[cfg(feature = "relaying")]
+use crate::IncomingForwardedPacket;
 use crate::{
-    AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
-    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError,
-    replay_filter::TagReplayFilter,
+    AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingPacket,
+    IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError, replay_filter::TagReplayFilter,
 };
 
 /// Default [decoder](PacketDecoder) implementation for HOPR packets.
+///
+/// Without the `relaying` feature the ticket-validation state is carried but unused.
+#[cfg_attr(not(feature = "relaying"), allow(dead_code))]
 pub struct HoprDecoder<Chain, S, T> {
     chain_api: Chain,
     surb_store: std::sync::Arc<S>,
@@ -58,6 +63,7 @@ where
         &self.replay_filter
     }
 
+    #[cfg(feature = "relaying")]
     #[tracing::instrument(skip(self, fwd), level = "debug", fields(path_pos = fwd.path_pos))]
     fn validate_and_replace_ticket(
         &self,
@@ -395,6 +401,7 @@ where
                 );
                 Ok(result)
             }
+            #[cfg(feature = "relaying")]
             HoprPacket::Forwarded(fwd) => {
                 // Phase 3: Ticket validation and replacement for forwarded packets
                 // Transform the ticket so it can be sent to the next hop
@@ -429,6 +436,12 @@ where
                     .into(),
                 ))
             }
+            // A node built without `relaying` has no ticket path to relay with: such a packet is dropped.
+            #[cfg(not(feature = "relaying"))]
+            HoprPacket::Forwarded(_) => Err(IncomingPacketError::ProcessingError(
+                previous_hop.into(),
+                HoprProtocolError::InvalidState("this node does not relay packets"),
+            )),
             HoprPacket::Outgoing(_) => {
                 #[cfg(feature = "trace-timing")]
                 tracing::trace!(

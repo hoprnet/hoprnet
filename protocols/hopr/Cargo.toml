@@ -20,7 +20,10 @@ include = [
 ]
 
 [features]
-default = ["rayon"]
+default = ["rayon", "relaying"]
+# Relaying: the `Forwarded` packet, its ticket validation and replacement in the decoder. A node that
+# only sends and receives (an entry) builds without it.
+relaying = []
 all-benchmarks = []
 rayon = ["hopr-crypto-packet/rayon", "hopr-utils/parallelize-rayon"]
 serde = [

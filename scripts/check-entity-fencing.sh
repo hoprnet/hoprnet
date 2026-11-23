@@ -151,17 +151,21 @@ expect_crate() {
   echo "ok: \`$crate\` is $mode with features [$features]"
 }
 
-# `$1`: entity set. `$2`: a `hopr-transport` feature that must stay off for it.
-expect_transport_feature_off() {
-  local features=$1 feature=$2
+# `$1`: entity set. `$2`: `on` or `off`. `$3`: crate. `$4`: its feature, which must be so for the set.
+expect_feature() {
+  local features=$1 state=$2 crate=$3 feature=$4
+  local enabled=no
   if cargo tree --quiet --manifest-path "$repo_root/Cargo.toml" -p hopr-lib --no-default-features \
-    --features "$features,pix-bjj,transport-announce-quic" -e features -i hopr-transport 2>/dev/null |
-    grep -q "hopr-transport feature \"$feature\""; then
-    echo "FENCE BROKEN: hopr-transport feature \`$feature\` is on with [$features]" >&2
+    --features "$features,pix-bjj,transport-announce-quic" -e features -i "$crate" 2>/dev/null |
+    grep -q "$crate feature \"$feature\""; then
+    enabled=yes
+  fi
+  if { [ "$state" = on ] && [ "$enabled" = no ]; } || { [ "$state" = off ] && [ "$enabled" = yes ]; }; then
+    echo "FENCE BROKEN: $crate feature \`$feature\` is not $state with [$features]" >&2
     failures=$((failures + 1))
     return
   fi
-  echo "ok: hopr-transport feature \`$feature\` is off with features [$features]"
+  echo "ok: $crate feature \`$feature\` is $state with features [$features]"
 }
 
 # Source snippets shared between the entities.
@@ -177,7 +181,8 @@ WITH_SESSION_SERVER='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigur
 check_entry() {
   # An entry relays nothing, runs no PIX exit, and admits no Sessions.
   expect_present entry
-  expect_transport_feature_off entry raw-exit
+  expect_feature entry off hopr-transport raw-exit
+  expect_feature entry off hopr-protocol-hopr relaying
   expect_absent entry relay build_relay "$BUILD_RELAY"
   expect_absent entry relay run_relay "$RUN_RELAY"
   expect_absent entry relay out_index_sync_period "$RELAY_CFG"
@@ -189,7 +194,8 @@ check_entry() {
 check_relay() {
   # A pure relay carries no Session stack, no PIX exit and no source role.
   expect_present relay
-  expect_transport_feature_off relay raw-exit
+  expect_feature relay off hopr-transport raw-exit
+  expect_feature relay on hopr-protocol-hopr relaying
   for crate in hopr-transport-session hopr-protocol-session hopr-protocol-start; do
     expect_crate relay absent "$crate"
     expect_crate entry linked "$crate"
@@ -208,7 +214,8 @@ check_relay() {
 check_exit() {
   # The exit keeps the relay's ticket path and adds the Session server, but has no source role.
   expect_present exit
-  expect_transport_feature_off exit raw-exit
+  expect_feature exit off hopr-transport raw-exit
+  expect_feature exit on hopr-protocol-hopr relaying
   expect_has exit build_exit "$BUILD_EXIT"
   expect_absent exit entry build_entry "$BUILD_ENTRY"
 }

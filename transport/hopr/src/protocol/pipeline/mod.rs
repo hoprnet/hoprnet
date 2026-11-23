@@ -328,6 +328,9 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     let ticket_proc_success = ticket_proc;
     let ticket_events_unack = ticket_events.clone();
     futures::pin_mut!(app_incoming);
+    // Only the forwarding branch uses these; a node built without `relay` forwards nothing.
+    #[cfg(not(feature = "relay"))]
+    let _ = (&wire_outgoing, &ticket_proc_success, &ticket_events_unack);
 
     let res = wire_incoming
         // Use `map().buffered()` (FuturesOrdered) instead of `then_concurrent()` (FuturesUnordered)
@@ -356,7 +359,9 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     Ok(Ok(Ok(packet))) => {
                         if let IncomingPacket::Final(packet) = &packet {
                             output_span.record("session_id", tracing::field::display(packet.sender));
-                        } else if let IncomingPacket::Forwarded(packet) = &packet
+                        }
+                        #[cfg(feature = "relay")]
+                        if let IncomingPacket::Forwarded(packet) = &packet
                             && !output_span.is_disabled()
                         {
                             output_span.record("next_hop", packet.next_hop.to_peerid_str());
@@ -482,7 +487,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                 }
                 IncomingPacket::Final(final_packet) => {
                     let mut ack_outgoing_success = ack_outgoing_success.clone();
-                    Either::Right(Either::Left(async move {
+                    Either::Right(final_branch(async move {
                         let IncomingFinalPacket {
                             previous_hop,
                             sender,
@@ -507,6 +512,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         Some(WithContext::new((sender, plain_text, info), output_span))
                     }))
                 }
+                #[cfg(feature = "relay")]
                 IncomingPacket::Forwarded(fwd_packet) => {
                     let ticket_proc = ticket_proc_success.clone();
                     let mut wire_outgoing = wire_outgoing.clone();
@@ -1012,6 +1018,18 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
         "long-running background task finished"
     );
 }
+/// Places the final-packet future in the branch type the packet match shares with the forwarding one.
+/// Without the `relay` feature there is no forwarding branch, so the unused side is a pending future.
+#[cfg(feature = "relay")]
+fn final_branch<A, B>(f: A) -> Either<A, B> {
+    Either::Left(f)
+}
+
+#[cfg(not(feature = "relay"))]
+fn final_branch<A: std::future::Future>(f: A) -> Either<A, std::future::Pending<A::Output>> {
+    Either::Left(f)
+}
+
 /// Node type for which the packet processing pipeline is being constructed.
 ///
 /// The three HOPR node types differ in how they treat tickets and incoming acknowledgements:
