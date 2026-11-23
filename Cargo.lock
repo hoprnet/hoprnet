@@ -4428,7 +4428,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.8.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4662,7 +4662,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.35.1"
+version = "0.36.0"
 dependencies = [
  "anyhow",
  "async-trait",
