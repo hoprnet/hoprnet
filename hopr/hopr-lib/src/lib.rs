@@ -16,13 +16,13 @@
 // build one are unused by design. Only that combination is affected; consumers that build a node
 // enable one of `edge`, `relay` or `exit`.
 #![cfg_attr(
-    not(any(feature = "entry", feature = "relay", feature = "exit")),
+    not(any(feature = "entry", feature = "relay", feature = "exit", feature = "raw-exit")),
     allow(dead_code, unused_imports, unused_variables)
 )]
 
 // Only the exit entity has the Session exit (server) capability; an entry establishes Sessions and a
 // relay neither establishes nor admits them.
-#[cfg(all(feature = "session-exit", not(feature = "exit")))]
+#[cfg(all(feature = "session-exit", not(any(feature = "exit", feature = "raw-exit"))))]
 compile_error!("the `session-exit` feature belongs to the `exit` entity: enable `exit` instead");
 
 /// Helper functions.

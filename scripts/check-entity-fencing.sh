@@ -12,7 +12,7 @@
 # fence (an unresolvable path is "absent" everywhere).
 #
 # Usage: scripts/check-entity-fencing.sh [entity ...]
-#   Without arguments it checks every entity. Entities: entry, relay, exit — the basic division is
+#   Without arguments it checks every entity. Entities: entry, relay, exit, and the raw-exit test target — the basic division is
 #   entry <-> relay <-> exit.
 #
 # The fixture crates live in a temporary directory and are their own workspaces, so they resolve
@@ -172,6 +172,7 @@ expect_feature() {
 BUILD_RELAY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_relay; }'
 BUILD_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_exit; }'
 SESSION_BUILDER='pub fn f() -> Option<hopr_lib::builder::HoprBuilderWithSession> { None }'
+BUILD_RAW_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_raw_exit; }'
 BUILD_ENTRY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_entry; }'
 RUN_RELAY='pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::run_relay; }'
 RELAY_CFG='pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { out_index_sync_period: core::time::Duration::from_secs(1), ..Default::default() } }'
@@ -211,6 +212,16 @@ check_relay() {
   expect_absent relay exit with_session_exit "$WITH_SESSION_SERVER"
 }
 
+check_raw_exit() {
+  # The raw exit terminates Sessions without relaying: a test target, not an entity.
+  expect_present raw-exit
+  expect_feature raw-exit on hopr-transport raw-exit
+  expect_feature raw-exit off hopr-protocol-hopr relaying
+  expect_has raw-exit build_raw_exit "$BUILD_RAW_EXIT"
+  expect_absent raw-exit relay build_relay "$BUILD_RELAY"
+  expect_absent raw-exit relay out_index_sync_period "$RELAY_CFG"
+}
+
 check_exit() {
   # The exit keeps the relay's ticket path and adds the Session server, but has no source role.
   expect_present exit
@@ -222,7 +233,7 @@ check_exit() {
 
 entities=("$@")
 if [ ${#entities[@]} -eq 0 ]; then
-  entities=(entry relay exit)
+  entities=(entry relay exit raw-exit)
 fi
 
 for entity in "${entities[@]}"; do
@@ -230,8 +241,9 @@ for entity in "${entities[@]}"; do
   entry) check_entry ;;
   relay) check_relay ;;
   exit) check_exit ;;
+  raw-exit) check_raw_exit ;;
   *)
-    echo "unknown entity: $entity (expected one of entry, relay, exit)" >&2
+    echo "unknown entity: $entity (expected one of entry, relay, exit, raw-exit)" >&2
     exit 2
     ;;
   esac

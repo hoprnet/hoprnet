@@ -218,6 +218,50 @@ where
     Ok(Arc::new(node))
 }
 
+/// Builds a non-relaying exit HOPR node with a custom chain connector.
+///
+/// A test target: it terminates Sessions and resolves PIX shares but processes no tickets, so it
+/// takes no ticket manager.
+#[cfg(feature = "raw-exit")]
+pub async fn build_raw_exit_with_chain<
+    Chain,
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+>(
+    chain_key: &ChainKeypair,
+    packet_key: &OffchainKeypair,
+    config: HoprLibConfig,
+    probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
+    chain_connector: Chain,
+    server: Srv,
+) -> anyhow::Result<Arc<crate::Hopr<Chain, SharedChannelGraph, HoprNetwork, ()>>>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    if let Some(ref pcfg) = probe_cfg {
+        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
+    }
+
+    let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
+
+    let builder = make_builder(
+        chain_key,
+        packet_key,
+        config,
+        probe_cfg.unwrap_or_default(),
+        chain_connector,
+    )?;
+
+    let node = builder.with_session_exit(server).build_raw_exit(ticket_factory).await?;
+
+    Ok(Arc::new(node))
+}
+
 #[cfg(all(test, feature = "state-dump"))]
 pub(crate) mod tests {
     use anyhow::Context;

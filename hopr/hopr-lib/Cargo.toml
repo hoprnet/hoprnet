@@ -102,6 +102,9 @@ state-dump = [
 entry = ["session-entry", "hopr-transport/entry"]
 relay = ["hopr-transport/relay"]
 exit = ["relay", "session-exit", "hopr-transport/exit"]
+# Test target: an exit that terminates Sessions without relaying, so no ticket manager. It is not part
+# of the entity division, which keeps the relay capacity on every exit.
+raw-exit = ["session-exit", "hopr-transport/raw-exit"]
 default = ["pix-bjj", "transport-announce-quic", "relay"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]
@@ -164,6 +167,7 @@ profiling = ["dep:pprof"]
 testing = [
   "entry",
   "exit",
+  "raw-exit",
   "runtime-tokio",
   "dep:bytesize",
   "dep:hex-literal",

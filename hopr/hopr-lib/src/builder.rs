@@ -51,7 +51,10 @@ use hopr_api::{
     types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection},
 };
 use hopr_transport::HoprTransport;
-#[cfg(any(feature = "session-exit", all(feature = "session-entry", feature = "relay")))]
+#[cfg(any(
+    feature = "session-exit",
+    all(feature = "session-entry", any(feature = "relay", feature = "raw-exit"))
+))]
 use hopr_transport::IncomingSession;
 use hopr_utils::{
     network_types::{
@@ -109,9 +112,15 @@ struct BuildParts<Chain, Graph, Net, Ct, Dump = ()> {
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     // Read only by the relay and exit builds; a source node hands the transport no session
     // channels at all.
-    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+    #[cfg(all(
+        feature = "session-entry",
+        any(feature = "relay", feature = "exit", feature = "raw-exit")
+    ))]
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
-    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+    #[cfg(all(
+        feature = "session-entry",
+        any(feature = "relay", feature = "exit", feature = "raw-exit")
+    ))]
     admission_tx: Option<hopr_transport::SessionAdmissionSink>,
     processes: AbortableList<HoprLibProcess>,
 }
@@ -480,9 +489,15 @@ struct PreHopr<Chain, Graph, Net> {
     processes: AbortableList<HoprLibProcess>,
     // Read only by the relay and exit builds; a source node hands the transport no session
     // channels at all.
-    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+    #[cfg(all(
+        feature = "session-entry",
+        any(feature = "relay", feature = "exit", feature = "raw-exit")
+    ))]
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
-    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+    #[cfg(all(
+        feature = "session-entry",
+        any(feature = "relay", feature = "exit", feature = "raw-exit")
+    ))]
     admission_tx: Option<hopr_transport::SessionAdmissionSink>,
 }
 
@@ -563,9 +578,15 @@ where
 {
     let BuildParts {
         configured,
-        #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+        #[cfg(all(
+            feature = "session-entry",
+            any(feature = "relay", feature = "exit", feature = "raw-exit")
+        ))]
         session_tx,
-        #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+        #[cfg(all(
+            feature = "session-entry",
+            any(feature = "relay", feature = "exit", feature = "raw-exit")
+        ))]
         admission_tx,
         mut processes,
     } = parts;
@@ -944,9 +965,15 @@ where
             ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
             pix_event_subscribers: (ssa_tx, ssa_rx.deactivate()),
             processes,
-            #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+            #[cfg(all(
+                feature = "session-entry",
+                any(feature = "relay", feature = "exit", feature = "raw-exit")
+            ))]
             session_tx,
-            #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+            #[cfg(all(
+                feature = "session-entry",
+                any(feature = "relay", feature = "exit", feature = "raw-exit")
+            ))]
             admission_tx,
         },
         (cover_traffic, network, network_process),
@@ -1082,6 +1109,45 @@ macro_rules! impl_build_methods {
         {
             self.build_ticketing(ticket_manager, ticket_factory, true, "EXIT NODE STARTED AND RUNNING")
                 .await
+        }
+
+        /// Builds a non-relaying exit [`Hopr`] node: terminates Sessions and resolves PIX shares but
+        /// processes no tickets, so it has no ticket manager. A test target, not an entity.
+        #[cfg(feature = "raw-exit")]
+        pub async fn build_raw_exit<TFact>(
+            self,
+            ticket_factory: TFact,
+        ) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
+        where
+            TFact: TicketFactory + Clone + Send + Sync + 'static,
+        {
+            let (mut pre, (cover_traffic, network, network_process)) = pre_build_inner(self.into_parts()).await?;
+
+            tracing::info!("starting transport for raw exit node");
+            #[cfg(feature = "session-entry")]
+            let (session_tx, admission_tx) = (Some(pre.session_tx.clone()), pre.admission_tx.clone());
+            #[cfg(not(feature = "session-entry"))]
+            let (session_tx, admission_tx) = (None, None);
+            let (socket, transport_processes) = pre
+                .transport_api
+                .run_exit::<TFact, Ct, _>(
+                    cover_traffic,
+                    network,
+                    network_process,
+                    ticket_factory,
+                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
+                    session_tx,
+                    admission_tx,
+                )
+                .await?;
+
+            // Drain unrelated packets to avoid missing blackhole
+            spawn(drain_incoming_data(socket.reader()));
+
+            let mut processes = std::mem::take(&mut pre.processes);
+            processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
+
+            Ok(into_hopr(pre, processes, (), "RAW EXIT NODE STARTED AND RUNNING"))
         }
 
         /// Body of the relay and the exit build; `with_pix` is what separates them.
@@ -1268,12 +1334,12 @@ macro_rules! impl_node_builders {
                     configured: self.inner,
                     #[cfg(all(
                         feature = "session-entry",
-                        any(feature = "relay", feature = "exit")
+                        any(feature = "relay", feature = "exit", feature = "raw-exit")
                     ))]
                     session_tx: self.session_tx,
                     #[cfg(all(
                         feature = "session-entry",
-                        any(feature = "relay", feature = "exit")
+                        any(feature = "relay", feature = "exit", feature = "raw-exit")
                     ))]
                     admission_tx: Some(self.admission_tx),
                     processes,
@@ -1302,7 +1368,7 @@ macro_rules! impl_node_builders {
                     // receiver is dropped here, which the transport treats as "no incoming Sessions".
                     #[cfg(all(
                         feature = "session-entry",
-                        any(feature = "relay", feature = "exit")
+                        any(feature = "relay", feature = "exit", feature = "raw-exit")
                     ))]
                     session_tx: {
                         let (tx, _rx) = futures::channel::mpsc::channel::<IncomingSession>(1);
@@ -1310,7 +1376,7 @@ macro_rules! impl_node_builders {
                     },
                     #[cfg(all(
                         feature = "session-entry",
-                        any(feature = "relay", feature = "exit")
+                        any(feature = "relay", feature = "exit", feature = "raw-exit")
                     ))]
                     admission_tx: None,
                     processes: AbortableList::<HoprLibProcess>::default(),
