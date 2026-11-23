@@ -443,6 +443,11 @@ pub enum ClosureReason {
     /// the Entry failing to pay. Kept apart from it for exactly that reason: the two look alike from
     /// the outside — a PIX Session that stopped — and point at opposite nodes.
     MissingDepositData,
+    /// The local deposit pool answered after the SSA batch's commitment registrations had lapsed, so the
+    /// request was not sent.
+    ///
+    /// Exit-side like [`MissingDepositData`](Self::MissingDepositData): the pool is too slow, the peer is not at fault.
+    DepositPoolTooSlow,
     /// The PIX supervisor ended the Session — a recovery deadline elapsed, too many shares failed
     /// verification, or the supervisor itself became unavailable.
     ///
@@ -1475,6 +1480,7 @@ mod tests {
             ClosureReason::Eviction,
             ClosureReason::UnrealizedDeposit,
             ClosureReason::MissingDepositData,
+            ClosureReason::DepositPoolTooSlow,
             ClosureReason::PixFailure,
         ];
 
@@ -1489,6 +1495,7 @@ mod tests {
                 | ClosureReason::Eviction
                 | ClosureReason::UnrealizedDeposit
                 | ClosureReason::MissingDepositData
+                | ClosureReason::DepositPoolTooSlow
                 | ClosureReason::PixFailure => {}
             }
         }

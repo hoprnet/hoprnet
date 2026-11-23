@@ -2217,11 +2217,15 @@ async fn a_slow_deposit_pool_does_not_cost_the_request_its_registration() -> Res
 /// sent, and the Session ends rather than inviting an answer it cannot match.
 #[test(tokio::test)]
 async fn a_deposit_pool_slower_than_the_registration_lifetime_sends_nothing() -> Result<()> {
-    let (needed, requests, _) = slow_pool_scenario(Duration::from_millis(2500), Duration::ZERO).await?;
+    let (needed, requests, session_errors) = slow_pool_scenario(Duration::from_millis(2500), Duration::ZERO).await?;
     assert!(!needed, "no request went out, so there is nothing to deposit");
     assert_eq!(
         0, requests,
         "no SsaRequest may go on the wire for a registration that lapsed"
+    );
+    assert_eq!(
+        1, session_errors,
+        "the Entry is told, as for any other failure of the Exit's own pool"
     );
     Ok(())
 }

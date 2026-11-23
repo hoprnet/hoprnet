@@ -2290,11 +2290,10 @@ mod tests {
         Ok(())
     }
 
-    /// The old rule bounding the last two opening re-send gaps by the registration's lifetime is gone: every
-    /// re-send falls inside the delivery window, which validation keeps below that lifetime. A config it
-    /// rejected is accepted.
+    /// Opening re-send gaps are not bounded on their own: a config is valid as long as the delivery window
+    /// fits inside the registration's lifetime, however far apart the re-sends within it are.
     #[test]
-    fn validation_no_longer_bounds_the_gaps_between_opening_resends() -> anyhow::Result<()> {
+    fn validation_accepts_opening_resend_gaps_inside_the_delivery_window() -> anyhow::Result<()> {
         use anyhow::Context;
 
         let rcn = SsaReconstructorConfig {
@@ -2304,10 +2303,10 @@ mod tests {
         let mut cfg = valid_cfg();
         cfg.ssa_request_resend_interval = Duration::from_secs(3);
         cfg.max_opening_ssa_request_resends = 3;
-        // Gaps 3, 6, 12: the last pair is 18 s, which the removed rule refused inside 17 s. The window, 15 s, is
-        // inside the lifetime, which is what remains required.
+        // Gaps 3, 6, 12: the last pair spans 18 s, longer than the 17 s lifetime. The window, 15 s, is inside it,
+        // which is all that is required.
         cfg.max_ssa_delivery_time = Duration::from_secs(15);
-        validate_pix_supervision(&cfg, &rcn).context("the removed adjacent-gap rule must not reject this")?;
+        validate_pix_supervision(&cfg, &rcn).context("gaps longer than the lifetime are fine inside the window")?;
         Ok(())
     }
 
