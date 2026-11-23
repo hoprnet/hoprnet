@@ -1679,6 +1679,32 @@ mod tests {
         Ok(())
     }
 
+    /// A run over nearly the whole frame id range is handled in one step. A walk over its ids would take
+    /// minutes, so it fails the deadline rather than hanging the test.
+    #[tokio::test]
+    async fn ack_state_receiver_must_handle_a_run_over_the_whole_frame_id_range_in_one_step() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Partial,
+            ..Default::default()
+        };
+        let (ctl_tx, _ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: FrameInspector(FrameDashMap::with_capacity(10)).into(),
+            ctl_tx,
+        })?;
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(state.frames_discarded(1, FrameId::MAX - 1));
+        });
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .context("the run must not be walked one frame id at a time")??;
+
+        Ok(())
+    }
+
     /// Builds a request for `frame_id` naming the given missing-segment bitmap.
     fn request_for(frame_id: FrameId, missing: u8) -> SegmentRequest<MTU> {
         SegmentRequest::from_iter([(frame_id, [missing].into())])

@@ -12,14 +12,8 @@ pub trait SessionTelemetryTracker {
     /// Records `count` consecutive frames that have been discarded at once.
     ///
     /// Each run of consecutive frame ids the Sequencer gives up on is reported in one call, and a run
-    /// can span nearly the whole frame id range, so an implementation should override this to account
-    /// for the run in one step as well. The default records each frame with
-    /// [`frame_discarded`](Self::frame_discarded), one by one.
-    fn frames_discarded(&self, count: u32) {
-        for _ in 0..count {
-            self.frame_discarded();
-        }
-    }
+    /// can span nearly the whole frame id range, so it must be accounted for in one step.
+    fn frames_discarded(&self, count: u32);
     /// Records an incomplete frame that could not be reassembled.
     fn incomplete_frame(&self);
     /// Records an incoming Session message.
@@ -121,6 +115,10 @@ pub mod tests {
             self.increment("frames_discarded");
         }
 
+        fn frames_discarded(&self, count: u32) {
+            *self.0.lock().entry("frames_discarded".into()).or_insert(0) += count as usize;
+        }
+
         fn incomplete_frame(&self) {
             self.increment("incomplete_frames");
         }
@@ -136,38 +134,5 @@ pub mod tests {
         fn error(&self) {
             self.increment("errors");
         }
-    }
-
-    /// A tracker written before runs of discarded frames existed: it only knows `frame_discarded`.
-    #[derive(Default)]
-    struct PerFrameTracker(std::sync::atomic::AtomicU32);
-
-    impl SessionTelemetryTracker for PerFrameTracker {
-        fn frame_emitted(&self) {}
-
-        fn frame_completed(&self) {}
-
-        fn frame_discarded(&self) {
-            self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        }
-
-        fn incomplete_frame(&self) {}
-
-        fn incoming_message(&self, _: SessionMessageDiscriminants) {}
-
-        fn outgoing_message(&self, _: SessionMessageDiscriminants) {}
-
-        fn error(&self) {}
-    }
-
-    #[test]
-    fn a_tracker_without_its_own_run_handling_should_see_every_discarded_frame() {
-        let tracker = PerFrameTracker::default();
-
-        tracker.frames_discarded(0);
-        assert_eq!(0, tracker.0.load(std::sync::atomic::Ordering::Relaxed));
-
-        tracker.frames_discarded(5);
-        assert_eq!(5, tracker.0.load(std::sync::atomic::Ordering::Relaxed));
     }
 }

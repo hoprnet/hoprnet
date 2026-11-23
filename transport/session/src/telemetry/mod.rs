@@ -695,7 +695,7 @@ mod tests {
     }
 
     /// A run of discarded frames is one update, however long it is: the counter grows by the length of the run, and
-    /// the assembly gauge only by the frames that were being assembled.
+    /// the assembly gauge drops by it too, but never below zero.
     #[test]
     fn a_run_of_discarded_frames_is_counted_by_its_length() -> anyhow::Result<()> {
         let id: SessionId = HoprPseudonym::random();
