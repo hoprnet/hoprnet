@@ -486,8 +486,12 @@
 //!
 //! 7. PIX protocol events from the packet pipeline arrive via `dispatch_pix_event` and are forwarded to the supervisor
 //!    as `SessionPixEvent::RecoveryProgress`, `UnverifiableShares`, `AlmostRecovered`, or `Recovered`.
-//! 8. When a commitment becomes verifiable, a `PixDepositObserver` task loops on deposit confirmations, forwarding each
-//!    as `DepositConfirmed` to the supervisor.
+//! 8. When the Exit first learns an SSA's deposit address, a `PixDepositObserver` task forwards every confirmation on
+//!    the deposit channel as `DepositConfirmed` until the upper layer drops the sender. It then always reports
+//!    `DepositObserverClosed`. The supervisor ignores this event for a funded cycle — one with at least one non-zero
+//!    confirmation forwarded — and the observer logs that deposit channel ending at DEBUG. The observer warns only when
+//!    no non-zero confirmation was forwarded: an unfunded cycle still awaiting its deposit is written off by the
+//!    supervisor, which logs "closing PIX SSA".
 //! 9. `SessionPixEvent::SessionClosed` is the one event that does not come from `dispatch_pix_event`. The manager's own
 //!    close paths raise it, from `begin_surb_drain`, and the supervisor answers by either draining the funded cycle or
 //!    closing at once — see "Draining a closed Session" above.
@@ -1488,6 +1492,14 @@ pub enum SessionPixEvent {
     /// the whole remaining emission rather than a discounted one, and why the deadlines remain the
     /// backstop for a drain admitted on a figure that turns out to have been optimistic.
     SessionClosed { drainable_surbs: u64 },
+    /// The Session's data plane was detached or attached; a wake-up and nothing more.
+    ///
+    /// The state itself is [`ServiceGate::data_plane_detached`], which the worker reads on every turn
+    /// and feeds to the supervisor (see
+    /// [`SessionPixSupervisor::set_data_plane_detached`](supervisor::SessionPixSupervisor)). A level,
+    /// not an edge, so that a full command channel can lose neither a detach nor an attach, nor see
+    /// them reordered: this event only makes an otherwise idle worker take a turn.
+    DataPlaneChanged,
 }
 
 // ---------------------------------------------------------------------------
