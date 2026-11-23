@@ -12,6 +12,7 @@ use anyhow::anyhow;
 use futures::{Sink, SinkExt, StreamExt, TryStreamExt, channel::oneshot, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::{
+    HoprBalance,
     node::{
         OfferedIncentivization, PixAddressId, PixDepositData, PixDepositDataRequest, SessionAdmissionDecision,
         SessionAdmissionRequest,
@@ -1170,6 +1171,62 @@ impl std::fmt::Display for SessionHandles {
             Self::PixDepositObserver(idx) => write!(f, "PixDepositObserver({idx})"),
         }
     }
+}
+
+/// How a PIX deposit observer ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DepositObserverEnd {
+    /// The supervisor stopped accepting events, so the channel's end was not reported.
+    SupervisorGone,
+    /// The deposit channel ended after a non-zero confirmation was forwarded.
+    Funded,
+    /// The deposit channel ended without a non-zero confirmation being forwarded.
+    Unfunded,
+}
+
+/// Forwards confirmations while the deposit channel remains open.
+///
+/// The supervisor owns the deadline, so the observer carries none — a timeout here would
+/// have been a second authority racing the first.
+async fn observe_deposits<S, F, Fut>(
+    confirmations: S,
+    session_id: SessionId,
+    ssa_id: SsaId<HoprPseudonym>,
+    mut report: F,
+) -> DepositObserverEnd
+where
+    S: futures::Stream<Item = (PixAddressId, HoprBalance)>,
+    F: FnMut(SessionPixEvent) -> Fut,
+    Fut: std::future::Future<Output = Result<(), ()>>,
+{
+    let filtered_confirmations = confirmations.filter(|(evt_id, _)| {
+        futures::future::ready(evt_id.ssa_index() == ssa_id.ssa_index() && &evt_id.session_id() == ssa_id.pseudonym())
+    });
+    futures::pin_mut!(filtered_confirmations);
+    let mut funded = false;
+    let mut confirmations = 0_u32;
+    while let Some((_, amount)) = filtered_confirmations.next().await {
+        info!(%session_id, %ssa_id, %amount, "ssa deposit confirmed");
+        if report(SessionPixEvent::DepositConfirmed { ssa_id, amount })
+            .await
+            .is_err()
+        {
+            return DepositObserverEnd::SupervisorGone;
+        }
+        funded |= amount != HoprBalance::zero();
+        confirmations = confirmations.saturating_add(1);
+    }
+    let end = if funded {
+        debug!(%session_id, %ssa_id, confirmations, "deposit channel closed after confirmation");
+        DepositObserverEnd::Funded
+    } else {
+        warn!(%session_id, %ssa_id, confirmations, "deposit channel closed without confirmation");
+        DepositObserverEnd::Unfunded
+    };
+    // Always report the deposit channel ending: the supervisor decides whether the cycle is lost,
+    // and its phase guard makes this event a no-op for a funded cycle.
+    let _ = report(SessionPixEvent::DepositObserverClosed(ssa_id)).await;
+    end
 }
 
 /// The PIX dimensions this Session negotiated, on the Exit side.
@@ -4052,16 +4109,21 @@ impl PixToolbox {
 /// The Exit receives the client commitment messages in `handle_ssa_commit`, inserts the
 /// coefficient commitments into the [`SsaReconstructor`], and extracts the deposit address.
 /// It emits [`HoprSessionOutPixEvent::DepositNeeded`] to the upper layer with the
-/// [`AgreedSsaQuota`] and a channel to confirm the deposit.
+/// [`AgreedSsaQuota`] and a deposit channel for confirmations.
 ///
 /// A verifiable commitment is what starts the deposit clock, so the supervisor is told
 /// (`CommitmentVerified`) before anything can be reported against it. A `PixDepositObserver` task
-/// then forwards every confirmation arriving on that channel as `DepositConfirmed`: top-ups
-/// accumulate, and the supervisor is what decides when enough has landed. The observer carries no
-/// timeout of its own — `max_deposit_wait` is the deadline, and a second authority racing the
-/// first is exactly what the supervisor exists to prevent. If the upper layer drops the sender
-/// without ever confirming, the observer reports that (`DepositObserverClosed`) rather than
-/// letting the deadline run out on a deposit that is never coming.
+/// forwards every confirmation arriving on the deposit channel as `DepositConfirmed` until the
+/// upper layer drops the sender. A cycle is funded once at least one non-zero confirmation has
+/// been forwarded. A zero-amount confirmation does not make it funded or stop the observer.
+/// When the deposit channel ends, the observer always reports `DepositObserverClosed`; the
+/// supervisor's phase guard ignores it for a funded cycle.
+///
+/// A funded deposit channel ending is logged at DEBUG. The observer warns only when no non-zero
+/// confirmation was forwarded, because an unfunded cycle still awaiting its deposit is written
+/// off by the supervisor, which logs "closing PIX SSA". The observer carries no timeout of its
+/// own — `max_deposit_wait` is the deadline, and a second authority racing the first is exactly
+/// what the supervisor exists to prevent.
 ///
 /// Once the deposit suffices, the SSA moves to *recovering*. Its recovery deadlines start when it
 /// reaches the front, and its deposit releases the egress gate only while it is there. When a paid
@@ -9082,8 +9144,6 @@ where
             // Report deposits for as long as they arrive rather than waiting for the first one and
             // stopping: the pool may report more than once for a cycle, and a first message carrying
             // a zero balance asserts nothing, so the one that funds the cycle need not be the first.
-            // The supervisor owns the deadline, so the observer carries none — a timeout here would
-            // have been a second authority racing the first.
             let supervisor = session_slot.pix_supervisor.get().cloned();
             session_slot.abort_handles.lock().insert(
                 SessionHandles::PixDepositObserver(ssa_id.ssa_index().get()),
@@ -9093,27 +9153,11 @@ where
                         // only reachable if it died between the check above and here.
                         return;
                     };
-                    let mut confirmations = deposit_done_rx.filter(|(evt_id, _)| {
-                        futures::future::ready(
-                            evt_id.ssa_index() == ssa_id.ssa_index() && &evt_id.session_id() == ssa_id.pseudonym(),
-                        )
-                    });
-                    while let Some((_, amount)) = confirmations.next().await {
-                        info!(%session_id, %ssa_id, %amount, "ssa deposit confirmed");
-                        if supervisor
-                            .send_event(SessionPixEvent::DepositConfirmed { ssa_id, amount })
-                            .await
-                            .is_err()
-                        {
-                            return;
-                        }
-                    }
-                    // The upper layer dropped the sender without ever confirming, so no deposit is
-                    // coming. Saying so is better than letting the supervisor wait out its deadline.
-                    warn!(%session_id, %ssa_id, "deposit channel closed without confirmation");
-                    let _ = supervisor
-                        .send_event(SessionPixEvent::DepositObserverClosed(ssa_id))
-                        .await;
+                    observe_deposits(deposit_done_rx, session_id, ssa_id, |ev| {
+                        let supervisor = supervisor.clone();
+                        async move { supervisor.send_event(ev).await }
+                    })
+                    .await;
                 }),
             );
 
@@ -10049,6 +10093,178 @@ mod tests {
 
     use super::*;
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+
+    #[tokio::test]
+    async fn deposit_observer_forwards_each_confirmation_for_its_cycle() -> anyhow::Result<()> {
+        let warnings = Arc::new(WarnCounter::default());
+        let session_id = HoprPseudonym::random();
+        let ssa_id = SsaId::new(session_id, SsaIndex::MIN);
+        let address_id = PixAddressId::new(&session_id, SsaIndex::MIN);
+        let other_index = SsaIndex::new(2).context("index two is non-zero")?;
+        let first_amount = HoprBalance::zero();
+        let second_amount = HoprBalance::new_base(1000);
+        let confirmations = futures::stream::iter([
+            (address_id, first_amount),
+            (PixAddressId::new(&session_id, other_index), second_amount),
+            (
+                PixAddressId::new(&HoprPseudonym::random(), SsaIndex::MIN),
+                second_amount,
+            ),
+            (address_id, second_amount),
+        ]);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+        let end = observe_deposits(confirmations, session_id, ssa_id, |event| {
+            events.lock().push(event);
+            futures::future::ready(Ok(()))
+        })
+        .with_subscriber(warnings.clone())
+        .await;
+
+        assert_eq!(end, DepositObserverEnd::Funded);
+        assert_eq!(
+            warnings.count(),
+            0,
+            "a funded cycle must not warn when its channel closes"
+        );
+        assert!(matches!(
+            events.lock().as_slice(),
+            [
+                SessionPixEvent::DepositConfirmed { ssa_id: first_id, amount: first },
+                SessionPixEvent::DepositConfirmed { ssa_id: second_id, amount: second },
+                SessionPixEvent::DepositObserverClosed(closed_id),
+            ] if *first_id == ssa_id && *second_id == ssa_id && *closed_id == ssa_id
+                && *first == first_amount && *second == second_amount
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn deposit_observer_ends_unfunded_without_confirmation() {
+        let warnings = Arc::new(WarnCounter::default());
+        let session_id = HoprPseudonym::random();
+        let ssa_id = SsaId::new(session_id, SsaIndex::MIN);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+        let end = observe_deposits(futures::stream::iter([]), session_id, ssa_id, |event| {
+            events.lock().push(event);
+            futures::future::ready(Ok(()))
+        })
+        .with_subscriber(warnings.clone())
+        .await;
+
+        assert_eq!(end, DepositObserverEnd::Unfunded);
+        assert_eq!(
+            warnings.count(),
+            1,
+            "an empty deposit channel must warn once on closure"
+        );
+        assert!(matches!(
+            events.lock().as_slice(),
+            [SessionPixEvent::DepositObserverClosed(closed_id)] if *closed_id == ssa_id
+        ));
+    }
+
+    #[tokio::test]
+    async fn deposit_observer_ends_funded_after_a_confirmed_deposit() {
+        let warnings = Arc::new(WarnCounter::default());
+        let session_id = HoprPseudonym::random();
+        let ssa_id = SsaId::new(session_id, SsaIndex::MIN);
+        let address_id = PixAddressId::new(&session_id, SsaIndex::MIN);
+        let amount = HoprBalance::new_base(1000);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+        let end = observe_deposits(
+            futures::stream::iter([(address_id, amount)]),
+            session_id,
+            ssa_id,
+            |event| {
+                events.lock().push(event);
+                futures::future::ready(Ok(()))
+            },
+        )
+        .with_subscriber(warnings.clone())
+        .await;
+
+        assert_eq!(end, DepositObserverEnd::Funded);
+        assert_eq!(
+            warnings.count(),
+            0,
+            "a funded cycle must not warn when its channel closes"
+        );
+        assert!(matches!(
+            events.lock().as_slice(),
+            [
+                SessionPixEvent::DepositConfirmed { ssa_id: reported_id, amount: reported_amount },
+                SessionPixEvent::DepositObserverClosed(closed_id),
+            ] if *reported_id == ssa_id && *closed_id == ssa_id && *reported_amount == amount
+        ));
+    }
+
+    #[tokio::test]
+    async fn deposit_observer_ends_unfunded_after_only_zero_confirmations() {
+        let warnings = Arc::new(WarnCounter::default());
+        let session_id = HoprPseudonym::random();
+        let ssa_id = SsaId::new(session_id, SsaIndex::MIN);
+        let address_id = PixAddressId::new(&session_id, SsaIndex::MIN);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+        let end = observe_deposits(
+            futures::stream::iter([(address_id, HoprBalance::zero())]),
+            session_id,
+            ssa_id,
+            |event| {
+                events.lock().push(event);
+                futures::future::ready(Ok(()))
+            },
+        )
+        .with_subscriber(warnings.clone())
+        .await;
+
+        assert_eq!(end, DepositObserverEnd::Unfunded);
+        assert_eq!(
+            warnings.count(),
+            1,
+            "zero confirmations must still warn once on closure"
+        );
+        assert!(matches!(
+            events.lock().as_slice(),
+            [
+                SessionPixEvent::DepositConfirmed { ssa_id: reported_id, amount },
+                SessionPixEvent::DepositObserverClosed(closed_id),
+            ] if *reported_id == ssa_id && *closed_id == ssa_id && *amount == HoprBalance::zero()
+        ));
+    }
+
+    #[tokio::test]
+    async fn deposit_observer_stops_when_the_supervisor_is_gone() {
+        let warnings = Arc::new(WarnCounter::default());
+        let session_id = HoprPseudonym::random();
+        let ssa_id = SsaId::new(session_id, SsaIndex::MIN);
+        let address_id = PixAddressId::new(&session_id, SsaIndex::MIN);
+        let amount = HoprBalance::new_base(1000);
+        let confirmations = futures::stream::iter([(address_id, amount), (address_id, amount)]);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+        let end = observe_deposits(confirmations, session_id, ssa_id, |event| {
+            events.lock().push(event);
+            futures::future::ready(Err(()))
+        })
+        .with_subscriber(warnings.clone())
+        .await;
+
+        assert_eq!(end, DepositObserverEnd::SupervisorGone);
+        assert_eq!(
+            warnings.count(),
+            0,
+            "a missing supervisor must not trigger a closure warning"
+        );
+        assert!(matches!(
+            events.lock().as_slice(),
+            [SessionPixEvent::DepositConfirmed { ssa_id: reported_id, amount: reported_amount }]
+                if *reported_id == ssa_id && *reported_amount == amount
+        ));
+    }
 
     /// A [`PixToolbox`] whose deposit-data requests are answered, for tests that do not read the
     /// PIX event stream themselves.
