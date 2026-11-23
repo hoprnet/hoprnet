@@ -114,7 +114,7 @@ use hopr_lib::{
     api::node::HoprSessionEntryOperations,
     exports::{
         network::types::prelude::{IpOrHost, SealedHost},
-        transport::{SessionCapability, session::counters::routing_resolution_surb_timeout_count},
+        transport::{SessionCapability, counters::routing_resolution_surb_timeout_count},
     },
 };
 

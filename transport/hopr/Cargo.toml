@@ -49,7 +49,7 @@ raw-exit = ["session-exit"]
 # The session stack: the `SessionManager` wiring, incoming-Session admission and the client-side
 # Session API. `session-exit` implies `session-entry` because both are served by one manager and
 # an Exit establishes Sessions on its return path too.
-session-entry = []
+session-entry = ["dep:hopr-transport-session"]
 session-exit = ["session-entry"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`, making PIX stealth addresses
 # Baby JubJub public keys instead of Ethereum addresses. Default, because it is what
@@ -174,7 +174,7 @@ hopr-transport-mixer = { workspace = true, features = [
   "poisson",
 ] }
 hopr-transport-probe = { workspace = true }
-hopr-transport-session = { workspace = true }
+hopr-transport-session = { workspace = true, optional = true }
 hopr-transport-tag-allocator = { workspace = true }
 
 # Optional deps enabled by the `testing` feature.

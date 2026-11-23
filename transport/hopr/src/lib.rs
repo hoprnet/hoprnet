@@ -24,6 +24,8 @@
 pub mod config;
 /// Constants used and exposed by the crate.
 pub mod constants;
+/// Routing-resolution and encode-stage diagnostic counters.
+pub mod counters;
 /// Errors used by the crate.
 pub mod errors;
 pub mod observer;
@@ -101,17 +103,22 @@ use hopr_transport_probe::{
     Probe,
     ping::{PingConfig, Pinger},
 };
+#[cfg(feature = "session-entry")]
 pub use hopr_transport_session as session;
 #[cfg(all(feature = "session-entry", any(feature = "exit", feature = "raw-exit")))]
 use hopr_transport_session::HoprSessionInPixEvent;
-// Named by the PIX toolbox slot in `run_inner`, which a pure relay always leaves empty.
+#[cfg(feature = "session-entry")]
 use hopr_transport_session::PixToolbox;
 #[cfg(feature = "session-entry")]
 use hopr_transport_session::SessionManager;
 #[cfg(feature = "session-entry")]
 use hopr_transport_session::{AdmissionToken, DispatchResult, SessionManagerConfig, SurbAdmissionControl};
-#[cfg(any(feature = "entry", feature = "exit", feature = "raw-exit"))]
+#[cfg(all(
+    feature = "session-entry",
+    any(feature = "entry", feature = "exit", feature = "raw-exit")
+))]
 use hopr_transport_session::{AgreedSsaQuota, HoprSessionOutPixEvent};
+#[cfg(feature = "session-entry")]
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, InvalidPixParams, LOCAL_PIX_SUITE, PixParams, SESSION_MTU, SURB_SIZE, ServiceId,
@@ -119,9 +126,9 @@ pub use hopr_transport_session::{
     SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
-#[cfg(feature = "telemetry")]
+#[cfg(all(feature = "session-entry", feature = "telemetry"))]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "session-entry", feature = "runtime-tokio"))]
 pub use hopr_transport_session::{transfer_session, transfer_session_datagram};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
 #[cfg(any(feature = "exit", feature = "raw-exit"))]
@@ -365,6 +372,7 @@ async fn dispatch_incoming_messages<G, In, Out>(
             let ((pseudonym, data), span) = message.into_parts();
             let _entered = span.enter();
             let _dispatch = tracing::debug_span!("session.dispatch").entered();
+            #[cfg(feature = "session-entry")]
             hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             // `dispatch_message` is synchronous (moka::sync + crossfire try_send) and
             // never yields; the locks it takes, the forward receipts' among them, are
@@ -429,8 +437,54 @@ async fn dispatch_incoming_messages<G, In, Out>(
         .await;
 }
 
-#[cfg(feature = "session-entry")]
+/// Stand-ins for the Session types in a build without the session stack, so the role entry points keep
+/// one signature in every build. Nothing can construct them: a build without the session stack passes
+/// `None` for each.
+#[cfg(not(feature = "session-entry"))]
+mod absent_session {
+    /// An incoming Session; none can exist without the session stack.
+    pub type IncomingSession = std::convert::Infallible;
+    /// A Session admission sink; none can exist without the session stack.
+    pub type SessionAdmissionSink = std::convert::Infallible;
+    /// A PIX toolbox; only the session stack builds one.
+    pub type PixToolbox = std::convert::Infallible;
+}
+#[cfg(not(feature = "session-entry"))]
+use absent_session::PixToolbox;
+#[cfg(not(feature = "session-entry"))]
+pub use absent_session::{IncomingSession, SessionAdmissionSink};
+
+/// The tag allocator settings: the Session configuration's when the node has the session stack, the
+/// defaults otherwise (a relay still tags its probes).
+fn tag_allocator_config(cfg: &HoprProtocolConfig) -> hopr_transport_tag_allocator::TagAllocatorConfig {
+    #[cfg(feature = "session-entry")]
+    return cfg.session.tag_allocator;
+    #[cfg(not(feature = "session-entry"))]
+    {
+        let _ = cfg;
+        Default::default()
+    }
+}
+
+/// SSA dimensions `(polynomials, threshold, surplus)`: configured on a node with the session stack,
+/// the deployed defaults on a relay, which never originates PIX but whose encoder is generic over a
+/// share generator.
+fn pix_dimensions(cfg: &HoprProtocolConfig) -> (usize, usize, usize) {
+    #[cfg(feature = "session-entry")]
+    return (cfg.pix.num_ssa_parts, cfg.pix.ssa_part_size, cfg.pix.surplus_shares());
+    #[cfg(not(feature = "session-entry"))]
+    {
+        let _ = cfg;
+        (
+            hopr_protocol_pix::DEFAULT_POLYS_PER_SSA as usize,
+            hopr_protocol_pix::DEFAULT_POLY_THRESHOLD as usize,
+            hopr_protocol_pix::DEFAULT_SURPLUS_SHARES as usize,
+        )
+    }
+}
+
 /// HOPR protocol specific instantiation of the SessionManager.
+#[cfg(feature = "session-entry")]
 type HoprSessionManager = SessionManager<HoprMessageSender>;
 
 /// Allows configuration of one specific [`HoprSession`].
@@ -609,7 +663,7 @@ where
             planner_config.min_paths_anonymity_floor,
         );
 
-        let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
+        let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&tag_allocator_config(&cfg))?;
 
         let mut session_telemetry_tag_allocator = None;
         let mut probing_tag_allocator = None;
@@ -1195,8 +1249,10 @@ where
         // asserting that it had already been validated "before this code runs" via
         // `#[validate(nested)]` — but nothing in this crate calls `validate()`, so the guarantee
         // rested entirely on every caller remembering to.
+        #[cfg(feature = "session-entry")]
         validator::Validate::validate(&self.cfg.pix)
             .map_err(|error| HoprTransportError::Api(format!("invalid PIX configuration: {error}")))?;
+        let (num_ssa_parts, ssa_part_size, surplus_shares) = pix_dimensions(&self.cfg);
         // Checked rather than `as`-cast: the validation above already bounds all three, but a
         // truncating cast would turn a future widening of any of those ranges into a silently
         // wrong-but-valid-looking dimension rather than a startup error.
@@ -1207,9 +1263,9 @@ where
         // violation is a startup error to report rather than a panic to take down the node.
         let ssa_generator = Arc::new(
             hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::try_new(hopr_protocol_pix::SsaGeneratorConfig {
-                polynomials_per_ssa: narrow(self.cfg.pix.num_ssa_parts, "num_ssa_parts")?,
-                threshold: narrow(self.cfg.pix.ssa_part_size, "ssa_part_size")?,
-                surplus_shares: narrow(self.cfg.pix.surplus_shares(), "additional_shares")?,
+                polynomials_per_ssa: narrow(num_ssa_parts, "num_ssa_parts")?,
+                threshold: narrow(ssa_part_size, "ssa_part_size")?,
+                surplus_shares: narrow(surplus_shares, "additional_shares")?,
             })
             .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
         );

@@ -547,9 +547,9 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     let baseline_encode_drops = hopr_utils::parallelize::cpu::encode_timeout_drop_count() as u64;
     let baseline_inbox_drops = hopr_transport::session::counters::session_inbox_drop_count() as u64;
     let baseline_unknown_drops = hopr_transport::session::counters::session_unknown_data_drop_count() as u64;
-    let baseline_routing_attempts = hopr_transport::session::counters::routing_resolution_attempt_count() as u64;
-    let baseline_routing_failures = hopr_transport::session::counters::routing_resolution_failure_count() as u64;
-    let baseline_encode_stage_entries = hopr_transport::session::counters::encode_stage_entry_count() as u64;
+    let baseline_routing_attempts = hopr_transport::counters::routing_resolution_attempt_count() as u64;
+    let baseline_routing_failures = hopr_transport::counters::routing_resolution_failure_count() as u64;
+    let baseline_encode_stage_entries = hopr_transport::counters::encode_stage_entry_count() as u64;
     let baseline_unrelated = hopr_transport::session::counters::session_unrelated_dispatch_count() as u64;
     let baseline_dispatch_calls = hopr_transport::session::counters::dispatch_message_call_count() as u64;
 
@@ -809,11 +809,11 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     let dispatch_message_calls =
         hopr_transport::session::counters::dispatch_message_call_count() as u64 - baseline_dispatch_calls;
     let routing_resolution_attempts =
-        hopr_transport::session::counters::routing_resolution_attempt_count() as u64 - baseline_routing_attempts;
+        hopr_transport::counters::routing_resolution_attempt_count() as u64 - baseline_routing_attempts;
     let routing_resolution_failures =
-        hopr_transport::session::counters::routing_resolution_failure_count() as u64 - baseline_routing_failures;
+        hopr_transport::counters::routing_resolution_failure_count() as u64 - baseline_routing_failures;
     let encode_stage_entries =
-        hopr_transport::session::counters::encode_stage_entry_count() as u64 - baseline_encode_stage_entries;
+        hopr_transport::counters::encode_stage_entry_count() as u64 - baseline_encode_stage_entries;
 
     Ok(StressReport {
         samples,

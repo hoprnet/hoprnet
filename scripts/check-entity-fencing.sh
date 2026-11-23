@@ -120,6 +120,28 @@ expect_present() {
   echo "ok: hopr-lib builds with features [$features]"
 }
 
+# `$1`: entity set. `$2`: crate that must (`linked`) or must not (`absent`) be in its dependency tree.
+# Item checks prove a cfg fence; this proves the crate itself is not built, which is what keeps the
+# code out of the binary.
+expect_crate() {
+  local features=$1 mode=$2 crate=$3
+  local tree
+  tree=$(cargo tree --quiet --manifest-path "$repo_root/Cargo.toml" -p hopr-lib --no-default-features \
+    --features "$features,pix-bjj,transport-announce-quic" -e normal --prefix none 2>/dev/null | sed 's/ (.*//' | awk '{print $1}')
+  if grep -qx "$crate" <<<"$tree"; then
+    if [ "$mode" = absent ]; then
+      echo "FENCE BROKEN: \`$crate\` is linked with features [$features]" >&2
+      failures=$((failures + 1))
+      return
+    fi
+  elif [ "$mode" = linked ]; then
+    echo "FENCE BROKEN: \`$crate\` is not linked with features [$features]" >&2
+    failures=$((failures + 1))
+    return
+  fi
+  echo "ok: \`$crate\` is $mode with features [$features]"
+}
+
 # Source snippets shared between the entities.
 BUILD_RELAY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_relay; }'
 BUILD_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_exit; }'
@@ -144,6 +166,11 @@ check_entry() {
 check_relay() {
   # A pure relay carries no Session stack, no PIX exit and no source role.
   expect_present relay
+  for crate in hopr-transport-session hopr-protocol-session hopr-protocol-start; do
+    expect_crate relay absent "$crate"
+    expect_crate entry linked "$crate"
+    expect_crate exit linked "$crate"
+  done
   expect_absent relay entry build_entry "$BUILD_ENTRY"
   expect_absent relay exit HoprBuilderWithSession "$SESSION_BUILDER"
   expect_absent relay entry HoprSessionEntryConfig \

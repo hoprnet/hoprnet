@@ -2,11 +2,13 @@
 use std::time::Duration;
 
 use hopr_api::types::primitive::prelude::*;
+#[cfg(feature = "session-entry")]
+pub use hopr_transport::config::SessionGlobalConfig;
 pub use hopr_transport::{
     TagAllocatorConfig,
     config::{
         HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, MixerConfig, ProbeConfig,
-        SessionGlobalConfig, TransitLatencyConfig, TransportConfig, looks_like_domain,
+        TransitLatencyConfig, TransportConfig, looks_like_domain,
     },
 };
 use validator::{Validate, ValidationError};

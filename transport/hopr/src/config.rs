@@ -10,9 +10,11 @@ use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{
     HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, ReplayFilterConfig, SurbPopOrder, SurbStoreConfig,
 };
+#[cfg(feature = "session-entry")]
 use hopr_protocol_pix::SsaReconstructorConfig;
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
+#[cfg(feature = "session-entry")]
 use hopr_transport_session::{
     DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
     MAX_ASSUMED_SESSION_PACKET_RATE, MIN_BALANCER_SAMPLING_INTERVAL, MIN_REFUSAL_REPLY_REFILL_PERIOD,
@@ -269,7 +271,10 @@ pub struct TransitLatencyConfig {
     derive(serde::Serialize, serde::Deserialize),
     serde(deny_unknown_fields)
 )]
-#[validate(schema(function = "validate_pix_supervision_pairing", skip_on_field_errors = false))]
+#[cfg_attr(
+    feature = "session-entry",
+    validate(schema(function = "validate_pix_supervision_pairing", skip_on_field_errors = false))
+)]
 pub struct HoprProtocolConfig {
     /// Libp2p-related transport configuration
     #[validate(nested)]
@@ -290,14 +295,17 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub output_priority: crate::output_priority::OutputPriorityConfig,
+    #[cfg(feature = "session-entry")]
     /// Session protocol global configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
+    #[cfg(feature = "session-entry")]
     /// Global configuration for the PIX.
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub pix: PixGlobalConfig,
+    #[cfg(feature = "session-entry")]
     /// Per-node PIX session configuration for incoming sessions.
     #[validate(custom(function = "validate_incoming_session_pix_config"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -376,327 +384,334 @@ fn validate_relayer_health_weight(value: f64) -> Result<(), ValidationError> {
     }
 }
 
-/// Rejects a supervisor whose deadlines its own node's reconstructor cannot honour.
-///
-/// The deadlines the Exit-side supervisor derives from `incoming_session_pix_config` have to agree
-/// with the reconstructor's lifetimes: a supervisor that waits longer than the reconstructor keeps
-/// state is waiting on an SSA that can no longer be completed.
-///
-/// It lives on [`HoprProtocolConfig`] rather than beside the other `incoming_session_pix_config`
-/// checks because the two halves are *siblings*, and a field validator sees only its own field. The
-/// reconstructor became operator-settable under `pix.reconstructor`, and validating the supervisor
-/// against `SsaReconstructorConfig::default()` from inside the sibling would then certify a pairing
-/// the node does not run — passing for every operator who changed `unused_verifier_lifetime` or
-/// `max_ack_await_time`, which are precisely the values this check is about. Reaching both is the
-/// whole point, so the check has to sit where both are in scope.
-///
-/// [`ssa_reconstructor`](crate::ssa_reconstructor) builds from the same field, so what is validated
-/// here is what the node installs.
-fn validate_pix_supervision_pairing(cfg: &HoprProtocolConfig) -> Result<(), ValidationError> {
-    hopr_transport_session::validate_pix_supervision(
-        &cfg.incoming_session_pix_config.supervisor_config(),
-        &cfg.pix.reconstructor.into(),
-    )
-    .map_err(|error| {
-        let mut e = ValidationError::new("pix supervision deadlines conflict with the reconstructor's lifetimes");
-        e.message = Some(error.to_string().into());
-        e
-    })
-}
+#[cfg(feature = "session-entry")]
+mod pix_config {
+    use super::*;
 
-/// Rejects an [`IncomingSessionPixConfig`] that cannot work.
-///
-/// Three independent failures, all of which would otherwise only show up at runtime:
-///
-/// `quota_range` is operator-settable, and an empty (inverted) range silently makes
-/// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
-/// `UnacceptablePixParams` errors at Session establishment time.
-///
-/// `max_recovery_time` has to leave a whole cycle at the widest dimensions this Exit will *accept*
-/// time to complete, or it closes honest Sessions partway through one. With fill enabled that is
-/// judged at `fill.max_rate`, counted up to [`MAX_ASSUMED_SESSION_PACKET_RATE`]; without it, at that
-/// rate itself, so only a deadline no Session could meet is refused. The check is possible at all only because the
-/// quota counts the surplus: `quota_range.end()` prices every share a cycle emits, so the packet count follows by
-/// division with nothing left to guess.
-///
-/// And `max_live_cycle_bytes` has to admit at least one Session at those same widest dimensions,
-/// or the Exit advertises a `quota_range` whose top it will always refuse for want of budget —
-/// again as a Start error the operator cannot attribute. Deliberately *one* Session and not
-/// `maximum_managed_sessions` of them: this budget exists precisely because that product is a
-/// number no node holds, so checking it here would only ever reject the shipping defaults.
-fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
-    hopr_transport_session::validate_incoming_session_pix_config(cfg, MAX_ASSUMED_SESSION_PACKET_RATE).map_err(
-        |error| {
-            let mut e = ValidationError::new("invalid incoming PIX configuration");
+    /// Rejects a supervisor whose deadlines its own node's reconstructor cannot honour.
+    ///
+    /// The deadlines the Exit-side supervisor derives from `incoming_session_pix_config` have to agree
+    /// with the reconstructor's lifetimes: a supervisor that waits longer than the reconstructor keeps
+    /// state is waiting on an SSA that can no longer be completed.
+    ///
+    /// It lives on [`HoprProtocolConfig`] rather than beside the other `incoming_session_pix_config`
+    /// checks because the two halves are *siblings*, and a field validator sees only its own field. The
+    /// reconstructor became operator-settable under `pix.reconstructor`, and validating the supervisor
+    /// against `SsaReconstructorConfig::default()` from inside the sibling would then certify a pairing
+    /// the node does not run — passing for every operator who changed `unused_verifier_lifetime` or
+    /// `max_ack_await_time`, which are precisely the values this check is about. Reaching both is the
+    /// whole point, so the check has to sit where both are in scope.
+    ///
+    /// [`ssa_reconstructor`](crate::ssa_reconstructor) builds from the same field, so what is validated
+    /// here is what the node installs.
+    pub(super) fn validate_pix_supervision_pairing(cfg: &HoprProtocolConfig) -> Result<(), ValidationError> {
+        hopr_transport_session::validate_pix_supervision(
+            &cfg.incoming_session_pix_config.supervisor_config(),
+            &cfg.pix.reconstructor.into(),
+        )
+        .map_err(|error| {
+            let mut e = ValidationError::new("pix supervision deadlines conflict with the reconstructor's lifetimes");
             e.message = Some(error.to_string().into());
             e
-        },
-    )
-}
-
-/// Global configuration for the Protocol for Incentivization of eXits (PIX).
-#[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default, deny_unknown_fields)
-)]
-pub struct PixGlobalConfig {
-    /// Number of parts an SSA is split into.
-    ///
-    /// This scales will with the CPU parallelism.
-    ///
-    /// Defaults to [`DEFAULT_PIX_POLYS_PER_SSA`], which is also what
-    /// [`IncomingSessionPixConfig::quota_range`] is derived from — changing this without
-    /// widening the peer Exit's `quota_range` accordingly will get the Session rejected.
-    ///
-    /// The range below bounds this field alone, and nothing bounds its product with
-    /// [`ssa_part_size`](Self::ssa_part_size) beyond the two ranges. The product is this node's own
-    /// generation cost and the quota it pays for, and the peer Exit bounds the quota it will serve with
-    /// its `quota_range` when the Session is initiated — before this node has generated anything,
-    /// since polynomials are built only once the Exit asks for a cycle with an `SsaRequest`. An
-    /// oversized offer therefore costs one refused initiation. A local ceiling on the product used to
-    /// sit here on the premise that the refusal arrived after generation, which it does not.
-    #[validate(range(min = 8, max = 16192))]
-    #[default(DEFAULT_PIX_POLYS_PER_SSA as usize)]
-    pub num_ssa_parts: usize,
-
-    /// Number of shares required to reconstruct an SSA part.
-    ///
-    /// This does not scale well with CPU parallelism.
-    ///
-    /// Defaults to [`DEFAULT_PIX_SHARES_PER_POLY`]. See [`num_ssa_parts`](Self::num_ssa_parts)
-    /// for the interaction with the Exit's accepted quota range, and for why the two are not bounded
-    /// together. Capped at 255 because the threshold is one byte of the negotiated
-    /// [`PixParams`](hopr_protocol_pix::PixParams) word — see
-    /// [`MAX_POLY_THRESHOLD`](hopr_protocol_pix::MAX_POLY_THRESHOLD).
-    #[validate(range(min = 2, max = 255))]
-    #[default(DEFAULT_PIX_SHARES_PER_POLY as usize)]
-    pub ssa_part_size: usize,
-
-    /// Number of shares sent in addition to `ssa_part_size` to reconstruct an SSA part.
-    ///
-    /// This is used to account for potential packet loss but makes it take longer for the
-    /// other side to reconstruct the entire SSA from all its parts. This is because if
-    /// no packet loss is present, the other side can reconstruct the SSA from fewer shares.
-    ///
-    /// **Leave unset unless you have measured your return-path loss.** `None` derives the surplus
-    /// from [`num_ssa_parts`](Self::num_ssa_parts) and [`ssa_part_size`](Self::ssa_part_size) via
-    /// [`default_surplus_for`](hopr_protocol_pix::default_surplus_for), which sizes it so that a
-    /// cycle still recovers at 99 % when half of all shares go missing — 79 at the deployed
-    /// `4096 × 32`. Read [`surplus_shares`](Self::surplus_shares) for the resolved value.
-    ///
-    /// It depends on both dimensions because a cycle recovers only if *every* polynomial does: one
-    /// polynomial survives with probability `P(Binom(ssa_part_size + surplus, 1 − loss) >=
-    /// ssa_part_size)`, and the cycle with that raised to the power `num_ssa_parts`. Setting an
-    /// absolute count therefore means a different loss tolerance at every split.
-    ///
-    /// The factor is what matters, because it is what this costs. A polynomial leaves the
-    /// generator's queue at `ssa_part_size + surplus` shares whether or not any were
-    /// lost, so this is service the Exit performs in every case — and since the surplus travels to
-    /// the peer as part of the negotiated [`PixParams`](hopr_protocol_pix::PixParams), the per-SSA
-    /// quota counts it and the deposit pays for it. It buys loss tolerance, and it is charged for
-    /// like any other insurance: on purchase, not on claim.
-    ///
-    /// Raising it therefore costs money rather than earning free service, which is the way round it
-    /// should be. It used to be the other way: the surplus was excluded from the quota, so the
-    /// rational Entry raised this dial to take traffic it was not billed for.
-    ///
-    /// Capped at 255 because it is the other byte of that word, and at nothing tighter: how much
-    /// insurance a path needs is a property of its loss rate, and the surplus that a 50 % loss needs
-    /// exceeds the threshold at every split in the deployed range.
-    #[validate(range(min = 0, max = 255))]
-    pub additional_shares: Option<usize>,
-
-    /// Maximum number of SSA commitments this node, acting as an Entry, accepts in a single
-    /// `SsaRequest` from an Exit.
-    ///
-    /// This is a protection against a misbehaving Exit rather than a preference: each accepted entry
-    /// costs a full client commitment, its own burst of `SsaCommit` packets and its own on-chain
-    /// deposit, so an uncapped request would let one inbound packet amplify into minutes of CPU and
-    /// as many simultaneous deposits as the wire format admits (27). An over-cap request is rejected
-    /// in full before any of that work starts.
-    ///
-    /// **Must be at least the `ssas_per_request` of every Exit this node uses.** The batch size is not
-    /// negotiated — the Exit cannot learn this value — so an Exit batching above it has every request
-    /// rejected, and every such Session is lost. The refusal is reported to the Exit as an
-    /// `UnacceptablePixParams` `SessionError` so it fails in about a round trip rather than as a
-    /// deposit timeout minutes later, but raising the Exit side still requires raising this in step.
-    ///
-    /// Defaults to 2, minimum 1, maximum 9 (`MAX_SSA_BATCH_SIZE`).
-    #[validate(range(min = 1, max = 9))]
-    #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
-    pub max_ssas_per_request: usize,
-
-    /// Exit-side SSA reconstructor configuration.
-    ///
-    /// Nested rather than flattened so the whole PIX surface stays under one key, and so that
-    /// Exit-side capacity does not intermix with the Entry-side dimensions above.
-    #[validate(nested)]
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub reconstructor: PixReconstructorConfig,
-}
-
-impl PixGlobalConfig {
-    /// Surplus shares per polynomial: the operator's value if set, otherwise derived from
-    /// [`num_ssa_parts`](Self::num_ssa_parts) and [`ssa_part_size`](Self::ssa_part_size).
-    ///
-    /// Every reader must go through this rather than the field. The field is `Option` precisely
-    /// because serde cannot express "default to a function of a sibling", so the field alone is not
-    /// the configuration — reading it directly is how the unset case would silently become zero
-    /// surplus, i.e. no loss tolerance at all.
-    pub fn surplus_shares(&self) -> usize {
-        self.additional_shares.unwrap_or_else(|| {
-            hopr_protocol_pix::default_surplus_for(
-                self.num_ssa_parts.min(u16::MAX as usize) as u16,
-                self.ssa_part_size.min(u8::MAX as usize) as u8,
-            ) as usize
         })
     }
-}
 
-/// Rejects a reconstructor configuration that [`SsaReconstructorConfig`] itself would reject.
-///
-/// The mirror below deliberately carries no `range` attributes of its own. Every bound on those
-/// seven fields is a property of the reconstructor, not of this crate, so the protocol type stays
-/// the single source of truth for them and this delegates rather than restating. A restated range
-/// is simply a second place to forget when the first one moves.
-///
-/// `validator` schema functions return one [`ValidationError`], so the inner [`ValidationErrors`]
-/// is folded into its message — [`validate_incoming_session_pix_config`] above is the existing
-/// precedent in this file for a hand-written check that reaches into another crate.
-fn validate_pix_reconstructor_config(cfg: &PixReconstructorConfig) -> Result<(), ValidationError> {
-    SsaReconstructorConfig::from(*cfg).validate().map_err(|errors| {
-        let mut error = ValidationError::new("pix reconstructor configuration is out of range");
-        error.message = Some(errors.to_string().into());
-        error
-    })
-}
-
-/// Operator-facing mirror of [`SsaReconstructorConfig`], the Exit-side share reconstructor.
-///
-/// Stands in the same relationship to the protocol type that the fields of [`PixGlobalConfig`]
-/// stand in to `SsaGeneratorConfig`: `hopr-protocol-pix` owns the type the reconstructor is built
-/// from, and this crate owns the shape an operator writes. It exists because none of these seven
-/// values was reachable from a config file at all — both production constructors took
-/// `SsaReconstructorConfig::default()`, so the Exit side of PIX was unconfigurable while the Entry
-/// side was not.
-///
-/// Duplicating seven fields is the price of the mirror, and two guards pay it. The [`From`] impl
-/// below is written exhaustively, so a field added to [`SsaReconstructorConfig`] fails to compile
-/// until it is mirrored here; and `pix_reconstructor_mirror_matches_the_protocol_defaults` asserts
-/// the two default sets still agree. Validation is not duplicated at all — see
-// `validate_pix_reconstructor_config` is deliberately unlinked: it is module-private, so an
-// intra-doc link from this public type trips `rustdoc::private_intra_doc_links`, which the
-// `nix build .#docs` job builds as an error.
-/// `validate_pix_reconstructor_config`.
-///
-/// Each field's rationale lives on the protocol type and is linked rather than copied, since a
-/// third copy of the same prose is a third thing to keep true.
-#[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default, deny_unknown_fields)
-)]
-#[validate(schema(function = "validate_pix_reconstructor_config", skip_on_field_errors = false))]
-pub struct PixReconstructorConfig {
-    /// Time until the complete commitment to an SSA must be received.
+    /// Rejects an [`IncomingSessionPixConfig`] that cannot work.
     ///
-    /// Defaults to 2 minutes. See
-    /// [`SsaReconstructorConfig::incomplete_commitment_lifetime`].
-    #[default(SsaReconstructorConfig::DEFAULT_INCOMPLETE_COMMITMENT_LIFETIME)]
-    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
-    pub incomplete_commitment_lifetime: Duration,
-
-    /// Maximum time an SSA cycle can go without progress before it is discarded.
+    /// Three independent failures, all of which would otherwise only show up at runtime:
     ///
-    /// Defaults to 30 minutes. See [`SsaReconstructorConfig::unused_verifier_lifetime`].
-    #[default(SsaReconstructorConfig::DEFAULT_UNUSED_VERIFIER_LIFETIME)]
-    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
-    pub unused_verifier_lifetime: Duration,
-
-    /// Maximum number of peers tracked simultaneously with unacknowledged shares.
+    /// `quota_range` is operator-settable, and an empty (inverted) range silently makes
+    /// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
+    /// `UnacceptablePixParams` errors at Session establishment time.
     ///
-    /// Defaults to 2000, minimum 10. See [`SsaReconstructorConfig::max_tracked_peers`].
-    #[default(SsaReconstructorConfig::DEFAULT_MAX_TRACKED_PEERS)]
-    pub max_tracked_peers: usize,
-
-    /// Maximum number of awaited acknowledgements held **per peer**.
+    /// `max_recovery_time` has to leave a whole cycle at the widest dimensions this Exit will *accept*
+    /// time to complete, or it closes honest Sessions partway through one. With fill enabled that is
+    /// judged at `fill.max_rate`, counted up to [`MAX_ASSUMED_SESSION_PACKET_RATE`]; without it, at that
+    /// rate itself, so only a deadline no Session could meet is refused. The check is possible at all only because the
+    /// quota counts the surplus: `quota_range.end()` prices every share a cycle emits, so the packet count follows by
+    /// division with nothing left to guess.
     ///
-    /// Defaults to 1 000 000, minimum 10 000. See [`SsaReconstructorConfig::max_awaiting_acks`].
-    #[default(SsaReconstructorConfig::DEFAULT_MAX_AWAITING_ACKS)]
-    pub max_awaiting_acks: usize,
+    /// And `max_live_cycle_bytes` has to admit at least one Session at those same widest dimensions,
+    /// or the Exit advertises a `quota_range` whose top it will always refuse for want of budget —
+    /// again as a Start error the operator cannot attribute. Deliberately *one* Session and not
+    /// `maximum_managed_sessions` of them: this budget exists precisely because that product is a
+    /// number no node holds, so checking it here would only ever reject the shipping defaults.
+    pub(super) fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
+        hopr_transport_session::validate_incoming_session_pix_config(cfg, MAX_ASSUMED_SESSION_PACKET_RATE).map_err(
+            |error| {
+                let mut e = ValidationError::new("invalid incoming PIX configuration");
+                e.message = Some(error.to_string().into());
+                e
+            },
+        )
+    }
 
-    /// Maximum time an acknowledgement is awaited before its share is discarded.
-    ///
-    /// Defaults to 30 seconds. See [`SsaReconstructorConfig::max_ack_await_time`].
-    #[default(SsaReconstructorConfig::DEFAULT_MAX_ACK_AWAIT_TIME)]
-    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
-    pub max_ack_await_time: Duration,
+    /// Global configuration for the Protocol for Incentivization of eXits (PIX).
+    #[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
+    #[cfg_attr(
+        feature = "serde",
+        derive(serde::Serialize, serde::Deserialize),
+        serde(default, deny_unknown_fields)
+    )]
+    pub struct PixGlobalConfig {
+        /// Number of parts an SSA is split into.
+        ///
+        /// This scales will with the CPU parallelism.
+        ///
+        /// Defaults to [`DEFAULT_PIX_POLYS_PER_SSA`], which is also what
+        /// [`IncomingSessionPixConfig::quota_range`] is derived from — changing this without
+        /// widening the peer Exit's `quota_range` accordingly will get the Session rejected.
+        ///
+        /// The range below bounds this field alone, and nothing bounds its product with
+        /// [`ssa_part_size`](Self::ssa_part_size) beyond the two ranges. The product is this node's own
+        /// generation cost and the quota it pays for, and the peer Exit bounds the quota it will serve with
+        /// its `quota_range` when the Session is initiated — before this node has generated anything,
+        /// since polynomials are built only once the Exit asks for a cycle with an `SsaRequest`. An
+        /// oversized offer therefore costs one refused initiation. A local ceiling on the product used to
+        /// sit here on the premise that the refusal arrived after generation, which it does not.
+        #[validate(range(min = 8, max = 16192))]
+        #[default(DEFAULT_PIX_POLYS_PER_SSA as usize)]
+        pub num_ssa_parts: usize,
 
-    /// Whether to use the batch verification algorithm for acknowledgements.
-    ///
-    /// Defaults to `false`. See [`SsaReconstructorConfig::use_batch_verification`], which records
-    /// the measurements behind that default and why the knob was kept rather than removed.
-    #[default(SsaReconstructorConfig::DEFAULT_USE_BATCH_VERIFICATION)]
-    pub use_batch_verification: bool,
+        /// Number of shares required to reconstruct an SSA part.
+        ///
+        /// This does not scale well with CPU parallelism.
+        ///
+        /// Defaults to [`DEFAULT_PIX_SHARES_PER_POLY`]. See [`num_ssa_parts`](Self::num_ssa_parts)
+        /// for the interaction with the Exit's accepted quota range, and for why the two are not bounded
+        /// together. Capped at 255 because the threshold is one byte of the negotiated
+        /// [`PixParams`](hopr_protocol_pix::PixParams) word — see
+        /// [`MAX_POLY_THRESHOLD`](hopr_protocol_pix::MAX_POLY_THRESHOLD).
+        #[validate(range(min = 2, max = 255))]
+        #[default(DEFAULT_PIX_SHARES_PER_POLY as usize)]
+        pub ssa_part_size: usize,
 
-    /// Fraction of reconstructed polynomials at which an early recovery notification is emitted.
-    ///
-    /// Defaults to 0.85, range 0.0..=1.0. See
-    /// [`SsaReconstructorConfig::early_recovery_threshold`].
-    #[default(SsaReconstructorConfig::DEFAULT_EARLY_RECOVERY_THRESHOLD)]
-    pub early_recovery_threshold: f64,
+        /// Number of shares sent in addition to `ssa_part_size` to reconstruct an SSA part.
+        ///
+        /// This is used to account for potential packet loss but makes it take longer for the
+        /// other side to reconstruct the entire SSA from all its parts. This is because if
+        /// no packet loss is present, the other side can reconstruct the SSA from fewer shares.
+        ///
+        /// **Leave unset unless you have measured your return-path loss.** `None` derives the surplus
+        /// from [`num_ssa_parts`](Self::num_ssa_parts) and [`ssa_part_size`](Self::ssa_part_size) via
+        /// [`default_surplus_for`](hopr_protocol_pix::default_surplus_for), which sizes it so that a
+        /// cycle still recovers at 99 % when half of all shares go missing — 79 at the deployed
+        /// `4096 × 32`. Read [`surplus_shares`](Self::surplus_shares) for the resolved value.
+        ///
+        /// It depends on both dimensions because a cycle recovers only if *every* polynomial does: one
+        /// polynomial survives with probability `P(Binom(ssa_part_size + surplus, 1 − loss) >=
+        /// ssa_part_size)`, and the cycle with that raised to the power `num_ssa_parts`. Setting an
+        /// absolute count therefore means a different loss tolerance at every split.
+        ///
+        /// The factor is what matters, because it is what this costs. A polynomial leaves the
+        /// generator's queue at `ssa_part_size + surplus` shares whether or not any were
+        /// lost, so this is service the Exit performs in every case — and since the surplus travels to
+        /// the peer as part of the negotiated [`PixParams`](hopr_protocol_pix::PixParams), the per-SSA
+        /// quota counts it and the deposit pays for it. It buys loss tolerance, and it is charged for
+        /// like any other insurance: on purchase, not on claim.
+        ///
+        /// Raising it therefore costs money rather than earning free service, which is the way round it
+        /// should be. It used to be the other way: the surplus was excluded from the quota, so the
+        /// rational Entry raised this dial to take traffic it was not billed for.
+        ///
+        /// Capped at 255 because it is the other byte of that word, and at nothing tighter: how much
+        /// insurance a path needs is a property of its loss rate, and the surplus that a 50 % loss needs
+        /// exceeds the threshold at every split in the deployed range.
+        #[validate(range(min = 0, max = 255))]
+        pub additional_shares: Option<usize>,
 
-    /// Ceiling on the total awaiting-acknowledgement state held across every peer, in bytes.
-    ///
-    /// Defaults to 1 GiB, minimum 25 600 B — 64 entries at the measured per-entry cost. That floor
-    /// is a sanity check rather than a sizing recommendation; see
-    /// [`SsaReconstructorConfig::max_ack_buffer_bytes`], which is where it is enforced and why it is
-    /// deliberately low.
-    ///
-    /// This — not the product of [`max_tracked_peers`](Self::max_tracked_peers) and
-    /// [`max_awaiting_acks`](Self::max_awaiting_acks) — is what bounds the reconstructor's
-    /// acknowledgement buffer, and the reconstructor enforces it as shares arrive rather than
-    /// checking a workload model here. A model would have to assume a Session count and a packet
-    /// rate; `maximum_managed_sessions` validates to 100 000 and `SessionCapability::NoRateControl`
-    /// removes the rate limiter, so neither assumption survives contact with a legal configuration.
-    #[default(SsaReconstructorConfig::DEFAULT_MAX_ACK_BUFFER_BYTES)]
-    pub max_ack_buffer_bytes: usize,
-}
+        /// Maximum number of SSA commitments this node, acting as an Entry, accepts in a single
+        /// `SsaRequest` from an Exit.
+        ///
+        /// This is a protection against a misbehaving Exit rather than a preference: each accepted entry
+        /// costs a full client commitment, its own burst of `SsaCommit` packets and its own on-chain
+        /// deposit, so an uncapped request would let one inbound packet amplify into minutes of CPU and
+        /// as many simultaneous deposits as the wire format admits (27). An over-cap request is rejected
+        /// in full before any of that work starts.
+        ///
+        /// **Must be at least the `ssas_per_request` of every Exit this node uses.** The batch size is not
+        /// negotiated — the Exit cannot learn this value — so an Exit batching above it has every request
+        /// rejected, and every such Session is lost. The refusal is reported to the Exit as an
+        /// `UnacceptablePixParams` `SessionError` so it fails in about a round trip rather than as a
+        /// deposit timeout minutes later, but raising the Exit side still requires raising this in step.
+        ///
+        /// Defaults to 2, minimum 1, maximum 9 (`MAX_SSA_BATCH_SIZE`).
+        #[validate(range(min = 1, max = 9))]
+        #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
+        pub max_ssas_per_request: usize,
 
-impl From<PixReconstructorConfig> for SsaReconstructorConfig {
-    /// Both sides are written out exhaustively, with no `..Default::default()` on either.
-    ///
-    /// That is the guard the mirror rests on: a field added to [`SsaReconstructorConfig`] leaves
-    /// this initialiser incomplete and a field added to [`PixReconstructorConfig`] leaves the
-    /// pattern incomplete, so either one fails to compile until it is mirrored. Struct update
-    /// syntax would compile in both directions and silently pin the new knob to its default.
-    fn from(cfg: PixReconstructorConfig) -> Self {
-        let PixReconstructorConfig {
-            incomplete_commitment_lifetime,
-            unused_verifier_lifetime,
-            max_tracked_peers,
-            max_awaiting_acks,
-            max_ack_await_time,
-            use_batch_verification,
-            early_recovery_threshold,
-            max_ack_buffer_bytes,
-        } = cfg;
+        /// Exit-side SSA reconstructor configuration.
+        ///
+        /// Nested rather than flattened so the whole PIX surface stays under one key, and so that
+        /// Exit-side capacity does not intermix with the Entry-side dimensions above.
+        #[validate(nested)]
+        #[cfg_attr(feature = "serde", serde(default))]
+        pub reconstructor: PixReconstructorConfig,
+    }
 
-        Self {
-            incomplete_commitment_lifetime,
-            unused_verifier_lifetime,
-            max_tracked_peers,
-            max_awaiting_acks,
-            max_ack_await_time,
-            use_batch_verification,
-            early_recovery_threshold,
-            max_ack_buffer_bytes,
+    impl PixGlobalConfig {
+        /// Surplus shares per polynomial: the operator's value if set, otherwise derived from
+        /// [`num_ssa_parts`](Self::num_ssa_parts) and [`ssa_part_size`](Self::ssa_part_size).
+        ///
+        /// Every reader must go through this rather than the field. The field is `Option` precisely
+        /// because serde cannot express "default to a function of a sibling", so the field alone is not
+        /// the configuration — reading it directly is how the unset case would silently become zero
+        /// surplus, i.e. no loss tolerance at all.
+        pub fn surplus_shares(&self) -> usize {
+            self.additional_shares.unwrap_or_else(|| {
+                hopr_protocol_pix::default_surplus_for(
+                    self.num_ssa_parts.min(u16::MAX as usize) as u16,
+                    self.ssa_part_size.min(u8::MAX as usize) as u8,
+                ) as usize
+            })
+        }
+    }
+
+    /// Rejects a reconstructor configuration that [`SsaReconstructorConfig`] itself would reject.
+    ///
+    /// The mirror below deliberately carries no `range` attributes of its own. Every bound on those
+    /// seven fields is a property of the reconstructor, not of this crate, so the protocol type stays
+    /// the single source of truth for them and this delegates rather than restating. A restated range
+    /// is simply a second place to forget when the first one moves.
+    ///
+    /// `validator` schema functions return one [`ValidationError`], so the inner [`ValidationErrors`]
+    /// is folded into its message — [`validate_incoming_session_pix_config`] above is the existing
+    /// precedent in this file for a hand-written check that reaches into another crate.
+    pub(super) fn validate_pix_reconstructor_config(cfg: &PixReconstructorConfig) -> Result<(), ValidationError> {
+        SsaReconstructorConfig::from(*cfg).validate().map_err(|errors| {
+            let mut error = ValidationError::new("pix reconstructor configuration is out of range");
+            error.message = Some(errors.to_string().into());
+            error
+        })
+    }
+
+    /// Operator-facing mirror of [`SsaReconstructorConfig`], the Exit-side share reconstructor.
+    ///
+    /// Stands in the same relationship to the protocol type that the fields of [`PixGlobalConfig`]
+    /// stand in to `SsaGeneratorConfig`: `hopr-protocol-pix` owns the type the reconstructor is built
+    /// from, and this crate owns the shape an operator writes. It exists because none of these seven
+    /// values was reachable from a config file at all — both production constructors took
+    /// `SsaReconstructorConfig::default()`, so the Exit side of PIX was unconfigurable while the Entry
+    /// side was not.
+    ///
+    /// Duplicating seven fields is the price of the mirror, and two guards pay it. The [`From`] impl
+    /// below is written exhaustively, so a field added to [`SsaReconstructorConfig`] fails to compile
+    /// until it is mirrored here; and `pix_reconstructor_mirror_matches_the_protocol_defaults` asserts
+    /// the two default sets still agree. Validation is not duplicated at all — see
+    // `validate_pix_reconstructor_config` is deliberately unlinked: it is module-private, so an
+    // intra-doc link from this public type trips `rustdoc::private_intra_doc_links`, which the
+    // `nix build .#docs` job builds as an error.
+    /// `validate_pix_reconstructor_config`.
+    ///
+    /// Each field's rationale lives on the protocol type and is linked rather than copied, since a
+    /// third copy of the same prose is a third thing to keep true.
+    #[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
+    #[cfg_attr(
+        feature = "serde",
+        derive(serde::Serialize, serde::Deserialize),
+        serde(default, deny_unknown_fields)
+    )]
+    #[validate(schema(function = "validate_pix_reconstructor_config", skip_on_field_errors = false))]
+    pub struct PixReconstructorConfig {
+        /// Time until the complete commitment to an SSA must be received.
+        ///
+        /// Defaults to 2 minutes. See
+        /// [`SsaReconstructorConfig::incomplete_commitment_lifetime`].
+        #[default(SsaReconstructorConfig::DEFAULT_INCOMPLETE_COMMITMENT_LIFETIME)]
+        #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+        pub incomplete_commitment_lifetime: Duration,
+
+        /// Maximum time an SSA cycle can go without progress before it is discarded.
+        ///
+        /// Defaults to 30 minutes. See [`SsaReconstructorConfig::unused_verifier_lifetime`].
+        #[default(SsaReconstructorConfig::DEFAULT_UNUSED_VERIFIER_LIFETIME)]
+        #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+        pub unused_verifier_lifetime: Duration,
+
+        /// Maximum number of peers tracked simultaneously with unacknowledged shares.
+        ///
+        /// Defaults to 2000, minimum 10. See [`SsaReconstructorConfig::max_tracked_peers`].
+        #[default(SsaReconstructorConfig::DEFAULT_MAX_TRACKED_PEERS)]
+        pub max_tracked_peers: usize,
+
+        /// Maximum number of awaited acknowledgements held **per peer**.
+        ///
+        /// Defaults to 1 000 000, minimum 10 000. See [`SsaReconstructorConfig::max_awaiting_acks`].
+        #[default(SsaReconstructorConfig::DEFAULT_MAX_AWAITING_ACKS)]
+        pub max_awaiting_acks: usize,
+
+        /// Maximum time an acknowledgement is awaited before its share is discarded.
+        ///
+        /// Defaults to 30 seconds. See [`SsaReconstructorConfig::max_ack_await_time`].
+        #[default(SsaReconstructorConfig::DEFAULT_MAX_ACK_AWAIT_TIME)]
+        #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+        pub max_ack_await_time: Duration,
+
+        /// Whether to use the batch verification algorithm for acknowledgements.
+        ///
+        /// Defaults to `false`. See [`SsaReconstructorConfig::use_batch_verification`], which records
+        /// the measurements behind that default and why the knob was kept rather than removed.
+        #[default(SsaReconstructorConfig::DEFAULT_USE_BATCH_VERIFICATION)]
+        pub use_batch_verification: bool,
+
+        /// Fraction of reconstructed polynomials at which an early recovery notification is emitted.
+        ///
+        /// Defaults to 0.85, range 0.0..=1.0. See
+        /// [`SsaReconstructorConfig::early_recovery_threshold`].
+        #[default(SsaReconstructorConfig::DEFAULT_EARLY_RECOVERY_THRESHOLD)]
+        pub early_recovery_threshold: f64,
+
+        /// Ceiling on the total awaiting-acknowledgement state held across every peer, in bytes.
+        ///
+        /// Defaults to 1 GiB, minimum 25 600 B — 64 entries at the measured per-entry cost. That floor
+        /// is a sanity check rather than a sizing recommendation; see
+        /// [`SsaReconstructorConfig::max_ack_buffer_bytes`], which is where it is enforced and why it is
+        /// deliberately low.
+        ///
+        /// This — not the product of [`max_tracked_peers`](Self::max_tracked_peers) and
+        /// [`max_awaiting_acks`](Self::max_awaiting_acks) — is what bounds the reconstructor's
+        /// acknowledgement buffer, and the reconstructor enforces it as shares arrive rather than
+        /// checking a workload model here. A model would have to assume a Session count and a packet
+        /// rate; `maximum_managed_sessions` validates to 100 000 and `SessionCapability::NoRateControl`
+        /// removes the rate limiter, so neither assumption survives contact with a legal configuration.
+        #[default(SsaReconstructorConfig::DEFAULT_MAX_ACK_BUFFER_BYTES)]
+        pub max_ack_buffer_bytes: usize,
+    }
+
+    impl From<PixReconstructorConfig> for SsaReconstructorConfig {
+        /// Both sides are written out exhaustively, with no `..Default::default()` on either.
+        ///
+        /// That is the guard the mirror rests on: a field added to [`SsaReconstructorConfig`] leaves
+        /// this initialiser incomplete and a field added to [`PixReconstructorConfig`] leaves the
+        /// pattern incomplete, so either one fails to compile until it is mirrored. Struct update
+        /// syntax would compile in both directions and silently pin the new knob to its default.
+        fn from(cfg: PixReconstructorConfig) -> Self {
+            let PixReconstructorConfig {
+                incomplete_commitment_lifetime,
+                unused_verifier_lifetime,
+                max_tracked_peers,
+                max_awaiting_acks,
+                max_ack_await_time,
+                use_batch_verification,
+                early_recovery_threshold,
+                max_ack_buffer_bytes,
+            } = cfg;
+
+            Self {
+                incomplete_commitment_lifetime,
+                unused_verifier_lifetime,
+                max_tracked_peers,
+                max_awaiting_acks,
+                max_ack_await_time,
+                use_batch_verification,
+                early_recovery_threshold,
+                max_ack_buffer_bytes,
+            }
         }
     }
 }
+#[cfg(feature = "session-entry")]
+pub use pix_config::*;
 
 /// Configuration of the HOPR packet pipeline.
 #[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
@@ -909,368 +924,374 @@ pub struct TransportConfig {
     pub prefer_local_addresses: bool,
 }
 
-const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_mins(3);
+#[cfg(feature = "session-entry")]
+mod session_config {
+    use super::*;
 
-const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
+    pub(super) const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_mins(3);
 
-const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
+    pub(super) const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
 
-const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: usize = 3;
+    pub(super) const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
-const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
+    pub(super) const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: usize = 3;
 
-const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
+    pub(super) const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
-const DEFAULT_MAXIMUM_MANAGED_SESSIONS: usize = 100;
+    pub(super) const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
-fn default_session_balancer_buffer_duration() -> Duration {
-    DEFAULT_SESSION_BALANCER_BUFFER_DURATION
-}
+    pub(super) const DEFAULT_MAXIMUM_MANAGED_SESSIONS: usize = 100;
 
-fn default_session_establish_max_retries() -> usize {
-    DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
-}
-
-fn default_session_idle_timeout() -> Duration {
-    DEFAULT_SESSION_IDLE_TIMEOUT
-}
-
-fn default_session_establish_retry_delay() -> Duration {
-    DEFAULT_SESSION_ESTABLISH_RETRY_DELAY
-}
-
-fn default_session_balancer_sampling() -> Duration {
-    DEFAULT_SESSION_BALANCER_SAMPLING
-}
-
-fn default_max_managed_sessions() -> usize {
-    DEFAULT_MAXIMUM_MANAGED_SESSIONS
-}
-
-/// Transport-layer default for the SURB balance notification period; this is the effective default
-/// for [`SessionGlobalConfig::surb_balance_notify_period`] (15s). It deliberately overrides the
-/// lower-level fallback in `SessionManagerConfig` (whose own field default is `None`) with a 15s
-/// cadence, so the Entry's dead-reckoned estimate of the Exit's SURB buffer is corrected often
-/// enough to keep the SURB balancer from under-producing (and starving the Exit) under drift,
-/// without the per-session keep-alive overhead of the previous 2s cadence. The 1s floor is enforced
-/// downstream by `SessionManager::new` (`MIN_SURB_BUFFER_NOTIFICATION_PERIOD`).
-fn default_session_surb_balance_notify_period() -> Option<Duration> {
-    Some(Duration::from_secs(15))
-}
-
-/// Transport-layer default for the Exit's degraded notification period: 1s.
-///
-/// Fast enough to corroborate a dead-relayer verdict inside the 15s test gate from a 15s base
-/// cadence, and no faster than the floor `SessionManager::new` enforces anyway.
-fn default_session_surb_degraded_notify_period() -> Option<Duration> {
-    Some(Duration::from_secs(1))
-}
-
-/// Transport-layer default for [`SessionGlobalConfig::surb_idle_notify_period`]: 45s.
-fn default_session_surb_idle_notify_period() -> Option<Duration> {
-    Some(Duration::from_secs(45))
-}
-
-/// Transport-layer default for the Exit's refusal reply budget: a burst of 32, then one reply a second.
-fn default_session_refusal_reply_budget() -> Option<RefusalReplyBudget> {
-    Some(RefusalReplyBudget::default())
-}
-
-fn default_session_max_frames_behind_gap() -> Option<usize> {
-    Some(256)
-}
-
-fn default_session_forward_receipts() -> bool {
-    true
-}
-
-fn default_session_surb_target_notify() -> bool {
-    true
-}
-
-fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
-    if SESSION_IDLE_MIN_TIMEOUT <= *value {
-        Ok(())
-    } else {
-        Err(ValidationError::new("session idle timeout is too low"))
+    pub(super) fn default_session_balancer_buffer_duration() -> Duration {
+        DEFAULT_SESSION_BALANCER_BUFFER_DURATION
     }
-}
 
-fn validate_balancer_sampling(value: &Duration) -> Result<(), ValidationError> {
-    if MIN_BALANCER_SAMPLING_INTERVAL <= *value {
-        Ok(())
-    } else {
-        Err(ValidationError::new("balancer sampling interval is too low"))
+    pub(super) fn default_session_establish_max_retries() -> usize {
+        DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
     }
-}
 
-fn validate_balancer_buffer_duration(value: &Duration) -> Result<(), ValidationError> {
-    if MIN_SURB_BUFFER_DURATION <= *value {
-        Ok(())
-    } else {
-        Err(ValidationError::new("minmum SURB buffer duration is too low"))
+    pub(super) fn default_session_idle_timeout() -> Duration {
+        DEFAULT_SESSION_IDLE_TIMEOUT
     }
-}
 
-fn validate_surb_balance_notify_period(value: &Duration) -> Result<(), ValidationError> {
-    // `custom` on an `Option` field skips `None` and passes the inner value on `Some`.
-    if *value >= Duration::from_secs(1) {
-        Ok(())
-    } else {
-        Err(ValidationError::new(
-            "SURB balance notify period must be at least 1 second",
-        ))
+    pub(super) fn default_session_establish_retry_delay() -> Duration {
+        DEFAULT_SESSION_ESTABLISH_RETRY_DELAY
     }
-}
 
-fn validate_surb_degraded_notify_period(value: &Duration) -> Result<(), ValidationError> {
-    if *value >= Duration::from_secs(1) {
-        Ok(())
-    } else {
-        Err(ValidationError::new(
-            "SURB degraded notify period must be at least 1 second",
-        ))
+    pub(super) fn default_session_balancer_sampling() -> Duration {
+        DEFAULT_SESSION_BALANCER_SAMPLING
     }
-}
 
-fn validate_surb_idle_notify_period(value: &Duration) -> Result<(), ValidationError> {
-    if *value >= Duration::from_secs(1) {
-        Ok(())
-    } else {
-        Err(ValidationError::new(
-            "SURB idle notify period must be at least 1 second",
-        ))
+    pub(super) fn default_max_managed_sessions() -> usize {
+        DEFAULT_MAXIMUM_MANAGED_SESSIONS
     }
-}
 
-fn validate_refusal_reply_budget(value: &RefusalReplyBudget) -> Result<(), ValidationError> {
-    if value.refill_period >= MIN_REFUSAL_REPLY_REFILL_PERIOD {
-        Ok(())
-    } else {
-        Err(ValidationError::new(
-            "refusal reply budget refill period must be at least 1 millisecond",
-        ))
+    /// Transport-layer default for the SURB balance notification period; this is the effective default
+    /// for [`SessionGlobalConfig::surb_balance_notify_period`] (15s). It deliberately overrides the
+    /// lower-level fallback in `SessionManagerConfig` (whose own field default is `None`) with a 15s
+    /// cadence, so the Entry's dead-reckoned estimate of the Exit's SURB buffer is corrected often
+    /// enough to keep the SURB balancer from under-producing (and starving the Exit) under drift,
+    /// without the per-session keep-alive overhead of the previous 2s cadence. The 1s floor is enforced
+    /// downstream by `SessionManager::new` (`MIN_SURB_BUFFER_NOTIFICATION_PERIOD`).
+    pub(super) fn default_session_surb_balance_notify_period() -> Option<Duration> {
+        Some(Duration::from_secs(15))
     }
-}
 
-/// Global configuration of Sessions and the Session manager.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Validate, smart_default::SmartDefault)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(deny_unknown_fields)
-)]
-pub struct SessionGlobalConfig {
-    /// Maximum time before an idle Session is closed.
+    /// Transport-layer default for the Exit's degraded notification period: 1s.
     ///
-    /// Defaults to 3 minutes.
-    #[validate(custom(function = "validate_session_idle_timeout"))]
-    #[default(default_session_idle_timeout())]
+    /// Fast enough to corroborate a dead-relayer verdict inside the 15s test gate from a 15s base
+    /// cadence, and no faster than the floor `SessionManager::new` enforces anyway.
+    pub(super) fn default_session_surb_degraded_notify_period() -> Option<Duration> {
+        Some(Duration::from_secs(1))
+    }
+
+    /// Transport-layer default for [`SessionGlobalConfig::surb_idle_notify_period`]: 45s.
+    pub(super) fn default_session_surb_idle_notify_period() -> Option<Duration> {
+        Some(Duration::from_secs(45))
+    }
+
+    /// Transport-layer default for the Exit's refusal reply budget: a burst of 32, then one reply a second.
+    pub(super) fn default_session_refusal_reply_budget() -> Option<RefusalReplyBudget> {
+        Some(RefusalReplyBudget::default())
+    }
+
+    pub(super) fn default_session_forward_receipts() -> bool {
+        true
+    }
+
+    pub(super) fn default_session_max_frames_behind_gap() -> Option<usize> {
+        Some(256)
+    }
+
+    pub(super) fn default_session_surb_target_notify() -> bool {
+        true
+    }
+
+    pub(super) fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
+        if SESSION_IDLE_MIN_TIMEOUT <= *value {
+            Ok(())
+        } else {
+            Err(ValidationError::new("session idle timeout is too low"))
+        }
+    }
+
+    pub(super) fn validate_balancer_sampling(value: &Duration) -> Result<(), ValidationError> {
+        if MIN_BALANCER_SAMPLING_INTERVAL <= *value {
+            Ok(())
+        } else {
+            Err(ValidationError::new("balancer sampling interval is too low"))
+        }
+    }
+
+    pub(super) fn validate_balancer_buffer_duration(value: &Duration) -> Result<(), ValidationError> {
+        if MIN_SURB_BUFFER_DURATION <= *value {
+            Ok(())
+        } else {
+            Err(ValidationError::new("minmum SURB buffer duration is too low"))
+        }
+    }
+
+    pub(super) fn validate_surb_balance_notify_period(value: &Duration) -> Result<(), ValidationError> {
+        // `custom` on an `Option` field skips `None` and passes the inner value on `Some`.
+        if *value >= Duration::from_secs(1) {
+            Ok(())
+        } else {
+            Err(ValidationError::new(
+                "SURB balance notify period must be at least 1 second",
+            ))
+        }
+    }
+
+    pub(super) fn validate_surb_degraded_notify_period(value: &Duration) -> Result<(), ValidationError> {
+        if *value >= Duration::from_secs(1) {
+            Ok(())
+        } else {
+            Err(ValidationError::new(
+                "SURB degraded notify period must be at least 1 second",
+            ))
+        }
+    }
+
+    pub(super) fn validate_surb_idle_notify_period(value: &Duration) -> Result<(), ValidationError> {
+        if *value >= Duration::from_secs(1) {
+            Ok(())
+        } else {
+            Err(ValidationError::new(
+                "SURB idle notify period must be at least 1 second",
+            ))
+        }
+    }
+
+    pub(super) fn validate_refusal_reply_budget(value: &RefusalReplyBudget) -> Result<(), ValidationError> {
+        if value.refill_period >= MIN_REFUSAL_REPLY_REFILL_PERIOD {
+            Ok(())
+        } else {
+            Err(ValidationError::new(
+                "refusal reply budget refill period must be at least 1 millisecond",
+            ))
+        }
+    }
+
+    /// Global configuration of Sessions and the Session manager.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Validate, smart_default::SmartDefault)]
     #[cfg_attr(
         feature = "serde",
-        serde(default = "default_session_idle_timeout", with = "humantime_serde")
+        derive(serde::Serialize, serde::Deserialize),
+        serde(deny_unknown_fields)
     )]
-    pub idle_timeout: Duration,
+    pub struct SessionGlobalConfig {
+        /// Maximum time before an idle Session is closed.
+        ///
+        /// Defaults to 3 minutes.
+        #[validate(custom(function = "validate_session_idle_timeout"))]
+        #[default(default_session_idle_timeout())]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default = "default_session_idle_timeout", with = "humantime_serde")
+        )]
+        pub idle_timeout: Duration,
 
-    /// Maximum number of Sessions that can be managed by the Session manager.
-    ///
-    /// Default is 100, minimum is 2, maximum is 100 000.
-    #[validate(range(min = 2, max = 100_000))]
-    #[default(default_max_managed_sessions())]
-    #[cfg_attr(feature = "serde", serde(default = "default_max_managed_sessions"))]
-    pub maximum_managed_sessions: usize,
+        /// Maximum number of Sessions that can be managed by the Session manager.
+        ///
+        /// Default is 100, minimum is 2, maximum is 100 000.
+        #[validate(range(min = 2, max = 100_000))]
+        #[default(default_max_managed_sessions())]
+        #[cfg_attr(feature = "serde", serde(default = "default_max_managed_sessions"))]
+        pub maximum_managed_sessions: usize,
 
-    /// Maximum retries to attempt to establish the Session
-    /// Set 0 for no retries.
-    ///
-    /// Defaults to 3, maximum is 20.
-    #[validate(range(min = 0, max = 20))]
-    #[default(default_session_establish_max_retries())]
-    #[cfg_attr(feature = "serde", serde(default = "default_session_establish_max_retries"))]
-    pub establish_max_retries: usize,
+        /// Maximum retries to attempt to establish the Session
+        /// Set 0 for no retries.
+        ///
+        /// Defaults to 3, maximum is 20.
+        #[validate(range(min = 0, max = 20))]
+        #[default(default_session_establish_max_retries())]
+        #[cfg_attr(feature = "serde", serde(default = "default_session_establish_max_retries"))]
+        pub establish_max_retries: usize,
 
-    /// Delay between Session establishment retries.
-    ///
-    /// Default is 2 seconds.
-    #[default(default_session_establish_retry_delay())]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default = "default_session_establish_retry_delay", with = "humantime_serde")
-    )]
-    pub establish_retry_timeout: Duration,
+        /// Delay between Session establishment retries.
+        ///
+        /// Default is 2 seconds.
+        #[default(default_session_establish_retry_delay())]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default = "default_session_establish_retry_delay", with = "humantime_serde")
+        )]
+        pub establish_retry_timeout: Duration,
 
-    /// Sampling interval for SURB balancer in milliseconds.
-    ///
-    /// Default is 100 milliseconds.
-    #[validate(custom(function = "validate_balancer_sampling"))]
-    #[default(default_session_balancer_sampling())]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default = "default_session_balancer_sampling", with = "humantime_serde")
-    )]
-    pub balancer_sampling_interval: Duration,
+        /// Sampling interval for SURB balancer in milliseconds.
+        ///
+        /// Default is 100 milliseconds.
+        #[validate(custom(function = "validate_balancer_sampling"))]
+        #[default(default_session_balancer_sampling())]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default = "default_session_balancer_sampling", with = "humantime_serde")
+        )]
+        pub balancer_sampling_interval: Duration,
 
-    /// Minimum runway of received SURBs in seconds.
-    ///
-    /// This applies to incoming Sessions on Exit nodes only and is the main indicator of how
-    /// the egress traffic will be shaped, unless the `NoRateControl` Session
-    /// capability is specified during initiation.
-    ///
-    /// Default is 5 seconds, minimum is 1 second.
-    #[validate(custom(function = "validate_balancer_buffer_duration"))]
-    #[default(default_session_balancer_buffer_duration())]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default = "default_session_balancer_buffer_duration", with = "humantime_serde")
-    )]
-    pub balancer_minimum_surb_buffer_duration: Duration,
+        /// Minimum runway of received SURBs in seconds.
+        ///
+        /// This applies to incoming Sessions on Exit nodes only and is the main indicator of how
+        /// the egress traffic will be shaped, unless the `NoRateControl` Session
+        /// capability is specified during initiation.
+        ///
+        /// Default is 5 seconds, minimum is 1 second.
+        #[validate(custom(function = "validate_balancer_buffer_duration"))]
+        #[default(default_session_balancer_buffer_duration())]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default = "default_session_balancer_buffer_duration", with = "humantime_serde")
+        )]
+        pub balancer_minimum_surb_buffer_duration: Duration,
 
-    /// How often the Exit reports its true SURB buffer level to the Entry, as an absolute
-    /// correction of the Entry's dead-reckoned estimate. Without it, cumulative packet loss
-    /// silently inflates the estimate until the Exit runs out of SURBs and can no longer
-    /// send reply data.
-    ///
-    /// A report costs the Exit one SURB, so it is sent only to an Entry that has shown it runs a SURB
-    /// balancer, by having sent a keep-alive (whether or not that keep-alive announces a target, but not a manual
-    /// ping), and only while the Exit's own estimate of the SURBs it holds for the Session is above 0.
-    ///
-    /// Default is 15 seconds. Set to `null` to disable; minimum effective period is 1 second.
-    #[validate(custom(function = "validate_surb_balance_notify_period"))]
-    #[default(default_session_surb_balance_notify_period())]
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default = "default_session_surb_balance_notify_period",
-            with = "humantime_serde::option"
-        )
-    )]
-    pub surb_balance_notify_period: Option<Duration>,
+        /// How often the Exit reports its true SURB buffer level to the Entry, as an absolute
+        /// correction of the Entry's dead-reckoned estimate. Without it, cumulative packet loss
+        /// silently inflates the estimate until the Exit runs out of SURBs and can no longer
+        /// send reply data.
+        ///
+        /// A report costs the Exit one SURB, so it is sent only to an Entry that has shown it runs a SURB
+        /// balancer, by having sent a keep-alive (whether or not that keep-alive announces a target, but not a manual
+        /// ping), and only while the Exit's own estimate of the SURBs it holds for the Session is above 0.
+        ///
+        /// Default is 15 seconds. Set to `null` to disable; minimum effective period is 1 second.
+        #[validate(custom(function = "validate_surb_balance_notify_period"))]
+        #[default(default_session_surb_balance_notify_period())]
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                default = "default_session_surb_balance_notify_period",
+                with = "humantime_serde::option"
+            )
+        )]
+        pub surb_balance_notify_period: Option<Duration>,
 
-    /// How often the Exit reports its SURB buffer level while the Session's forward path is degraded.
-    ///
-    /// The Entry's dead-relayer verdict is corroborated by replies coming home after the relayer went
-    /// quiet. When the forward path is dark, the data frames never reassemble at the Exit, so no echo
-    /// reply goes out and the Exit's SURB-level report is the only reply left — at
-    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period), 15 s by default, the verdict
-    /// waits 12 to 28 s for it instead of the ~11 s an intact path gives.
-    ///
-    /// While the Session has lost a frame within the last three seconds, or its frames stalled within
-    /// them (segments of two frames arriving and neither completing for a second, which shows a dark
-    /// forward path seconds before its first frame times out), its Entry has shown it reads the
-    /// reports, and its SURB stock is above the keep-alive reserve, the Exit reports this often
-    /// instead. The extra traffic is bounded by both: at most one SURB per report, never into the
-    /// reserve, and the normal period resumes within three seconds and one poll of the last loss or stall. A
-    /// Session that loses frames only occasionally therefore spends a few extra SURBs of its buffer
-    /// around each loss and nothing otherwise.
-    ///
-    /// While the frames stall, the forward path is dark: the reports are all the Entry hears, and the Exit
-    /// sends one every 100 ms, as long as this period is set (a fixed cadence, bounded by the same reserve).
-    /// A Session of single-segment frames never stalls, so it only ever reports at this period.
-    ///
-    /// A Session for which the Exit has no announced SURB target (a `NoRateControl` Session, which runs no
-    /// balancer on the Exit) never reports at this period; it keeps the normal one.
-    ///
-    /// The same holds on a PIX Session: its degraded reports stop at the keep-alive reserve too. PIX
-    /// fill itself is unaffected by degradation and keeps its own reserve.
-    ///
-    /// Default is 1 second. Set to `null` to disable; minimum is 1 second, and a value at or above
-    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) reports no faster, so it is
-    /// treated as disabled.
-    #[validate(custom(function = "validate_surb_degraded_notify_period"))]
-    #[default(default_session_surb_degraded_notify_period())]
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default = "default_session_surb_degraded_notify_period",
-            with = "humantime_serde::option"
-        )
-    )]
-    pub surb_degraded_notify_period: Option<Duration>,
+        /// How often the Exit reports its SURB buffer level while the Session's forward path is degraded.
+        ///
+        /// The Entry's dead-relayer verdict is corroborated by replies coming home after the relayer went
+        /// quiet. When the forward path is dark, the data frames never reassemble at the Exit, so no echo
+        /// reply goes out and the Exit's SURB-level report is the only reply left — at
+        /// [`surb_balance_notify_period`](Self::surb_balance_notify_period), 15 s by default, the verdict
+        /// waits 12 to 28 s for it instead of the ~11 s an intact path gives.
+        ///
+        /// While the Session has lost a frame within the last three seconds, or its frames stalled within
+        /// them (segments of two frames arriving and neither completing for a second, which shows a dark
+        /// forward path seconds before its first frame times out), its Entry has shown it reads the
+        /// reports, and its SURB stock is above the keep-alive reserve, the Exit reports this often
+        /// instead. The extra traffic is bounded by both: at most one SURB per report, never into the
+        /// reserve, and the normal period resumes within three seconds and one poll of the last loss or stall. A
+        /// Session that loses frames only occasionally therefore spends a few extra SURBs of its buffer
+        /// around each loss and nothing otherwise.
+        ///
+        /// While the frames stall, the forward path is dark: the reports are all the Entry hears, and the Exit
+        /// sends one every 100 ms, as long as this period is set (a fixed cadence, bounded by the same reserve).
+        /// A Session of single-segment frames never stalls, so it only ever reports at this period.
+        ///
+        /// A Session for which the Exit has no announced SURB target (a `NoRateControl` Session, which runs no
+        /// balancer on the Exit) never reports at this period; it keeps the normal one.
+        ///
+        /// The same holds on a PIX Session: its degraded reports stop at the keep-alive reserve too. PIX
+        /// fill itself is unaffected by degradation and keeps its own reserve.
+        ///
+        /// Default is 1 second. Set to `null` to disable; minimum is 1 second, and a value at or above
+        /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) reports no faster, so it is
+        /// treated as disabled.
+        #[validate(custom(function = "validate_surb_degraded_notify_period"))]
+        #[default(default_session_surb_degraded_notify_period())]
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                default = "default_session_surb_degraded_notify_period",
+                with = "humantime_serde::option"
+            )
+        )]
+        pub surb_degraded_notify_period: Option<Duration>,
 
-    /// The longest period the Exit's SURB-level report backs off to on an idle Session.
-    ///
-    /// Each report costs the Exit a SURB, and a ticket on a multi-hop return path. While no data moves, PIX
-    /// fill is off and the Session is not degraded, the period doubles from
-    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) up to this value, after the first minute.
-    /// Data in either direction resets it. Clamped to a quarter of [`idle_timeout`](Self::idle_timeout), because
-    /// on an idle Session these reports keep the Entry's slot alive, and per Session to a quarter of the idle
-    /// timeout the Entry announces. An Entry that announces none is assumed to use this node's.
-    ///
-    /// Default is 45 seconds. Set to `null` to disable; minimum is 1 second.
-    #[validate(custom(function = "validate_surb_idle_notify_period"))]
-    #[default(default_session_surb_idle_notify_period())]
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default = "default_session_surb_idle_notify_period",
-            with = "humantime_serde::option"
-        )
-    )]
-    pub surb_idle_notify_period: Option<Duration>,
+        /// The longest period the Exit's SURB-level report backs off to on an idle Session.
+        ///
+        /// Each report costs the Exit a SURB, and a ticket on a multi-hop return path. While no data moves, PIX
+        /// fill is off and the Session is not degraded, the period doubles from
+        /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) up to this value, after the first minute.
+        /// Data in either direction resets it. Clamped to a quarter of [`idle_timeout`](Self::idle_timeout), because
+        /// on an idle Session these reports keep the Entry's slot alive, and per Session to a quarter of the idle
+        /// timeout the Entry announces. An Entry that announces none is assumed to use this node's.
+        ///
+        /// Default is 45 seconds. Set to `null` to disable; minimum is 1 second.
+        #[validate(custom(function = "validate_surb_idle_notify_period"))]
+        #[default(default_session_surb_idle_notify_period())]
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                default = "default_session_surb_idle_notify_period",
+                with = "humantime_serde::option"
+            )
+        )]
+        pub surb_idle_notify_period: Option<Duration>,
 
-    /// Whether the Entry's SURB balancer tells the Exit its buffer target on its keep-alives.
-    ///
-    /// For a Session that announced a target, the Exit sizes the SURB ring from it, and widens the ring
-    /// when a raised one arrives. A rate-controlled Exit also takes its balancer's set-point, its egress
-    /// cap (`max_surbs_per_sec`) and the SURB reserve it holds back for its keep-alives from the target,
-    /// and follows every change the Entry announces, lowered as well as raised.
-    ///
-    /// With this off, the Exit only knows the target announced at establishment, and no change to it
-    /// is seen, lower or higher. A rate-controlled Exit then keeps its ring, balancer, egress cap and
-    /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
-    /// the Exit's egress cap or widen its ring, and one that lowers it to that reserve or below may
-    /// leave the Exit holding its data back for good, waiting for a stock the Entry no longer keeps. A
-    /// Session that announces no target at establishment, as an Entry without a SURB balancer or any
-    /// `NoRateControl` Entry does, gets the full ring from the start, so turning this off costs it
-    /// nothing. The Exit's SURB-level reports are unaffected: it recognises a balancing Entry by its
-    /// balancer's keep-alives, flagged or not.
-    ///
-    /// Default is true.
-    #[default(default_session_surb_target_notify())]
-    #[cfg_attr(feature = "serde", serde(default = "default_session_surb_target_notify"))]
-    pub surb_target_notify: bool,
+        /// Whether the Entry's SURB balancer tells the Exit its buffer target on its keep-alives.
+        ///
+        /// For a Session that announced a target, the Exit sizes the SURB ring from it, and widens the ring
+        /// when a raised one arrives. A rate-controlled Exit also takes its balancer's set-point, its egress
+        /// cap (`max_surbs_per_sec`) and the SURB reserve it holds back for its keep-alives from the target,
+        /// and follows every change the Entry announces, lowered as well as raised.
+        ///
+        /// With this off, the Exit only knows the target announced at establishment, and no change to it
+        /// is seen, lower or higher. A rate-controlled Exit then keeps its ring, balancer, egress cap and
+        /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
+        /// the Exit's egress cap or widen its ring, and one that lowers it to that reserve or below may
+        /// leave the Exit holding its data back for good, waiting for a stock the Entry no longer keeps. A
+        /// Session that announces no target at establishment, as an Entry without a SURB balancer or any
+        /// `NoRateControl` Entry does, gets the full ring from the start, so turning this off costs it
+        /// nothing. The Exit's SURB-level reports are unaffected: it recognises a balancing Entry by its
+        /// balancer's keep-alives, flagged or not.
+        ///
+        /// Default is true.
+        #[default(default_session_surb_target_notify())]
+        #[cfg_attr(feature = "serde", serde(default = "default_session_surb_target_notify"))]
+        pub surb_target_notify: bool,
 
-    /// Whether Exits report the Session packets they received, and this node judges forward relayers
-    /// from those receipts. Off, no receipts are asked for, sent or recorded.
-    ///
-    /// Default is true.
-    #[default(default_session_forward_receipts())]
-    #[cfg_attr(feature = "serde", serde(default = "default_session_forward_receipts"))]
-    pub forward_receipts: bool,
+        /// Whether Exits report the Session packets they received, and this node judges forward relayers
+        /// from those receipts. Off, no receipts are asked for, sent or recorded.
+        ///
+        /// Default is true.
+        #[default(default_session_forward_receipts())]
+        #[cfg_attr(feature = "serde", serde(default = "default_session_forward_receipts"))]
+        pub forward_receipts: bool,
 
-    /// How many later frames may queue behind a missing one before the reassembler gives up on it
-    /// and releases what it already has.
-    ///
-    /// Only applies to Sessions without retransmission, where a missing frame is never coming and
-    /// waiting out the frame timeout cannot change the outcome — it only holds everything behind
-    /// it. The right value tracks reordering depth (throughput × latency spread ÷ frame size), so
-    /// a bulk-data Session and a control Session on the same node differ by orders of magnitude;
-    /// an individual Session may override it.
-    ///
-    /// Default is 256. Set to `null` to disable the bound and wait out the frame timeout instead.
-    #[default(default_session_max_frames_behind_gap())]
-    #[cfg_attr(feature = "serde", serde(default = "default_session_max_frames_behind_gap"))]
-    pub max_frames_behind_gap: Option<usize>,
+        /// How many later frames may queue behind a missing one before the reassembler gives up on it
+        /// and releases what it already has.
+        ///
+        /// Only applies to Sessions without retransmission, where a missing frame is never coming and
+        /// waiting out the frame timeout cannot change the outcome — it only holds everything behind
+        /// it. The right value tracks reordering depth (throughput × latency spread ÷ frame size), so
+        /// a bulk-data Session and a control Session on the same node differ by orders of magnitude;
+        /// an individual Session may override it.
+        ///
+        /// Default is 256. Set to `null` to disable the bound and wait out the frame timeout instead.
+        #[default(default_session_max_frames_behind_gap())]
+        #[cfg_attr(feature = "serde", serde(default = "default_session_max_frames_behind_gap"))]
+        pub max_frames_behind_gap: Option<usize>,
 
-    /// How many refusal replies the Exit sends to refused `StartSession`s, across all reasons.
-    ///
-    /// Each reply can cost the Exit a ticket while the request is free, so a flood of refused requests
-    /// would otherwise drain its funds. A refusal that finds the budget spent gets no reply and the
-    /// requester times out.
-    ///
-    /// Default is `{ burst: 32, refill_period: 1s }`; a `burst` of 0 never answers. Set to `null` to
-    /// answer every refusal. The refill period must be at least 1 millisecond.
-    #[validate(custom(function = "validate_refusal_reply_budget"))]
-    #[default(default_session_refusal_reply_budget())]
-    #[cfg_attr(feature = "serde", serde(default = "default_session_refusal_reply_budget"))]
-    pub refusal_reply_budget: Option<RefusalReplyBudget>,
+        /// How many refusal replies the Exit sends to refused `StartSession`s, across all reasons.
+        ///
+        /// Each reply can cost the Exit a ticket while the request is free, so a flood of refused requests
+        /// would otherwise drain its funds. A refusal that finds the budget spent gets no reply and the
+        /// requester times out.
+        ///
+        /// Default is `{ burst: 32, refill_period: 1s }`; a `burst` of 0 never answers. Set to `null` to
+        /// answer every refusal. The refill period must be at least 1 millisecond.
+        #[validate(custom(function = "validate_refusal_reply_budget"))]
+        #[default(default_session_refusal_reply_budget())]
+        #[cfg_attr(feature = "serde", serde(default = "default_session_refusal_reply_budget"))]
+        pub refusal_reply_budget: Option<RefusalReplyBudget>,
 
-    /// Tag allocator partition configuration.
-    #[validate(nested)]
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub tag_allocator: hopr_transport_tag_allocator::TagAllocatorConfig,
+        /// Tag allocator partition configuration.
+        #[validate(nested)]
+        #[cfg_attr(feature = "serde", serde(default))]
+        pub tag_allocator: hopr_transport_tag_allocator::TagAllocatorConfig,
+    }
 }
-
+#[cfg(feature = "session-entry")]
+pub use session_config::*;
 #[cfg(test)]
 mod tests {
     use anyhow::Context;

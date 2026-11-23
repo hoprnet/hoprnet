@@ -94,8 +94,7 @@ where
                 // after which no SURB is coming and continuing to wait costs the node its egress.
                 let deadline = std::time::Instant::now() + surb_wait;
                 loop {
-                    hopr_transport_session::counters::ROUTING_RESOLUTION_ATTEMPTS
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    crate::counters::ROUTING_RESOLUTION_ATTEMPTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     trace!(?unresolved, "resolving routing for packet");
                     match resolve(
                         data.data.total_len(),
@@ -137,7 +136,7 @@ where
                             return Some(crate::trace_context::WithContext::new((resolved, data), output_span));
                         }
                         Err(error) if error.is_surb() && std::time::Instant::now() >= deadline => {
-                            hopr_transport_session::counters::ROUTING_RESOLUTION_SURB_TIMEOUTS
+                            crate::counters::ROUTING_RESOLUTION_SURB_TIMEOUTS
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             // Warn rather than trace: this is the only externally visible sign that
                             // a counterparty has stopped replenishing, and the outage it replaces
@@ -159,7 +158,7 @@ where
                             futures_timer::Delay::new(SURB_RETRY_INTERVAL).await;
                         }
                         Err(error) => {
-                            hopr_transport_session::counters::ROUTING_RESOLUTION_FAILURES
+                            crate::counters::ROUTING_RESOLUTION_FAILURES
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             error!(%error, "failed to resolve routing");
                             return None;
@@ -442,7 +441,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn a_starved_return_packet_should_not_withhold_the_packets_behind_it() -> anyhow::Result<()> {
         let starved = HoprPseudonym::random();
-        let dropped_before = hopr_transport_session::counters::routing_resolution_surb_timeout_count();
+        let dropped_before = crate::counters::routing_resolution_surb_timeout_count();
 
         let input = futures::stream::iter(vec![
             (return_routing(starved), packet(0)),
@@ -482,7 +481,7 @@ mod tests {
         // operator with the same nothing the unbounded wait did: traffic missing and no signal
         // saying why.
         assert!(
-            hopr_transport_session::counters::routing_resolution_surb_timeout_count() > dropped_before,
+            crate::counters::routing_resolution_surb_timeout_count() > dropped_before,
             "the starved packet was dropped without being counted, so the condition stays invisible"
         );
 

@@ -195,8 +195,7 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
             let exit_ack_proc = exit_ack_proc.clone();
             let counters = counters.clone();
             async move {
-                hopr_transport_session::counters::ENCODE_STAGE_ENTRIES
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                crate::counters::ENCODE_STAGE_ENTRIES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 // The SURB-batch generation was captured with the return-path plan and carried on
                 // `packet_info`; stamp that, not a value re-read at encode time.
                 let generation = data.packet_info.and_then(|info| info.surb_generation);
