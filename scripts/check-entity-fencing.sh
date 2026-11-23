@@ -182,6 +182,10 @@ SESSION_CAP_CFG='pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::confi
 WITH_SESSION_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_exit; }'
 
 check_entry() {
+  # The ticket storage belongs to the binary that supplies it, never to the library: no entity links it.
+  expect_crate entry absent hopr-ticket-manager
+  expect_crate relay absent hopr-ticket-manager
+  expect_crate exit absent hopr-ticket-manager
   # An entry relays nothing, runs no PIX exit, and admits no Sessions.
   expect_present entry
   expect_feature entry off hopr-transport exit
