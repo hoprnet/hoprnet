@@ -2941,9 +2941,12 @@ mod tests {
         let forward = scores.forward_first_hop.context("forward dimension")?;
         let ret = scores.return_first_hop.context("return dimension")?;
         let route = scores.route.context("route dimension")?;
+        // The scores are accumulated, so a value at a whole number can land a rounding error past
+        // it; the bounds check is about the range the graph offers, not about exact arithmetic.
+        let within = |score: f64, max: f64| (1.0 - 1e-9..=max + 1e-9).contains(&score);
         for (name, score) in [("forward", forward), ("return", ret)] {
             assert!(
-                (1.0..=2.0).contains(&score),
+                within(score, 2.0),
                 "{name} first-hop score {score} must lie within the two relayers the graph offers"
             );
         }
@@ -2954,7 +2957,7 @@ mod tests {
         // Two relayers either side give at most four distinct routes, and the route dimension is
         // what sees that combination rather than either leg alone.
         assert!(
-            (1.0..=4.0).contains(&route),
+            within(route, 4.0),
             "route score {route} must lie within the four combinations the graph offers"
         );
         anyhow::Ok(())
