@@ -30,6 +30,7 @@ const DEFAULT_STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 131_072;
 const DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_EGRESS_COALESCE_DELAY: Duration = Duration::from_millis(8);
+const DEFAULT_EGRESS_COALESCE_MAX_PACKETS: usize = 4;
 
 /// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
 pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
@@ -60,6 +61,11 @@ fn default_egress_backpressure_timeout() -> Duration {
 #[inline]
 fn default_egress_coalesce_delay() -> Duration {
     DEFAULT_EGRESS_COALESCE_DELAY
+}
+
+#[inline]
+fn default_egress_coalesce_max_packets() -> usize {
+    DEFAULT_EGRESS_COALESCE_MAX_PACKETS
 }
 
 fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError> {
@@ -147,7 +153,7 @@ pub struct StreamProtocolConfig {
     ///
     /// A value of `1` flushes on every encoded frame (one syscall per message) and also caps the
     /// per-peer egress coalescing target byte threshold (`min(frame_writer_backpressure_bytes,
-    /// 4 × HOPR_PACKET_SIZE)`).
+    /// egress_coalesce_max_packets × HOPR_PACKET_SIZE)`).
     /// Larger values coalesce adjacent frames into a single quinn write call,
     /// reducing connection-mutex acquisitions, driver wake-ups, and reverse QUIC ACKs on the hot
     /// path.
@@ -189,6 +195,18 @@ pub struct StreamProtocolConfig {
         serde(default = "default_egress_coalesce_delay", with = "humantime_serde")
     )]
     pub egress_coalesce_delay: Duration,
+
+    /// Maximum number of HOPR packets coalesced into a single QUIC write batch before flushing.
+    ///
+    /// Caps the byte threshold for per-peer egress coalescing to
+    /// `min(frame_writer_backpressure_bytes, egress_coalesce_max_packets × HOPR_PACKET_SIZE)`.
+    /// Setting this to `1` flushes every packet immediately. Must be at least `1`.
+    ///
+    /// Defaults to `4` (4 × 3,669 B ≈ 10 full 1,452 B QUIC 1-RTT datagrams).
+    #[validate(range(min = 1))]
+    #[default(default_egress_coalesce_max_packets())]
+    #[cfg_attr(feature = "serde", serde(default = "default_egress_coalesce_max_packets"))]
+    pub egress_coalesce_max_packets: usize,
 }
 
 fn default_counter_flush_interval() -> Duration {
@@ -2689,6 +2707,22 @@ mod tests {
             }
             .validate()
             .is_err()
+        );
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_max_packets: 0,
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_max_packets: 1,
+                ..Default::default()
+            }
+            .validate()
+            .is_ok()
         );
     }
 }

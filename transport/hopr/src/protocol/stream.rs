@@ -13,7 +13,7 @@ use std::{
 
 use crossfire::mpsc;
 use futures::{
-    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, Sink, StreamExt,
+    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, Sink, SinkExt, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
 use futures_timer::Delay;
@@ -190,11 +190,6 @@ where
     }
 }
 
-/// Target byte batch for per-peer QUIC egress coalescing (4 × 3,669 B HOPR packets ≈ 10 full
-/// 1,452 B QUIC 1-RTT datagrams). Bounded by `frame_writer_backpressure_bytes` so tests that set
-/// a 1-byte boundary still flush every frame immediately.
-const EGRESS_COALESCE_TARGET_BYTES: usize = 4 * crate::protocol::HOPR_PACKET_SIZE;
-
 /// Drains `rx` into `frame_writer`, coalescing bursting per-peer HOPR packets up to
 /// `coalesce_target_bytes` or `coalesce_delay` before flushing into the underlying QUIC stream
 /// so Quinn fills full 1,452 B UDP datagrams instead of flushing one 3,669 B packet
@@ -214,8 +209,6 @@ where
     T: AsRef<[u8]> + Send + 'static,
     S: Sink<T> + Unpin,
 {
-    use futures::SinkExt as _;
-
     let mut stream = rx.into_stream();
     let burst_window = coalesce_delay;
     let mut pending_bytes: usize = 0;
@@ -288,6 +281,7 @@ fn spawn_stream_pumps<S, C>(
     frame_writer_backpressure_bytes: usize,
     write_stall_timeout: Duration,
     egress_coalesce_delay: Duration,
+    egress_coalesce_max_packets: usize,
     ready: Arc<AtomicBool>,
 ) where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -315,7 +309,8 @@ fn spawn_stream_pumps<S, C>(
     // pump completes and the eviction closure below removes the cache entry, so the next send reopens.
     let frame_writer = StallGuardSink::new(frame_writer, write_stall_timeout);
 
-    let coalesce_target_bytes = frame_writer_backpressure_bytes.min(EGRESS_COALESCE_TARGET_BYTES);
+    let coalesce_target_bytes = frame_writer_backpressure_bytes
+        .min(egress_coalesce_max_packets.saturating_mul(crate::protocol::HOPR_PACKET_SIZE));
 
     // Write pump: drain the per-peer channel into the framed stream writer, coalescing closely
     // spaced HOPR packets to pack full 1,452 B QUIC datagrams and reduce reverse QUIC ACKs.
@@ -413,6 +408,7 @@ where
     let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
     let egress_backpressure_timeout = stream_cfg.egress_backpressure_timeout;
     let egress_coalesce_delay = stream_cfg.egress_coalesce_delay;
+    let egress_coalesce_max_packets = stream_cfg.egress_coalesce_max_packets;
 
     let open_ctx = Arc::new((control, codec, tx_in));
 
@@ -444,6 +440,7 @@ where
                     frame_writer_backpressure_bytes,
                     egress_backpressure_timeout,
                     egress_coalesce_delay,
+                    egress_coalesce_max_packets,
                     ready,
                 );
                 cache.insert(peer, sink);
@@ -519,6 +516,7 @@ where
                                         frame_writer_backpressure_bytes,
                                         egress_backpressure_timeout,
                                         egress_coalesce_delay,
+                                        egress_coalesce_max_packets,
                                         ready,
                                     );
                                 }
@@ -1721,8 +1719,6 @@ mod tests {
     async fn egress_write_pump_coalesces_adjacent_spaced_packets_into_one_wire_write() -> anyhow::Result<()> {
         use std::sync::Mutex as StdMutex;
 
-        use futures::SinkExt;
-
         struct RecStream {
             write_sizes: Arc<StdMutex<Vec<usize>>>,
         }
@@ -1824,8 +1820,6 @@ mod tests {
     #[tokio::test]
     async fn isolated_egress_packet_flushes_immediately_without_waiting_for_coalesce_delay() -> anyhow::Result<()> {
         use std::sync::Mutex as StdMutex;
-
-        use futures::SinkExt;
 
         struct RecStream {
             write_sizes: Arc<StdMutex<Vec<usize>>>,
