@@ -50,6 +50,22 @@ pub struct SessionPixSupervisorHandle {
 }
 
 impl SessionPixSupervisorHandle {
+    /// A handle whose commands land in the returned receiver instead of a worker.
+    #[cfg(test)]
+    pub(crate) fn observable() -> (Self, CmdRx) {
+        let (cmd_tx, cmd_rx) = crossfire::mpsc::bounded_async::<WorkerCommand>(64);
+        let gate = ServiceGate::new(1, 256);
+        let telemetry = Arc::new(PixSessionTelemetry::new(gate.clone()));
+        (
+            Self {
+                cmd_tx,
+                gate,
+                telemetry,
+            },
+            cmd_rx,
+        )
+    }
+
     /// Send a PIX event to the supervisor, awaiting capacity if the channel is
     /// full.
     ///
@@ -143,6 +159,20 @@ impl SessionPixSupervisorHandle {
 pub enum WorkerCommand {
     Event(SessionPixEvent),
     ActionResult { action: SessionPixAction, ok: bool },
+}
+
+#[cfg(test)]
+impl WorkerCommand {
+    /// The SSA ids of a failed `RequestSsa` result, or `None` for any other command.
+    pub(crate) fn failed_request_ssa_ids(&self) -> Option<&[hopr_protocol_pix::SsaId<HoprPseudonym>]> {
+        match self {
+            Self::ActionResult {
+                action: SessionPixAction::RequestSsa { ssa_ids, .. },
+                ok: false,
+            } => Some(ssa_ids),
+            _ => None,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
