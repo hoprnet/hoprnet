@@ -555,15 +555,13 @@ async fn default_multi_surb_piggybacking_keeps_exit_surb_balance_bounded(
                 forward_path: hopr_lib::HopRouting::try_from(0usize)?,
                 return_path: hopr_lib::HopRouting::try_from(0usize)?,
                 capabilities: SessionCapability::Segmentation.into(),
-                pseudonym: None,
                 surb_management: Some(hopr_lib::SurbBalancerConfig {
                     target_surb_buffer_size: target,
                     max_surbs_per_sec: 100,
                     ..Default::default()
                 }),
                 max_surbs_per_data_packet: default_max_surbs,
-                flow_control: None,
-                max_frames_behind_gap: None,
+                ..Default::default()
             },
         )
         .await
@@ -573,8 +571,9 @@ async fn default_multi_surb_piggybacking_keeps_exit_surb_balance_bounded(
     let ring_ceiling = exit_store
         .admitted_ring_ceiling(session.id())
         .context("the Exit must admit a SURB ring for the established session")?;
+    let target_usize = usize::try_from(target)?;
     assert!(
-        ring_ceiling > target as usize,
+        ring_ceiling > target_usize,
         "fixture: ring ceiling ({ring_ceiling}) must exceed target ({target}) so overshoot is observable before \
          eviction"
     );
@@ -582,7 +581,8 @@ async fn default_multi_surb_piggybacking_keeps_exit_surb_balance_bounded(
     // Each 32-byte echo has room for 8 SURBs while consuming 1 (+7 net SURBs/packet if ungated).
     // Two waves offer far more SURB slots than `ring_ceiling`, so ungated piggybacking would slam
     // into and overflow the ring, whereas gated piggybacking settles near `target`.
-    let upper_bound = (target as usize + 64).min(ring_ceiling - 1);
+    const SURB_SETTLING_SLACK: usize = 64;
+    let upper_bound = (target_usize + SURB_SETTLING_SLACK).min(ring_ceiling - 1);
     for wave in 1..=2 {
         for i in 0..wave_packets {
             verify_session_echo(&mut session, &format!("wave-{wave}-pkt-{i}")).await?;

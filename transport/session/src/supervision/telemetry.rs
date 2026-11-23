@@ -282,12 +282,18 @@ pub enum PixAdmissionRejection {
     LiveCycleCapacity,
     /// The node is already managing `maximum_sessions`, or this pseudonym already holds a slot.
     NoSessionSlot,
+    /// This pseudonym holds a PIX Session slot that a resume request may not take over: it is not
+    /// established, is an older attempt, is draining or poisoned, was never paid for, or was
+    /// negotiated on other terms. Answered `NotResumable`, unlike [`NoSessionSlot`](Self::NoSessionSlot).
+    TakeoverIneligible,
     /// This node could not decide right now — the session server did not answer in time, or its
     /// request channel was full.
     Busy,
     /// The initiation packet carried a SURB with a direct (0-hop) return path, over which no PIX
     /// share can be delivered.
     DirectReturnPath,
+    /// The peer asked to resume a Session this node cannot resume.
+    NotResumable,
 }
 
 impl PixAdmissionRejection {
@@ -1385,9 +1391,14 @@ mod tests {
         );
         assert_eq!("no_pix_support", PixAdmissionRejection::NoPixSupport.to_string());
         assert_eq!(
+            "takeover_ineligible",
+            PixAdmissionRejection::TakeoverIneligible.to_string()
+        );
+        assert_eq!(
             "direct_return_path",
             PixAdmissionRejection::DirectReturnPath.to_string()
         );
+        assert_eq!("not_resumable", PixAdmissionRejection::NotResumable.to_string());
     }
 
     /// A refusal is only a PIX admission refusal if the peer was asking for PIX.
@@ -1407,8 +1418,10 @@ mod tests {
             PixAdmissionRejection::TargetPolicy,
             PixAdmissionRejection::LiveCycleCapacity,
             PixAdmissionRejection::NoSessionSlot,
+            PixAdmissionRejection::TakeoverIneligible,
             PixAdmissionRejection::Busy,
             PixAdmissionRejection::DirectReturnPath,
+            PixAdmissionRejection::NotResumable,
         ] {
             assert!(reason.record_if_pix(pix), "{reason} refused a PIX offer");
             assert!(
