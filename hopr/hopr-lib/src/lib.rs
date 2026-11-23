@@ -171,9 +171,9 @@ pub struct HoprSessionClientConfig {
     /// `usize::MAX` is not gated.
     /// Setting to 0 leaves all SURB production to the SURB balancer. If in that case no SURB
     /// balancer is configured, no SURBs are produced, making traffic possible only in one direction.
-    /// Default matches [`hopr_transport::SessionClientConfig::default`] (up to packet SURB
+    /// Default matches [`hopr_transport::DEFAULT_MAX_SURBS_PER_DATA_PACKET`] (up to packet SURB
     /// capacity, clamped by the balancer's remaining SURB deficit).
-    #[default(hopr_transport::SessionClientConfig::default().max_surbs_per_data_packet)]
+    #[default(hopr_transport::DEFAULT_MAX_SURBS_PER_DATA_PACKET)]
     pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
     /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
@@ -231,7 +231,7 @@ impl Default for HoprSessionClientExplicitPathConfig {
             capabilities: SessionCapability::Segmentation.into(),
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
-            max_surbs_per_data_packet: hopr_transport::SessionClientConfig::default().max_surbs_per_data_packet,
+            max_surbs_per_data_packet: hopr_transport::DEFAULT_MAX_SURBS_PER_DATA_PACKET,
             flow_control: None,
             max_frames_behind_gap: None,
         }
@@ -450,6 +450,7 @@ where
             async { self.transport_api.new_session(destination, target, cfg).await }
         })
         .retry(backoff)
+        .when(is_retryable_session_error)
         .sleep(backon::FuturesTimerSleeper)
         .await?)
     }
@@ -845,9 +846,41 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
     Ok(hopr_transport::peer_id_to_public_key(peer_id)?)
 }
 
+/// Whether a failed Session establishment is worth repeating: not when the peer permanently rejected it.
+#[cfg(feature = "session-client")]
+fn is_retryable_session_error(error: &errors::HoprTransportError) -> bool {
+    !matches!(
+        error,
+        errors::HoprTransportError::Session(hopr_transport::TransportSessionError::Rejected(reason))
+            if reason.is_permanent()
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "session-client")]
+    #[test]
+    fn permanent_session_rejections_are_not_retried() {
+        use hopr_transport::{StartErrorReason, TransportSessionError};
+
+        for reason in [
+            StartErrorReason::NotResumable,
+            StartErrorReason::UnacceptablePixParams,
+            StartErrorReason::TargetNotAdmitted,
+        ] {
+            let error = errors::HoprTransportError::Session(TransportSessionError::Rejected(reason));
+            assert!(!is_retryable_session_error(&error), "{reason}");
+        }
+        for reason in [StartErrorReason::Busy, StartErrorReason::NoSlotsAvailable] {
+            let error = errors::HoprTransportError::Session(TransportSessionError::Rejected(reason));
+            assert!(is_retryable_session_error(&error), "{reason}");
+        }
+        assert!(is_retryable_session_error(&errors::HoprTransportError::Session(
+            TransportSessionError::Timeout
+        )));
+    }
 
     #[test]
     fn network_health_green_is_ready() {

@@ -924,6 +924,11 @@ fn default_session_surb_target_notify() -> bool {
     true
 }
 
+/// Transport-layer default for [`SessionGlobalConfig::datagram_pack_delay`]: 10ms.
+fn default_session_datagram_pack_delay() -> Option<Duration> {
+    Some(Duration::from_millis(10))
+}
+
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
@@ -1192,6 +1197,21 @@ pub struct SessionGlobalConfig {
     #[default(default_session_refusal_reply_budget())]
     #[cfg_attr(feature = "serde", serde(default = "default_session_refusal_reply_budget"))]
     pub refusal_reply_budget: Option<RefusalReplyBudget>,
+
+    /// Optional coalesce window for packing multiple complete datagrams into a single HOPR packet
+    /// payload on non-PIX stateless `NoDelay` sessions.
+    ///
+    /// Isolated datagrams arriving after an idle gap flush immediately with no added delay;
+    /// back-to-back burst datagrams pack up to one HOPR packet payload without splitting messages
+    /// across packets.
+    ///
+    /// Default is 10 milliseconds. Set to `null` to disable packing.
+    #[default(default_session_datagram_pack_delay())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_session_datagram_pack_delay", with = "humantime_serde::option")
+    )]
+    pub datagram_pack_delay: Option<Duration>,
 
     /// Tag allocator partition configuration.
     #[validate(nested)]
@@ -1694,6 +1714,57 @@ mod tests {
             "a batch of {} live cycles per session needs a budget raised past the {widest} one cycle needs",
             hopr_transport_session::MAX_SSA_BATCH_SIZE
         );
+    }
+
+    /// The default resume window is longer than a short idle timeout, which must not stop a node from
+    /// starting: the session manager caps the window instead.
+    #[test]
+    fn a_short_session_idle_timeout_does_not_invalidate_the_default_resume_window() {
+        for idle_timeout in [
+            Duration::from_millis(2500),
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ] {
+            let cfg = HoprProtocolConfig {
+                session: SessionGlobalConfig {
+                    idle_timeout,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            assert!(
+                Duration::from_secs(60) >= idle_timeout / 2,
+                "the default window is above the cap at {idle_timeout:?}"
+            );
+            cfg.validate()
+                .unwrap_or_else(|error| panic!("an idle timeout of {idle_timeout:?} must validate: {error}"));
+        }
+    }
+
+    #[test]
+    fn the_pix_resume_window_defaults_to_a_minute() {
+        assert_eq!(
+            Duration::from_secs(60),
+            IncomingSessionPixConfig::default().resume_window
+        );
+    }
+
+    /// `resume_window` is settable from a configuration file, in humantime.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn the_pix_resume_window_is_configurable() -> anyhow::Result<()> {
+        let cfg: IncomingSessionPixConfig =
+            serde_saphyr::from_str("resume_window: 2m\n").context("config with a resume window must parse")?;
+        assert_eq!(Duration::from_secs(120), cfg.resume_window);
+
+        let disabled: IncomingSessionPixConfig =
+            serde_saphyr::from_str("resume_window: 0s\n").context("a zero window must parse")?;
+        assert_eq!(Duration::ZERO, disabled.resume_window);
+
+        let omitted: IncomingSessionPixConfig =
+            serde_saphyr::from_str("enforce_pix: true\n").context("config without the setting must parse")?;
+        assert_eq!(Duration::from_secs(60), omitted.resume_window);
+        Ok(())
     }
 
     // The reversed range is the point of the test: `quota_range` is operator-settable, so an
@@ -2577,6 +2648,46 @@ mod tests {
     #[test]
     fn refusal_reply_budget_rejects_unknown_fields() {
         assert!(serde_saphyr::from_str::<SessionGlobalConfig>("refusal_reply_budget: { burts: 5 }").is_err());
+    }
+
+    // --- datagram_pack_delay tests ---
+
+    #[test]
+    fn datagram_pack_delay_defaults_to_10_milliseconds() {
+        let cfg = SessionGlobalConfig::default();
+        assert_eq!(Some(Duration::from_millis(10)), cfg.datagram_pack_delay);
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn datagram_pack_delay_yaml_round_trip_handles_omitted_null_and_explicit_duration() -> anyhow::Result<()> {
+        // Omitted -> default Some(10ms).
+        let omitted: SessionGlobalConfig =
+            serde_saphyr::from_str("idle_timeout: 3m\n").context("omitted datagram_pack_delay must parse")?;
+        assert_eq!(Some(Duration::from_millis(10)), omitted.datagram_pack_delay);
+
+        // Explicit null -> None (disabled), and round-trips through YAML.
+        let disabled: SessionGlobalConfig =
+            serde_saphyr::from_str("datagram_pack_delay: null\n").context("null datagram_pack_delay must parse")?;
+        assert_eq!(None, disabled.datagram_pack_delay);
+        assert!(disabled.validate().is_ok());
+        let disabled_yaml = serde_saphyr::to_string(&disabled).context("serialize disabled config")?;
+        let disabled_rt: SessionGlobalConfig =
+            serde_saphyr::from_str(&disabled_yaml).context("deserialize disabled round-trip")?;
+        assert_eq!(None, disabled_rt.datagram_pack_delay);
+
+        // Explicit humantime duration -> Some(25ms), and round-trips through YAML.
+        let explicit: SessionGlobalConfig =
+            serde_saphyr::from_str("datagram_pack_delay: 25ms\n").context("explicit datagram_pack_delay must parse")?;
+        assert_eq!(Some(Duration::from_millis(25)), explicit.datagram_pack_delay);
+        assert!(explicit.validate().is_ok());
+        let explicit_yaml = serde_saphyr::to_string(&explicit).context("serialize explicit config")?;
+        let explicit_rt: SessionGlobalConfig =
+            serde_saphyr::from_str(&explicit_yaml).context("deserialize explicit round-trip")?;
+        assert_eq!(Some(Duration::from_millis(25)), explicit_rt.datagram_pack_delay);
+
+        Ok(())
     }
 
     #[test]

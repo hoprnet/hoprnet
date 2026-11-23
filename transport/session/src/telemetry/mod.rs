@@ -261,6 +261,11 @@ const SURB_RATE_WINDOW_US: u64 = 1_000_000;
 
 #[derive(Debug)]
 struct SessionRuntimeState {
+    /// The slot instance that initialised this state; `0` for one created lazily by a late update.
+    ///
+    /// A pseudonym can be reused, so state keyed by it can belong to a successor of the Session a
+    /// teardown is about: only the owner removes it.
+    owner: u64,
     created_at_us: u64,
     last_activity_us: u64,
     #[allow(dead_code)]
@@ -270,7 +275,12 @@ struct SessionRuntimeState {
 
 impl SessionRuntimeState {
     fn new(now_us: u64) -> Self {
+        Self::owned_by(0, now_us)
+    }
+
+    fn owned_by(owner: u64, now_us: u64) -> Self {
         Self {
+            owner,
             created_at_us: now_us,
             last_activity_us: now_us,
             frames_being_assembled: 0,
@@ -293,7 +303,7 @@ fn session_ack_mode(capabilities: CapabilitySet) -> SessionAckMode {
 
 type CapabilitySet = flagset::FlagSet<Capability>;
 
-pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig) {
+pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig, owner: u64) {
     let now = now_us();
     let ack_mode = session_ack_mode(cfg.capabilities);
     let session_id_str: &str = session_id.as_ref();
@@ -312,15 +322,53 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
 
     {
         let mut state = SESSION_RUNTIME.lock();
-        state.insert(session_id, SessionRuntimeState::new(now));
+        state.insert(session_id, SessionRuntimeState::owned_by(owner, now));
     }
 
     refresh_lifetime_metrics(&session_id, now, now, now);
 }
 
-pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool) {
+/// Whether `owner` may tear down the metrics state of `session_id`: it initialised it, or nobody did.
+///
+/// `false` means a successor Session under the same pseudonym has taken the state over.
+pub fn owns_session_metrics(session_id: &SessionId, owner: u64) -> bool {
+    SESSION_RUNTIME
+        .lock()
+        .get(session_id)
+        .is_none_or(|state| state.owner == 0 || state.owner == owner)
+}
+
+/// The slot instance that owns the metrics state of `session_id`, if there is any.
+#[cfg(test)]
+pub fn session_metrics_owner(session_id: &SessionId) -> Option<u64> {
+    SESSION_RUNTIME.lock().get(session_id).map(|state| state.owner)
+}
+
+/// Hands the metrics state of `session_id` to `owner`, a successor slot instance that took the
+/// Session's control plane over, and marks the Session active again.
+///
+/// Without it the successor's later teardown would find the state owned by its predecessor and leave
+/// it behind. A no-op when no state exists, which is a Session whose teardown already ran.
+pub fn adopt_session_metrics(session_id: &SessionId, owner: u64) {
+    let adopted = {
+        let mut state = SESSION_RUNTIME.lock();
+        state.get_mut(session_id).map(|s| s.owner = owner).is_some()
+    };
+    if adopted {
+        set_session_state(session_id, SessionLifecycleState::Active);
+    }
+}
+
+/// Removes the metrics state of `session_id` on behalf of `owner`, unless a successor has taken it.
+pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool, owner: u64) {
     // Before the zeroing below: a concurrent touch landing in between would refresh the gauges back to nonzero.
-    SESSION_RUNTIME.lock().remove(session_id);
+    {
+        let mut state = SESSION_RUNTIME.lock();
+        if state.get(session_id).is_some_and(|s| s.owner != 0 && s.owner != owner) {
+            return;
+        }
+        state.remove(session_id);
+    }
 
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id_str], 0.0);
@@ -542,20 +590,22 @@ fn increment_frame_assembly_gauge(session_id: &SessionId) {
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[session_id_str], 1.0);
 }
 
+/// Decrements the gauge of frames being assembled by `by`, but never below zero.
 #[allow(dead_code)]
-fn decrement_frame_assembly_gauge(session_id: &SessionId) {
+fn decrement_frame_assembly_gauge(session_id: &SessionId, by: u32) {
     let mut state = SESSION_RUNTIME.lock();
     let Some(runtime) = state.get_mut(session_id) else {
         return;
     };
 
-    if runtime.frames_being_assembled == 0 {
+    let by = u64::from(by).min(runtime.frames_being_assembled);
+    if by == 0 {
         return;
     }
 
-    runtime.frames_being_assembled -= 1;
+    runtime.frames_being_assembled -= by;
     let session_id_str: &str = session_id.as_ref();
-    METRIC_SESSION_FRAME_BEING_ASSEMBLED.decrement(&[session_id_str], 1.0);
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.decrement(&[session_id_str], by as f64);
 }
 
 impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
@@ -565,16 +615,21 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
 
     fn frame_completed(&self) {
         METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[self.label()]);
-        decrement_frame_assembly_gauge(&self.0);
+        decrement_frame_assembly_gauge(&self.0, 1);
     }
 
     fn frame_discarded(&self) {
         METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[self.label()]);
-        decrement_frame_assembly_gauge(&self.0);
+        decrement_frame_assembly_gauge(&self.0, 1);
+    }
+
+    fn frames_discarded(&self, count: u32) {
+        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment_by(&[self.label()], count.into());
+        decrement_frame_assembly_gauge(&self.0, count);
     }
 
     fn incomplete_frame(&self) {
-        decrement_frame_assembly_gauge(&self.0);
+        decrement_frame_assembly_gauge(&self.0, 1);
     }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {
@@ -621,7 +676,7 @@ mod tests {
     #[test]
     fn session_metrics_are_exported_through_hopr_metrics() {
         let id: SessionId = HoprPseudonym::random();
-        initialize_session_metrics(id, HoprSessionConfig::default());
+        initialize_session_metrics(id, HoprSessionConfig::default(), 0);
         record_session_read(&id, 10);
         SessionIdWrapper::from(id).frame_completed();
 
@@ -639,10 +694,42 @@ mod tests {
         assert!(text.contains(&mode_metric));
     }
 
+    /// A run of discarded frames is one update, however long it is: the counter grows by the length of the run, and
+    /// the assembly gauge drops by it too, but never below zero.
+    #[test]
+    fn a_run_of_discarded_frames_is_counted_by_its_length() -> anyhow::Result<()> {
+        let id: SessionId = HoprPseudonym::random();
+        initialize_session_metrics(id, HoprSessionConfig::default(), 0);
+        let tracker = SessionIdWrapper::from(id);
+
+        (0..3).for_each(|_| increment_frame_assembly_gauge(&id));
+        tracker.frames_discarded(2);
+        assert_eq!(1.0, gauge(&METRIC_SESSION_FRAME_BEING_ASSEMBLED, &id));
+
+        tracker.frame_discarded();
+        tracker.frames_discarded(1 << 31);
+        assert_eq!(
+            0.0,
+            gauge(&METRIC_SESSION_FRAME_BEING_ASSEMBLED, &id),
+            "the gauge does not go below zero"
+        );
+
+        let text = hopr_api::types::telemetry::gather_all_metrics().context("must gather metrics")?;
+        let session_id: &str = id.as_ref();
+        assert_eq!(
+            Some(f64::from(1u32 << 31) + 3.0),
+            series_value(
+                &text,
+                &format!("hopr_session_frame_discarded_total{{session_id=\"{session_id}\"}}")
+            )
+        );
+        Ok(())
+    }
+
     #[test]
     fn surb_metrics_are_exported_through_hopr_metrics() {
         let id: SessionId = HoprPseudonym::random();
-        initialize_session_metrics(id, HoprSessionConfig::default());
+        initialize_session_metrics(id, HoprSessionConfig::default(), 0);
         let estimator = AtomicSurbFlowEstimator::default();
         let state = Arc::new(BalancerStateValues::new(Default::default()));
 
@@ -710,7 +797,7 @@ mod tests {
     /// Attaches balancer data to a fresh Session and returns the pieces a gauge test drives.
     fn session_with_balancer() -> (SessionId, AtomicSurbFlowEstimator, Arc<BalancerStateValues>) {
         let id: SessionId = HoprPseudonym::random();
-        initialize_session_metrics(id, HoprSessionConfig::default());
+        initialize_session_metrics(id, HoprSessionConfig::default(), 0);
         let estimator = AtomicSurbFlowEstimator::default();
         let state = Arc::new(BalancerStateValues::new(Default::default()));
         set_session_balancer_data(&id, estimator.clone(), Arc::clone(&state));
@@ -807,7 +894,7 @@ mod tests {
         state.buffer_level.store(3_000, std::sync::atomic::Ordering::Relaxed);
         refresh_at(&id, now_us());
 
-        remove_session_metrics_state(&id, false);
+        remove_session_metrics_state(&id, false, 0);
 
         assert_eq!(gauge(&METRIC_SESSION_SURB_BUFFER_ESTIMATE, &id), 0.0);
         assert_eq!(gauge(&METRIC_SESSION_SURB_RATE_PER_SEC, &id), 0.0);

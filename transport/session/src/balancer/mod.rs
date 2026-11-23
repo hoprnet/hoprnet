@@ -206,7 +206,9 @@ impl SurbFlowEstimator for AtomicSurbFlowEstimator {
     }
 
     fn estimate_surbs_produced(&self) -> u64 {
-        self.produced.load(std::sync::atomic::Ordering::Relaxed)
+        // Pairs with the release in `BalancerStateValues::claim_organic_surbs` and
+        // `SessionManager`'s SURB production accounting.
+        self.produced.load(std::sync::atomic::Ordering::Acquire)
     }
 
     fn estimate_surbs_evicted(&self) -> u64 {

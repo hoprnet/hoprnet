@@ -62,7 +62,13 @@ where
     S: futures::Sink<Segment>,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    fn new(inner: S, frame_size: usize, send_terminating_segment: bool, datagram: bool) -> Self {
+    fn new(
+        inner: S,
+        frame_size: usize,
+        send_terminating_segment: bool,
+        datagram: bool,
+        first_frame_id: FrameId,
+    ) -> Self {
         // Clamp frame_size to [SESSION_MTU, SESSION_MTU * (SeqIndicator::MAX + 1)].
         // Minimum is SESSION_MTU so that a single frame fits in one
         // HOPR packet (1 segment). Maximum is bounded by SeqIndicator capacity.
@@ -83,7 +89,7 @@ where
             // latter under-counts whenever the MAX_SESSION_MTU cap binds.
             ready_segments: VecDeque::with_capacity(frame_size.div_ceil(session_socket_mtu::<C>())),
             frame_size,
-            frame_id: 1,
+            frame_id: first_frame_id,
             is_closed: false,
             send_terminating_segment,
             datagram,
@@ -238,6 +244,63 @@ where
     }
 }
 
+/// Extension to [`futures::io::AsyncWrite`] allowing [`SessionSocket`](crate::SessionSocket) to
+/// push any buffered frame bytes and ready segments into the underlying sink without invoking
+/// `poll_flush` on that sink.
+pub(crate) trait UpstreamWriter: futures::io::AsyncWrite + Send {
+    fn poll_drain_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>>;
+}
+
+impl<const C: usize, S> UpstreamWriter for Segmenter<C, S>
+where
+    S: futures::Sink<Segment> + Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+{
+    #[instrument(name = "Segmenter::poll_drain_segments", level = "trace", skip(self, cx), fields(frame_id = self.frame_id, frame_size = self.frame.len(), ready_segments = self.ready_segments.len()), ret)]
+    fn poll_drain_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        if self.is_closed {
+            return Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "segmenter closed",
+            )));
+        }
+
+        let mut this = self.project();
+        loop {
+            if !this.ready_segments.is_empty() {
+                futures::ready!(this.inner.as_mut().poll_ready(cx).map_err(std::io::Error::other))?;
+
+                let segment = this.ready_segments.pop_front().unwrap();
+                tracing::trace!(seg_id = %segment.id(), "segment draining out");
+
+                this.inner.as_mut().start_send(segment).map_err(std::io::Error::other)?;
+            } else if !this.frame.is_empty() {
+                segment_into(
+                    this.frame.as_slice(),
+                    session_socket_mtu::<C>(),
+                    *this.frame_id,
+                    this.ready_segments,
+                )
+                .map_err(std::io::Error::other)?;
+
+                tracing::trace!(num_segments = this.ready_segments.len(), "drained frame ready");
+
+                this.frame.clear();
+                *this.frame_id += 1;
+                *this.state = State::WritingFrame;
+            } else {
+                // Drive any sink combinator (e.g. `SinkExt::with`) so the last segment submitted
+                // via `start_send` is forwarded into the underlying sink without calling
+                // `poll_flush`.
+                futures::ready!(this.inner.as_mut().poll_ready(cx).map_err(std::io::Error::other))?;
+                *this.state = State::BufferingFrame;
+                tracing::trace!("all segments drained");
+                return Poll::Ready(Ok(()));
+            }
+        }
+    }
+}
+
 /// Sink extension methods for segmenting binary data into a sink.
 pub trait SegmenterExt: futures::Sink<Segment> {
     /// Attaches a [`Segmenter`] to the underlying sink.
@@ -246,7 +309,7 @@ pub trait SegmenterExt: futures::Sink<Segment> {
         Self: Sized,
         Self::Error: std::error::Error + Send + Sync + 'static,
     {
-        Segmenter::new(self, frame_size, false, false)
+        Segmenter::new(self, frame_size, false, false, 1)
     }
 
     /// Attaches a [`Segmenter`] to the underlying sink.
@@ -259,7 +322,23 @@ pub trait SegmenterExt: futures::Sink<Segment> {
         Self: Sized,
         Self::Error: std::error::Error + Send + Sync + 'static,
     {
-        Segmenter::new(self, frame_size, true, datagram)
+        Segmenter::new(self, frame_size, true, datagram, 1)
+    }
+
+    /// As [`SegmenterExt::segmenter_with_terminating_segment`], but the first frame sent gets
+    /// `first_frame_id` instead of 1 (see [`SessionSocketConfig::stream_base`](crate::SessionSocketConfig)).
+    /// The caller validates the id.
+    fn segmenter_with_terminating_segment_from<const C: usize>(
+        self,
+        frame_size: usize,
+        datagram: bool,
+        first_frame_id: FrameId,
+    ) -> Segmenter<C, Self>
+    where
+        Self: Sized,
+        Self::Error: std::error::Error + Send + Sync + 'static,
+    {
+        Segmenter::new(self, frame_size, true, datagram, first_frame_id)
     }
 }
 

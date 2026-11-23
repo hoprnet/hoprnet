@@ -34,8 +34,11 @@ use {
 use crate::{
     MAX_SESSION_MTU,
     errors::SessionError,
-    processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
-    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage, stop_on_invalid_header},
+    processing::{ReassemblerExt, SegmenterExt, SequencerExt, UpstreamWriter, types::FrameInspector},
+    protocol::{
+        FrameId, OrderedFrame, Segment, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage,
+        stop_on_invalid_header,
+    },
     session_frame_size,
 };
 
@@ -140,13 +143,84 @@ pub struct SessionSocketConfig {
     /// lost packet and unmodified receivers decode them unchanged. Isolated datagrams arriving
     /// after an idle gap flush immediately without waiting. `None` (default) writes each message
     /// immediately.
+    ///
+    /// Stateless sockets only: [`SessionSocket::new`] (the acknowledged socket) rejects it with
+    /// [`SessionError::InvalidConfig`].
     #[default(None)]
     pub pack_delay: Option<Duration>,
+    /// The first frame id of the stream, for a socket that succeeds an earlier stream under the
+    /// same pseudonym. `None` (default) starts at 1; otherwise it must lie in
+    /// `1..=`[`MAX_STREAM_BASE`], or the socket is not created
+    /// ([`SessionError::InvalidConfig`]).
+    ///
+    /// Frame ids restart at 1 with every socket, so a late frame of the predecessor stream (its
+    /// terminating one included) cannot be told from a frame of the successor by its id. With a
+    /// base, the successor sends its first frame as `stream_base` and expects the peer's first
+    /// frame as `stream_base` too, and the base is chosen above every id the predecessor used.
+    /// Each predecessor frame is then below the base, and the socket drops it as an already seen
+    /// (old) frame: stateless sockets before reassembly, and the sequencer for anything that
+    /// still reaches it. It does not move the expected id, close the stream or count as a loss
+    /// (the loss report counts it as a duplicate segment).
+    ///
+    /// Both peers must use the same value. The Start protocol negotiates it (`SessionResumed`);
+    /// a one-sided base leaves the other side waiting for frame 1, or dropping the peer's frames.
+    ///
+    /// Stateless sockets only: [`SessionSocket::new`] (the acknowledged socket) rejects it, because
+    /// retransmission and acknowledgement state has not been verified for a stream that does not
+    /// start at 1, and the transport takes over only stateless Sessions.
+    #[default(None)]
+    pub stream_base: Option<FrameId>,
 }
 
-type BoxedWrite = Pin<Box<dyn futures::AsyncWrite + Send>>;
-type BoxedMessageStream<const C: usize> =
-    Pin<Box<dyn futures::Stream<Item = Result<SessionMessage<C>, SessionError>> + Send>>;
+/// The progress of a stateless socket's stream, shared with whoever holds a clone.
+///
+/// Lets a manager that may replace the socket (see [`SessionSocketConfig::stream_base`]) learn the highest frame id
+/// either direction has used, without reading anything from the socket itself. Both counters only ever grow, and
+/// read `0` until the first segment.
+#[derive(Debug, Clone, Default)]
+pub struct StreamProgress {
+    received: Arc<AtomicU32>,
+    sent: Arc<AtomicU32>,
+}
+
+impl StreamProgress {
+    /// A progress that starts at the given highest frame ids, as of a stream known up to them.
+    pub fn starting_at(highest_received: FrameId, highest_sent: FrameId) -> Self {
+        Self {
+            received: Arc::new(AtomicU32::new(highest_received)),
+            sent: Arc::new(AtomicU32::new(highest_sent)),
+        }
+    }
+
+    /// The highest frame id of any segment received so far, whether or not its frame was ever completed or
+    /// delivered.
+    pub fn highest_received(&self) -> FrameId {
+        self.received.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// The highest frame id of any segment sent so far.
+    pub fn highest_sent(&self) -> FrameId {
+        self.sent.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+/// The highest allowed [`SessionSocketConfig::stream_base`], 2^31.
+///
+/// It leaves half of the `u32` frame id space (2^31 frames) to the stream, which cannot be
+/// exhausted in practice, and keeps the sequencer's "frame id 0 ends the sequence" wrap-around
+/// far away.
+pub const MAX_STREAM_BASE: FrameId = 1 << 31;
+
+/// Validates the configured stream base and returns the first frame id (1 for `None`).
+fn first_frame_id(stream_base: Option<FrameId>) -> Result<FrameId, SessionError> {
+    match stream_base {
+        None => Ok(1),
+        Some(base) if (1..=MAX_STREAM_BASE).contains(&base) => Ok(base),
+        Some(base) => Err(SessionError::InvalidConfig(format!(
+            "stream base {base} is outside of 1..={MAX_STREAM_BASE}"
+        ))),
+    }
+}
 
 /// Logs a failed update of the socket state.
 ///
@@ -162,8 +236,10 @@ fn log_state_update_error(error: &SessionError, message: &'static str) {
 
 enum WriteState {
     WriteOnly,
-    Writing,
+    WritingAndFlushing,
     Flushing(usize),
+    WritingAndDraining,
+    Draining(usize),
 }
 
 /// Socket-like object implementing the Session protocol that can operate on any transport that
@@ -178,10 +254,133 @@ pub struct SessionSocket<const C: usize, S: SocketState<C>> {
     state: S,
     span: tracing::Span,
     // This is where upstream writes the to-be-segmented frame data to
-    upstream_frames_in: Pin<Box<dyn futures::io::AsyncWrite + Send>>,
+    upstream_frames_in: Pin<Box<dyn UpstreamWriter>>,
     // This is where upstream reads the reconstructed frame data from
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
     write_state: WriteState,
+}
+
+/// Builder for a stateless (unreliable) [`SessionSocket`].
+///
+/// Construct via [`SessionSocket::stateless_builder`].
+#[cfg(feature = "telemetry")]
+#[must_use = "builders do nothing unless `.build()` is called"]
+pub struct StatelessSocketBuilder<const C: usize, T, I, S = telemetry::NoopTracker> {
+    id: I,
+    transport: T,
+    cfg: SessionSocketConfig,
+    loss_signal: Option<Arc<FrameLossSignal>>,
+    stream_progress: Option<StreamProgress>,
+    pack_budget: Option<PackPayloadBudget>,
+    stats: S,
+}
+
+/// Builder for a stateless (unreliable) [`SessionSocket`].
+///
+/// Construct via [`SessionSocket::stateless_builder`].
+#[cfg(not(feature = "telemetry"))]
+#[must_use = "builders do nothing unless `.build()` is called"]
+pub struct StatelessSocketBuilder<const C: usize, T, I> {
+    id: I,
+    transport: T,
+    cfg: SessionSocketConfig,
+    loss_signal: Option<Arc<FrameLossSignal>>,
+    stream_progress: Option<StreamProgress>,
+    pack_budget: Option<PackPayloadBudget>,
+}
+
+#[cfg(feature = "telemetry")]
+impl<const C: usize, T, I, S> StatelessSocketBuilder<C, T, I, S> {
+    /// Sets the [`FrameLossSignal`] stamped whenever this socket drops or loses a frame.
+    pub fn loss_signal(mut self, loss_signal: impl Into<Option<Arc<FrameLossSignal>>>) -> Self {
+        self.loss_signal = loss_signal.into();
+        self
+    }
+
+    /// Sets the [`StreamProgress`] updated with the highest sent and received frame ids.
+    pub fn stream_progress(mut self, progress: impl Into<Option<StreamProgress>>) -> Self {
+        self.stream_progress = progress.into();
+        self
+    }
+
+    /// Sets an optional dynamic [`PackPayloadBudget`] bounding packed writes when
+    /// [`SessionSocketConfig::pack_delay`] is `Some`.
+    pub fn pack_budget(mut self, budget: impl Into<Option<PackPayloadBudget>>) -> Self {
+        self.pack_budget = budget.into();
+        self
+    }
+
+    /// Sets the telemetry tracker attached to the socket pipeline.
+    pub fn stats<S2>(self, stats: S2) -> StatelessSocketBuilder<C, T, I, S2>
+    where
+        S2: SessionTelemetryTracker + Clone + Send + 'static,
+    {
+        StatelessSocketBuilder {
+            id: self.id,
+            transport: self.transport,
+            cfg: self.cfg,
+            loss_signal: self.loss_signal,
+            stream_progress: self.stream_progress,
+            pack_budget: self.pack_budget,
+            stats,
+        }
+    }
+
+    /// Builds the configured stateless [`SessionSocket`].
+    pub fn build(self) -> Result<SessionSocket<C, Stateless<C>>, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+        S: SessionTelemetryTracker + Clone + Send + 'static,
+    {
+        SessionSocket::<C, Stateless<C>>::build_stateless(
+            self.id,
+            self.transport,
+            self.cfg,
+            self.loss_signal,
+            self.stream_progress,
+            self.pack_budget,
+            self.stats,
+        )
+    }
+}
+
+#[cfg(not(feature = "telemetry"))]
+impl<const C: usize, T, I> StatelessSocketBuilder<C, T, I> {
+    /// Sets the [`FrameLossSignal`] stamped whenever this socket drops or loses a frame.
+    pub fn loss_signal(mut self, loss_signal: impl Into<Option<Arc<FrameLossSignal>>>) -> Self {
+        self.loss_signal = loss_signal.into();
+        self
+    }
+
+    /// Sets the [`StreamProgress`] updated with the highest sent and received frame ids.
+    pub fn stream_progress(mut self, progress: impl Into<Option<StreamProgress>>) -> Self {
+        self.stream_progress = progress.into();
+        self
+    }
+
+    /// Sets an optional dynamic [`PackPayloadBudget`] bounding packed writes when
+    /// [`SessionSocketConfig::pack_delay`] is `Some`.
+    pub fn pack_budget(mut self, budget: impl Into<Option<PackPayloadBudget>>) -> Self {
+        self.pack_budget = budget.into();
+        self
+    }
+
+    /// Builds the configured stateless [`SessionSocket`].
+    pub fn build(self) -> Result<SessionSocket<C, Stateless<C>>, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+    {
+        SessionSocket::<C, Stateless<C>>::build_stateless(
+            self.id,
+            self.transport,
+            self.cfg,
+            self.loss_signal,
+            self.stream_progress,
+            self.pack_budget,
+        )
+    }
 }
 
 // Ensure `state.stop()` runs even if the socket is dropped without
@@ -201,6 +400,25 @@ impl<const C: usize, S: SocketState<C>> PinnedDrop for SessionSocket<C, S> {
 }
 
 impl<const C: usize> SessionSocket<C, Stateless<C>> {
+    /// Starts building a stateless socket with optional loss signal, stream progress, pack budget,
+    /// and (when `telemetry` is enabled) telemetry tracker.
+    pub fn stateless_builder<T, I>(id: I, transport: T, cfg: SessionSocketConfig) -> StatelessSocketBuilder<C, T, I>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+    {
+        StatelessSocketBuilder {
+            id,
+            transport,
+            cfg,
+            loss_signal: None,
+            stream_progress: None,
+            pack_budget: None,
+            #[cfg(feature = "telemetry")]
+            stats: telemetry::NoopTracker,
+        }
+    }
+
     /// Creates a new stateless socket suitable for fast UDP-like communication.
     ///
     /// Note that this results in a faster socket than if created via [`SessionSocket::new`] with
@@ -222,24 +440,40 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
-        Self::new_stateless_with_pack_budget(
-            id,
-            transport,
-            cfg,
-            loss_signal,
-            None,
-            #[cfg(feature = "telemetry")]
-            stats,
-        )
+        let builder = Self::stateless_builder(id, transport, cfg).loss_signal(loss_signal);
+        #[cfg(feature = "telemetry")]
+        let builder = builder.stats(stats);
+        builder.build()
     }
 
-    /// Like [`Self::new_stateless`], with an optional dynamic [`PackPayloadBudget`] bounding each
-    /// packed write when [`SessionSocketConfig::pack_delay`] is `Some`.
-    pub fn new_stateless_with_pack_budget<T, I>(
+    /// Like [`new_stateless`](Self::new_stateless), and additionally publishes the stream's progress in `progress`:
+    /// the highest frame id of any segment received, and of any segment sent (see [`StreamProgress`]).
+    pub fn new_stateless_tracked<T, I>(
         id: I,
         transport: T,
         cfg: SessionSocketConfig,
         loss_signal: Option<Arc<FrameLossSignal>>,
+        progress: Option<StreamProgress>,
+        #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
+    ) -> Result<Self, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+    {
+        let builder = Self::stateless_builder(id, transport, cfg)
+            .loss_signal(loss_signal)
+            .stream_progress(progress);
+        #[cfg(feature = "telemetry")]
+        let builder = builder.stats(stats);
+        builder.build()
+    }
+
+    fn build_stateless<T, I>(
+        id: I,
+        transport: T,
+        cfg: SessionSocketConfig,
+        loss_signal: Option<Arc<FrameLossSignal>>,
+        progress: Option<StreamProgress>,
         pack_budget: Option<PackPayloadBudget>,
         #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
     ) -> Result<Self, SessionError>
@@ -247,6 +481,8 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
+        let progress_out = progress.clone();
+        let first_frame_id = first_frame_id(cfg.stream_base)?;
         let span = tracing::debug_span!("session.socket");
         let _entered = span.enter();
         // Preserve frame boundaries within the number of segments SeqIndicator can enumerate.
@@ -256,47 +492,49 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         #[cfg(feature = "telemetry")]
         let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
-        let (upstream_frames_in, packets_in): (BoxedWrite, BoxedMessageStream<C>) =
-            if let Some(pack_delay) = cfg.pack_delay {
-                let (transport_rx, transport_tx) = futures::AsyncReadExt::split(transport);
-                let packets_in =
-                    stop_on_invalid_header(asynchronous_codec::FramedRead::new(transport_rx, SessionCodec::<C>));
-                let packets_out =
-                    packing::WholeMessagePackingSink::<C>::new(transport_tx, pack_delay, pack_budget, span.clone());
-                let upstream = packets_out
-                    .with(move |segment| {
-                        #[cfg(feature = "telemetry")]
-                        s0.outgoing_message(SessionMessageDiscriminants::Segment);
+        let (packets_out, packets_in) = if let Some(pack_delay) = cfg.pack_delay {
+            let (transport_rx, transport_tx) = futures::AsyncReadExt::split(transport);
+            (
+                future::Either::Left(packing::WholeMessagePackingSink::<C>::new(
+                    transport_tx,
+                    pack_delay,
+                    pack_budget,
+                    span.clone(),
+                )),
+                future::Either::Left(asynchronous_codec::FramedRead::new(transport_rx, SessionCodec::<C>)),
+            )
+        } else {
+            // Segment data incoming/outgoing using underlying transport
+            let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
 
-                        future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
-                    })
-                    .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
-                (Box::pin(upstream), Box::pin(packets_in))
-            } else {
-                // Segment data incoming/outgoing using underlying transport
-                let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
+            // Check if we allow sending multiple segments to downstream in a single write
+            // The HWM cannot be 0 bytes
+            framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
 
-                // Check if we allow sending multiple segments to downstream in a single write
-                // The HWM cannot be 0 bytes
-                framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
+            // Downstream transport
+            let (packets_out, packets_in) = framed.split();
+            (future::Either::Right(packets_out), future::Either::Right(packets_in))
+        };
 
-                // Downstream transport
-                let (packets_out, packets_in) = framed.split();
-                let packets_in = stop_on_invalid_header(packets_in);
+        let packets_in = stop_on_invalid_header(packets_in);
 
-                // Pipeline IN: Data incoming from Upstream
-                let upstream = packets_out
-                    .with(move |segment| {
-                        #[cfg(feature = "telemetry")]
-                        s0.outgoing_message(SessionMessageDiscriminants::Segment);
+        // Pipeline IN: Data incoming from Upstream
+        let upstream_frames_in = packets_out
+            .with(move |segment: Segment| {
+                #[cfg(feature = "telemetry")]
+                s0.outgoing_message(SessionMessageDiscriminants::Segment);
+                if let Some(progress) = &progress_out {
+                    progress
+                        .sent
+                        .fetch_max(segment.frame_id, std::sync::atomic::Ordering::Relaxed);
+                }
 
-                        future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
-                    })
-                    .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
-                (Box::pin(upstream), Box::pin(packets_in))
-            };
+                future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
+            })
+            .segmenter_with_terminating_segment_from::<C>(frame_size, cfg.datagram, first_frame_id);
 
-        let last_emitted_frame = Arc::new(AtomicU32::new(0));
+        // Everything below the first frame id counts as seen, a predecessor stream's frames included
+        let last_emitted_frame = Arc::new(AtomicU32::new(first_frame_id - 1));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
         // Dropped frames are counted and reported once per window, not logged one by one
@@ -331,6 +569,11 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             #[cfg(feature = "telemetry")]
                             s1.incoming_message(SessionMessageDiscriminants::Segment);
 
+                            if let Some(progress) = &progress {
+                                progress
+                                    .received
+                                    .fetch_max(s.frame_id, std::sync::atomic::Ordering::Relaxed);
+                            }
                             // Filter old frame ids to save space in the Reassembler
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
@@ -397,6 +640,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     max_item_age: cfg.max_frame_age,
                     max_frames_behind_gap: cfg.max_frames_behind_gap,
                     adapt_to_reordering: cfg.adapt_gap_wait,
+                    stream_base: cfg.stream_base,
                 },
                 reorder,
             )
@@ -413,20 +657,15 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         lr3.frame_emitted();
                         #[cfg(feature = "telemetry")]
                         s3.frame_emitted();
-                        Some(Ok(frame.0))
+                        Some(Ok::<_, std::io::Error>(frame.0))
                     }
                     // Downstream skips discarded frames
-                    Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        tracing::debug!(frame_id, "frame discarded");
-                        lr3.frame_discarded();
+                    Err(gap) => {
+                        tracing::debug!(first = gap.first, last = gap.last, "frames discarded");
+                        lr3.frames_discarded(u64::from(gap.count()));
                         #[cfg(feature = "telemetry")]
-                        s3.frame_discarded();
+                        s3.frames_discarded(gap.count());
                         None
-                    }
-                    Err(err) => {
-                        #[cfg(feature = "telemetry")]
-                        s3.error();
-                        Some(Err(std::io::Error::other(err)))
                     }
                 })
             })
@@ -435,12 +674,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         Ok(Self {
             state: Stateless::new(id),
             span: span.clone(),
-            upstream_frames_in,
+            upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(downstream_frames_out),
-            write_state: if cfg.flush_immediately {
-                WriteState::Writing
-            } else {
-                WriteState::WriteOnly
+            write_state: match (cfg.flush_immediately, cfg.pack_delay.is_some()) {
+                (false, _) => WriteState::WriteOnly,
+                (true, false) => WriteState::WritingAndFlushing,
+                (true, true) => WriteState::WritingAndDraining,
             },
         })
     }
@@ -465,6 +704,16 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
+        if cfg.stream_base.is_some() {
+            return Err(SessionError::InvalidConfig(
+                "a stream base is supported on stateless sockets only".into(),
+            ));
+        }
+        if cfg.pack_delay.is_some() {
+            return Err(SessionError::InvalidConfig(
+                "datagram packing is supported on stateless sockets only".into(),
+            ));
+        }
         let span = tracing::debug_span!("session.socket");
         let _entered = span.enter();
         // The upper bound is additionally limited by the missing-segment bitmap in SegmentRequests.
@@ -631,6 +880,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
                 // A retransmission can still fill the gap, so it is waited out in full.
                 adapt_to_reordering: false,
+                stream_base: None,
             })
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
@@ -650,22 +900,17 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         lr3.frame_emitted();
                         #[cfg(feature = "telemetry")]
                         s3.frame_emitted();
-                        Some(Ok(frame.0))
+                        Some(Ok::<_, std::io::Error>(frame.0))
                     }
-                    Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        tracing::debug!(frame_id, "frame discarded");
-                        lr3.frame_discarded();
-                        if let Err(error) = st_3.frame_discarded(frame_id) {
+                    Err(gap) => {
+                        tracing::debug!(first = gap.first, last = gap.last, "frames discarded");
+                        lr3.frames_discarded(u64::from(gap.count()));
+                        if let Err(error) = st_3.frames_discarded(gap.first, gap.last) {
                             log_state_update_error(&error, "frame discarded state update failed");
                         }
                         #[cfg(feature = "telemetry")]
-                        s3.frame_discarded();
+                        s3.frames_discarded(gap.count());
                         None // Downstream skips discarded frames
-                    }
-                    Err(err) => {
-                        #[cfg(feature = "telemetry")]
-                        s3.error();
-                        Some(Err(std::io::Error::other(err)))
                     }
                 })
             })
@@ -677,7 +922,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(downstream_frames_out),
             write_state: if cfg.flush_immediately {
-                WriteState::Writing
+                WriteState::WritingAndFlushing
             } else {
                 WriteState::WriteOnly
             },
@@ -704,13 +949,22 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncWrit
                 WriteState::WriteOnly => {
                     return this.upstream_frames_in.as_mut().poll_write(cx, buf);
                 }
-                WriteState::Writing => {
+                WriteState::WritingAndFlushing => {
                     let len = futures::ready!(this.upstream_frames_in.as_mut().poll_write(cx, buf))?;
                     *this.write_state = WriteState::Flushing(len);
                 }
                 WriteState::Flushing(len) => {
                     let res = futures::ready!(this.upstream_frames_in.as_mut().poll_flush(cx)).map(|_| *len);
-                    *this.write_state = WriteState::Writing;
+                    *this.write_state = WriteState::WritingAndFlushing;
+                    return Poll::Ready(res);
+                }
+                WriteState::WritingAndDraining => {
+                    let len = futures::ready!(this.upstream_frames_in.as_mut().poll_write(cx, buf))?;
+                    *this.write_state = WriteState::Draining(len);
+                }
+                WriteState::Draining(len) => {
+                    let res = futures::ready!(this.upstream_frames_in.as_mut().poll_drain_segments(cx)).map(|_| *len);
+                    *this.write_state = WriteState::WritingAndDraining;
                     return Poll::Ready(res);
                 }
             }
@@ -1742,6 +1996,46 @@ mod tests {
         Ok(())
     }
 
+    /// A frame far ahead of the one due next is reached, and every id before it counts as lost, on both
+    /// socket kinds.
+    ///
+    /// Frame 1 is delivered, then frame 2^31 arrives: ids `2..2^31` are the gap. This checks the loss
+    /// accounting of the whole pipeline, including a reliable socket's state, end to end. It is not the
+    /// guard against walking the gap one id per poll: that walk spins inside one `poll_read`, which no
+    /// timeout of this test can interrupt, so the sequencer tests, which bound the items they take, are.
+    #[test_log::test(tokio::test)]
+    async fn a_frame_far_ahead_is_reached_without_walking_the_gap_on_both_socket_kinds() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use tokio::io::AsyncWriteExt;
+
+        const FAR: u32 = 1 << 31;
+
+        for reliable in [false, true] {
+            let signal = Arc::new(FrameLossSignal::new());
+            let (mut socket, mut remote) = open_raw_receiver(reliable, Duration::from_millis(100), &signal)?;
+
+            let mut buf = [0u8; 9];
+            remote.write_all(&raw_segment(1, 0, 1, b"frame one")).await?;
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf))
+                .await
+                .context("the first frame timed out")??;
+            assert_eq!(b"frame one", &buf, "reliable={reliable}");
+
+            remote.write_all(&raw_segment(FAR, 0, 1, b"far frame")).await?;
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf))
+                .await
+                .context("the far frame was not reached within the time budget")??;
+            assert_eq!(b"far frame", &buf, "reliable={reliable}");
+
+            assert_eq!(
+                u64::from(FAR) - 2,
+                signal.lost_total(),
+                "every id between the two frames is a loss (reliable={reliable})"
+            );
+        }
+        Ok(())
+    }
+
     /// Drives the head-of-line case end to end over the real socket pipeline.
     ///
     /// Segment 0 is dropped, so frame 1 can never be completed, and the sender is deliberately
@@ -2286,6 +2580,309 @@ mod tests {
         assert!(a.is_ok());
         assert!(b.is_ok());
 
+        Ok(())
+    }
+
+    // ---- stream base ----
+
+    /// A terminating segment message, as it arrives off the wire.
+    fn raw_terminating(frame_id: u32) -> Vec<u8> {
+        Vec::from(SessionMessage::<MTU>::Segment(crate::protocol::Segment::terminating(
+            frame_id,
+        )))
+    }
+
+    /// Opens the receive side of a stateless socket expecting `stream_base`, with a gap bound of 256 frames.
+    fn open_based_receiver(
+        stream_base: Option<FrameId>,
+        frame_timeout: Duration,
+        signal: &Arc<FrameLossSignal>,
+    ) -> anyhow::Result<(SessionSocket<MTU, Stateless<MTU>>, tokio::io::DuplexStream)> {
+        use tokio_util::compat::TokioAsyncReadCompatExt;
+
+        let (transport, remote) = tokio::io::duplex(1 << 20);
+        let socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            transport.compat(),
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                frame_timeout,
+                max_frames_behind_gap: Some(256),
+                stream_base,
+                ..Default::default()
+            },
+            Some(signal.clone()),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        Ok((socket, remote))
+    }
+
+    /// Reads exactly `expected.len()` bytes and compares them.
+    async fn expect_read(socket: &mut (impl futures::io::AsyncRead + Unpin), expected: &[u8]) -> anyhow::Result<()> {
+        let mut buf = vec![0u8; expected.len()];
+        anyhow::Context::context(
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf)).await,
+            "timed out waiting for data",
+        )??;
+        assert_eq!(expected, buf.as_slice());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stream_progress_should_track_the_highest_frame_id_in_both_directions() -> anyhow::Result<()> {
+        let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let alice_progress = StreamProgress::default();
+        let bob_progress = StreamProgress::default();
+        let cfg = SessionSocketConfig {
+            stream_base: Some(100),
+            ..Default::default()
+        };
+        let mut alice = SessionSocket::<MTU, _>::new_stateless_tracked(
+            "alice",
+            alice,
+            cfg,
+            None,
+            Some(alice_progress.clone()),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let mut bob = SessionSocket::<MTU, _>::new_stateless_tracked(
+            "bob",
+            bob,
+            cfg,
+            None,
+            Some(bob_progress.clone()),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        assert_eq!(
+            (0, 0),
+            (alice_progress.highest_received(), alice_progress.highest_sent())
+        );
+
+        for data in [b"one".as_slice(), b"two", b"three"] {
+            alice.write_all(data).await?;
+            alice.flush().await?;
+            expect_read(&mut bob, data).await?;
+        }
+        assert_eq!(102, alice_progress.highest_sent());
+        assert_eq!(102, bob_progress.highest_received());
+        assert_eq!(0, bob_progress.highest_sent());
+        assert_eq!(0, alice_progress.highest_received());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stream_base_should_number_the_first_sent_frame_with_the_base() -> anyhow::Result<()> {
+        use crate::protocol::{Segment, SeqIndicator};
+
+        for (base, expected_first) in [
+            (None, 1),
+            (Some(1), 1),
+            (Some(5000), 5000),
+            (Some(MAX_STREAM_BASE), MAX_STREAM_BASE),
+        ] {
+            let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+            let mut socket = SessionSocket::<MTU, _>::new_stateless(
+                "alice",
+                alice,
+                SessionSocketConfig {
+                    stream_base: base,
+                    ..Default::default()
+                },
+                None,
+                #[cfg(feature = "telemetry")]
+                NoopTracker,
+            )?;
+            socket.write_all(b"first").await?;
+            socket.flush().await?;
+            socket.write_all(b"second").await?;
+            socket.flush().await?;
+            socket.close().await?;
+
+            let messages = futures::TryStreamExt::try_collect::<Vec<_>>(asynchronous_codec::FramedRead::new(
+                bob,
+                SessionCodec::<MTU>,
+            ))
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
+            let segment = |id: u32, data: &[u8]| {
+                SessionMessage::Segment(Segment {
+                    frame_id: id,
+                    seq_idx: 0,
+                    seq_flags: SeqIndicator::new_with_flags(1, false),
+                    data: data.to_vec().into_boxed_slice(),
+                })
+            };
+            assert_eq!(
+                messages,
+                vec![
+                    segment(expected_first, b"first"),
+                    segment(expected_first + 1, b"second"),
+                    SessionMessage::Segment(Segment::terminating(expected_first + 2)),
+                ],
+                "base={base:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stream_base_should_deliver_the_stream_in_order_and_drop_every_predecessor_frame() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(Some(1000), Duration::from_secs(30), &signal)?;
+
+        // Predecessor frames (data and terminating) before, between and after the new stream's frames,
+        // the new stream's own frames out of order.
+        remote.write_all(&raw_segment(900, 0, 1, b"old 900")).await?;
+        remote.write_all(&raw_terminating(6)).await?;
+        remote.write_all(&raw_segment(1000, 0, 1, b"new 1000")).await?;
+        remote.write_all(&raw_terminating(999)).await?;
+        remote.write_all(&raw_segment(1002, 0, 1, b"new 1002")).await?;
+        remote.write_all(&raw_segment(999, 0, 1, b"old 999")).await?;
+        remote.write_all(&raw_segment(1001, 0, 1, b"new 1001")).await?;
+        remote.write_all(&raw_terminating(1)).await?;
+        remote.write_all(&raw_segment(5, 0, 1, b"old 5")).await?;
+
+        expect_read(&mut socket, b"new 1000").await?;
+        expect_read(&mut socket, b"new 1001").await?;
+        expect_read(&mut socket, b"new 1002").await?;
+
+        // The successor's own terminating frame still closes the stream, and a late predecessor one does not.
+        remote.write_all(&raw_terminating(1003)).await?;
+        let mut buf = [0u8; 8];
+        assert_eq!(
+            0,
+            tokio::time::timeout(Duration::from_secs(2), socket.read(&mut buf)).await??
+        );
+
+        assert_eq!(0, signal.lost_total(), "predecessor frames are not a loss");
+        Ok(())
+    }
+
+    /// Review finding: a delayed predecessor frame 900 was admitted by the guard's window, and the gap rule
+    /// (`max_frames_behind_gap` = 256) then discarded the successor's frames. Below the base it is just old.
+    #[test_log::test(tokio::test)]
+    async fn a_delayed_predecessor_frame_should_not_discard_the_successor_frames() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(Some(1 << 16), Duration::from_secs(30), &signal)?;
+
+        remote.write_all(&raw_segment(900, 0, 1, b"old 900")).await?;
+        for id in (1u32 << 16)..(1u32 << 16) + 900 {
+            remote.write_all(&raw_segment(id, 0, 1, &id.to_be_bytes())).await?;
+        }
+        for id in (1u32 << 16)..(1u32 << 16) + 900 {
+            expect_read(&mut socket, &id.to_be_bytes()).await?;
+        }
+        assert_eq!(0, signal.lost_total());
+        Ok(())
+    }
+
+    /// Review finding: an in-order predecessor FIN numbered 6 that arrived after successor frames 1-5 closed the
+    /// successor. With a base above 6, it is dropped.
+    #[test_log::test(tokio::test)]
+    async fn a_predecessor_fin_arriving_after_new_frames_should_not_close_the_successor() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(Some(100), Duration::from_secs(30), &signal)?;
+
+        for id in 100..105u32 {
+            remote.write_all(&raw_segment(id, 0, 1, &id.to_be_bytes())).await?;
+        }
+        remote.write_all(&raw_terminating(6)).await?;
+        remote.write_all(&raw_segment(105, 0, 1, &105u32.to_be_bytes())).await?;
+        for id in 100..106u32 {
+            expect_read(&mut socket, &id.to_be_bytes()).await?;
+        }
+        assert_eq!(0, signal.lost_total());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_lost_first_frame_should_be_handled_by_the_gap_rule_with_a_stream_base() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(Some(5000), Duration::from_millis(100), &signal)?;
+
+        // Frame 5000 never arrives; the predecessor's frames do, which change nothing about that.
+        remote.write_all(&raw_segment(4999, 0, 1, b"old")).await?;
+        remote.write_all(&raw_segment(5001, 0, 1, b"new 5001")).await?;
+        remote.write_all(&raw_segment(5002, 0, 1, b"new 5002")).await?;
+
+        expect_read(&mut socket, b"new 5001").await?;
+        expect_read(&mut socket, b"new 5002").await?;
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn no_stream_base_should_start_at_frame_one() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut socket, mut remote) = open_based_receiver(None, Duration::from_secs(30), &signal)?;
+        // 1 is accepted and delivered first, and no frame is treated as predecessor
+        remote.write_all(&raw_segment(2, 0, 1, b"two")).await?;
+        remote.write_all(&raw_segment(1, 0, 1, b"one")).await?;
+        expect_read(&mut socket, b"one").await?;
+        expect_read(&mut socket, b"two").await?;
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_invalid_stream_base_should_be_rejected() -> anyhow::Result<()> {
+        let signal = Arc::new(FrameLossSignal::new());
+        for base in [0, MAX_STREAM_BASE + 1, FrameId::MAX] {
+            let result = open_based_receiver(Some(base), Duration::from_secs(1), &signal);
+            assert!(
+                matches!(result, Err(e) if e.downcast_ref::<SessionError>().is_some_and(|e| matches!(e, SessionError::InvalidConfig(_)))),
+                "base {base} must be rejected"
+            );
+        }
+        assert!(open_based_receiver(Some(1), Duration::from_secs(1), &signal).is_ok());
+        assert!(open_based_receiver(Some(MAX_STREAM_BASE), Duration::from_secs(1), &signal).is_ok());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_stateful_socket_should_reject_a_stream_base() -> anyhow::Result<()> {
+        let (alice, _bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let result = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::<MTU>::new("alice", AcknowledgementStateConfig::default()),
+            SessionSocketConfig {
+                stream_base: Some(10),
+                ..Default::default()
+            },
+            None,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        );
+        assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_stateful_socket_should_reject_pack_delay() -> anyhow::Result<()> {
+        let (alice, _bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let result = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::<MTU>::new("alice", AcknowledgementStateConfig::default()),
+            SessionSocketConfig {
+                pack_delay: Some(Duration::from_millis(10)),
+                ..Default::default()
+            },
+            None,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        );
+        assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
         Ok(())
     }
 }

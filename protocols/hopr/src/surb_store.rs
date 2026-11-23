@@ -1832,7 +1832,7 @@ impl SurbShareInfo for HoprSurb {
 /// to seal once the committed cycle is exhausted, so every SURB it mints from then on is share-less. The
 /// next cycle's shares are minted only after the Exit has requested that cycle, which is to say *behind*
 /// every share-less SURB minted in between. While the Entry produces SURBs faster than the Exit spends
-/// them — `max_surbs_per_data_packet > 1` bypasses the balancer's gate, so a 512 B write carries about
+/// them — `max_surbs_per_data_packet == usize::MAX` bypasses the balancer's gate, so a 512 B write carries about
 /// six against the one a reply spends — that share-less backlog grows faster than it drains. In a single
 /// FIFO queue the next cycle's shares are then reached late or never, and the supervisor closes the
 /// Session on `RecoveryIdle` (hoprnet#8466).
@@ -4959,6 +4959,35 @@ mod tests {
             "a retire whose token matches the current admission must still release the ring"
         );
 
+        Ok(())
+    }
+
+    /// Closing a Session retires the pseudonym's admitted SURB ring and nothing else: the sending-side
+    /// reply openers and the SURB generation survive, so an Entry that reconnects under the same
+    /// pseudonym can still open a reply sealed on a SURB it minted before the close, and its new
+    /// SURBs carry a generation the Exit does not take for an older one.
+    #[test]
+    fn retiring_a_pseudonym_keeps_its_reply_openers_and_surb_generation() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let sender_id = HoprSenderId::from_pseudonym_and_id(&pseudonym, [7u8; 8]);
+
+        store.insert_reply_opener(sender_id, cheap_opener());
+        let generation = store.bump_generation(&pseudonym);
+        let token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+
+        store.retire(&pseudonym, token);
+        store.pseudonym_openers.run_pending_tasks();
+
+        assert!(
+            store.find_reply_opener(&sender_id).is_some(),
+            "a reply sealed on a SURB minted before the close must still open afterwards"
+        );
+        assert_eq!(
+            generation.wrapping_add(1),
+            store.bump_generation(&pseudonym),
+            "the generation must carry on from where the closed Session left it"
+        );
         Ok(())
     }
 

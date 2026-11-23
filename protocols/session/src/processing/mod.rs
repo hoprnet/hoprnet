@@ -18,7 +18,7 @@ pub(crate) mod types;
 
 pub(crate) use reassembly::ReassemblerExt;
 pub(crate) use reorder::SharedReorder;
-pub(crate) use segmenter::SegmenterExt;
+pub(crate) use segmenter::{SegmenterExt, UpstreamWriter};
 pub(crate) use sequencer::{SequencerConfig, SequencerExt};
 
 #[cfg(test)]
@@ -29,7 +29,7 @@ mod tests {
     use futures_time::future::FutureExt;
     use rand::prelude::*;
 
-    use super::*;
+    use super::{sequencer::DiscardedFrames, *};
     use crate::{
         MAX_SESSION_MTU,
         errors::SessionError,
@@ -124,7 +124,7 @@ mod tests {
             if i != 3 {
                 assert!(matches!(&actual[i], Ok(frame) if expected[i].eq(frame)));
             } else {
-                assert!(matches!(actual[i], Err(SessionError::FrameDiscarded(4))))
+                assert!(matches!(actual[i], Err(DiscardedFrames { first: 4, last: 4 })))
             }
         }
 

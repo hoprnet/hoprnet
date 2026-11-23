@@ -519,3 +519,97 @@ async fn a_balanced_entry_is_not_starved_by_the_exits_reports(
     );
     Ok(())
 }
+
+/// Default multi-SURB piggybacking (`max_surbs_per_data_packet == 8`) must converge to the
+/// balancer's target on the Exit and stop growing, rather than filling and overflowing the Exit's
+/// SURB ring across sustained small-packet traffic — both below `distress_threshold` (500) where
+/// `SurbDistress` stays asserted and above it where distress clears.
+#[rstest]
+#[case::below_distress_threshold(200, 60)]
+#[case::above_distress_threshold(600, 80)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[cfg(feature = "session-client")]
+async fn default_multi_surb_piggybacking_keeps_exit_surb_balance_bounded(
+    #[case] target: u64,
+    #[case] wave_packets: usize,
+) -> anyhow::Result<()> {
+    use hopr_lib::{api::node::HasTransportApi as _, exports::transport::SurbStore as _};
+
+    let cluster = surb_report_cluster(Some(NOTIFY_PERIOD));
+    let ip = IpOrHost::from_str(":0")?;
+    let default_max_surbs = hopr_lib::HoprSessionClientConfig::default().max_surbs_per_data_packet;
+    assert!(
+        default_max_surbs > 1,
+        "this test exercises multi-SURB piggybacking under the default config (got {default_max_surbs})"
+    );
+
+    let drops_before = routing_resolution_surb_timeout_count();
+    let (mut session, _cfg) = cluster[0]
+        .inner()
+        .connect_to(
+            cluster[1].address(),
+            hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            hopr_lib::HoprSessionClientConfig {
+                forward_path: hopr_lib::HopRouting::try_from(0usize)?,
+                return_path: hopr_lib::HopRouting::try_from(0usize)?,
+                capabilities: SessionCapability::Segmentation.into(),
+                surb_management: Some(hopr_lib::SurbBalancerConfig {
+                    target_surb_buffer_size: target,
+                    max_surbs_per_sec: 100,
+                    ..Default::default()
+                }),
+                max_surbs_per_data_packet: default_max_surbs,
+                ..Default::default()
+            },
+        )
+        .await
+        .context("the session must establish")?;
+
+    let exit_store = cluster[1].inner().transport().surb_store();
+    let ring_ceiling = exit_store
+        .admitted_ring_ceiling(session.id())
+        .context("the Exit must admit a SURB ring for the established session")?;
+    let target_usize = usize::try_from(target)?;
+    assert!(
+        ring_ceiling > target_usize,
+        "fixture: ring ceiling ({ring_ceiling}) must exceed target ({target}) so overshoot is observable before \
+         eviction"
+    );
+
+    // Each 32-byte echo has room for 8 SURBs while consuming 1 (+7 net SURBs/packet if ungated).
+    // Two waves offer far more SURB slots than `ring_ceiling`, so ungated piggybacking would slam
+    // into and overflow the ring, whereas gated piggybacking settles near `target`.
+    const SURB_SETTLING_SLACK: usize = 64;
+    let upper_bound = (target_usize + SURB_SETTLING_SLACK).min(ring_ceiling - 1);
+    for wave in 1..=2 {
+        for i in 0..wave_packets {
+            verify_session_echo(&mut session, &format!("wave-{wave}-pkt-{i}")).await?;
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+
+        let held = exit_store.surbs_held();
+        tracing::info!(
+            wave,
+            held,
+            target,
+            upper_bound,
+            ring_ceiling,
+            "Exit SURB stock after wave"
+        );
+        assert!(held > 0, "wave {wave}: Exit must hold SURBs after echo traffic");
+        assert!(
+            held <= upper_bound,
+            "wave {wave}: Exit SURB stock ({held}) exceeded bound ({upper_bound}, target {target}, ring ceiling \
+             {ring_ceiling}); organic multi-SURB piggybacking is overshooting the balancer target"
+        );
+    }
+
+    let drops = routing_resolution_surb_timeout_count() - drops_before;
+    assert_eq!(
+        0, drops,
+        "bounded organic piggybacking must not starve the Exit's return path"
+    );
+    Ok(())
+}
