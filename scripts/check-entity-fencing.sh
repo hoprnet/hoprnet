@@ -205,6 +205,9 @@ check_relay() {
   expect_feature relay on hopr-protocol-hopr relaying
   for crate in hopr-transport-session hopr-protocol-session hopr-protocol-start; do
     expect_crate relay absent "$crate"
+    # A binary turns the runtime and telemetry on; a feature that names the optional Session crate without `?`
+    # would pull it into the relay through them.
+    expect_crate relay,runtime-tokio,telemetry absent "$crate"
     expect_crate entry linked "$crate"
     expect_crate exit linked "$crate"
   done

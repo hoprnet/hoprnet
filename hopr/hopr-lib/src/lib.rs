@@ -892,7 +892,7 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 }
 
 /// Whether a failed Session establishment is worth repeating: not when the peer permanently rejected it.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn is_retryable_session_error(error: &errors::HoprTransportError) -> bool {
     !matches!(
         error,
@@ -905,7 +905,7 @@ fn is_retryable_session_error(error: &errors::HoprTransportError) -> bool {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "session-client")]
+    #[cfg(feature = "session-entry")]
     #[test]
     fn permanent_session_rejections_are_not_retried() {
         use hopr_transport::{StartErrorReason, TransportSessionError};

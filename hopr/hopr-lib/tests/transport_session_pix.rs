@@ -338,7 +338,7 @@ async fn establish_pix_session_with_surbs(
 }
 
 /// As [`establish_pix_session`], but under a pseudonym the caller names, the way a client reconnects.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn establish_pix_session_under(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
@@ -349,7 +349,7 @@ async fn establish_pix_session_under(
 
 /// As [`establish_pix_session_under`], with the Entry's SURB balancer and the Exit's rate control under
 /// the caller's control (see [`establish_pix_session_with`]).
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn establish_pix_session_under_with(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
@@ -363,7 +363,7 @@ async fn establish_pix_session_under_with(
 }
 
 /// [`establish_pix_session_under_with`], keeping the library's own error (the outer error is a timeout).
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 async fn try_establish_pix_session_under_with(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
@@ -382,7 +382,7 @@ async fn try_establish_pix_session_under_with(
         cluster.entry.inner().connect_to(
             cluster.exit.address(),
             SessionTarget::UdpStream(SealedHost::Plain(IpOrHost::from_str(":0")?)),
-            HoprSessionClientConfig {
+            HoprSessionEntryConfig {
                 forward_path: routing,
                 return_path: routing,
                 capabilities,
@@ -2280,7 +2280,7 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
 /// 3. A Session is opened under `p`: it fails with `Rejected(NotResumable)`. The Entry's retry delay is far beyond the
 ///    connect timeout, so a retry would show as a timeout rather than as a slow success.
 /// 4. A Session under a fresh pseudonym `p'` is funded at `(p', 1)` and echoes.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -2381,16 +2381,16 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_closed_the_session_
 }
 
 /// An echo server that counts the Sessions it holds and the ones that have ended.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Clone, Default)]
 struct TrackingEchoServer {
     started: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     ended: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[async_trait::async_trait]
-impl hopr_api::node::HoprSessionServer for TrackingEchoServer {
+impl hopr_api::node::HoprSessionExit for TrackingEchoServer {
     type Error = hopr_lib::errors::HoprLibError;
     type Session = hopr_lib::exports::transport::IncomingSession;
 
@@ -2416,7 +2416,7 @@ impl hopr_api::node::HoprSessionServer for TrackingEchoServer {
     }
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl TrackingEchoServer {
     /// Sessions the server holds right now.
     fn live(&self) -> usize {
@@ -2428,7 +2428,7 @@ impl TrackingEchoServer {
 }
 
 /// What the two nodes' PIX event streams said about one pseudonym, as they said it.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Default, Debug)]
 struct PixTally {
     /// Deposit-data requests the Exit made, by SSA index.
@@ -2443,7 +2443,7 @@ struct PixTally {
 
 /// Answers the Exit's PIX events as [`spawn_exit_pix_driver`] does, and tallies the events of both
 /// nodes for `pseudonym`.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn spawn_pix_tally(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     pseudonym: hopr_lib::api::types::internal::protocol::HoprPseudonym,
@@ -2494,7 +2494,7 @@ fn spawn_pix_tally(
 }
 
 /// How a client leaves the Session it will reconnect from.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Clone, Copy, Debug)]
 enum Leave {
     /// A clean close, whose terminating segment reaches the Exit.
@@ -2516,7 +2516,7 @@ enum Leave {
 ///    next request is for SSA 2.
 ///
 /// Compiled here, to be run on a cluster.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1, Leave::Close)]
 #[case(1, Leave::Drop)]
@@ -2594,7 +2594,7 @@ async fn a_reconnect_under_the_same_pseudonym_takes_over_the_paid_session(
         Leave::Drop => {
             // Nothing tells the Exit, which still holds the Session live. The reconnect's challenge is
             // greater than the one the Session was established by, which is what lets it take the live
-            // Session over (see `SessionClientConfig::pseudonym`).
+            // Session over (see `SessionEntryConfig::pseudonym`).
             drop(first);
         }
     }
@@ -2680,7 +2680,7 @@ async fn a_reconnect_under_the_same_pseudonym_takes_over_the_paid_session(
 ///    cycle was funded during the window, which the drain or close would have stranded.
 ///
 /// Compiled here, to be run on a cluster.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1)]
 #[serial]
@@ -2767,14 +2767,14 @@ async fn a_closed_session_that_never_returns_ends_at_the_window_and_funds_no_suc
 }
 
 /// Captures the first incoming Session, so that a test can close it on the Exit, and echoes every later one.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Clone)]
 struct CaptureThenEchoServer {
     captured: std::sync::Arc<std::sync::Mutex<Option<hopr_lib::exports::transport::IncomingSession>>>,
     seen: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl CaptureThenEchoServer {
     #[allow(clippy::type_complexity)]
     fn new() -> (
@@ -2792,9 +2792,9 @@ impl CaptureThenEchoServer {
     }
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[async_trait::async_trait]
-impl hopr_api::node::HoprSessionServer for CaptureThenEchoServer {
+impl hopr_api::node::HoprSessionExit for CaptureThenEchoServer {
     type Error = hopr_lib::errors::HoprLibError;
     type Session = hopr_lib::exports::transport::IncomingSession;
 
@@ -2818,7 +2818,7 @@ impl hopr_api::node::HoprSessionServer for CaptureThenEchoServer {
 
 /// Whether the Exit signalled `milestone`-kind progress for `(pseudonym, index)`: the deposit (`recovered` false) or
 /// the recovery of the cycle's key (`recovered` true).
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn cycle_signalled(
     seen: &[(PixMilestone, std::time::Instant)],
     recovered: bool,
@@ -2843,7 +2843,7 @@ fn cycle_signalled(
 ///    `Rejected(NotResumable)`.
 /// 3. A Session under a fresh pseudonym `p'` is funded at `(p', 1)`, and echo traffic drives it until `(p', 1)`
 ///    recovers.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[rstest]
 #[case(1, 2)]
 #[case(1, 12)]
