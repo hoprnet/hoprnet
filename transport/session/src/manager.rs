@@ -2501,6 +2501,8 @@ pub(crate) struct ExitOpening {
     challenge: StartChallenge,
     /// How many repeats of the opening have been answered so far.
     answered_repeats: std::sync::atomic::AtomicU32,
+    /// The stream base the opening was answered with, if it was a resume attempt a takeover satisfied.
+    resumed_stream_base: Option<u32>,
 }
 
 impl SessionSlot {
@@ -6544,6 +6546,10 @@ where
         if let Some(toolbox) = self.pix_toolbox.get() {
             toolbox.share_generator.forget(&pseudonym);
         }
+        // So a later use of the pseudonym also clears the refused attempt's SURBs from the Exit's quarantine.
+        if let Some(admission) = self.surb_admission.get() {
+            admission.advance_generation(&pseudonym);
+        }
         claim.defuse();
     }
 
@@ -7508,17 +7514,26 @@ where
 
         info!(challenge = session_req.challenge, %pseudonym, "repeated session request — answering it again");
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
-        // The repeat started a new SURB generation, so the oldest SURB left is its own.
+        // The repeat started a new SURB generation, so the oldest SURB left is its own. A resume attempt
+        // is answered as it was the first time: a plain `SessionEstablished` would make the Entry refuse it.
+        let answer = match slot.opening.as_ref().and_then(|opening| opening.resumed_stream_base) {
+            Some(stream_base) => HoprStartProtocol::SessionResumed(StartResumed {
+                orig_challenge: session_req.challenge,
+                session_id: pseudonym,
+                stream_base,
+            }),
+            None => HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge: session_req.challenge,
+                session_id: pseudonym,
+            }),
+        };
         count_exit_control_send(
             ExitControlKind::SessionEstablishedReplay,
             ExitSessionKind::of(session_req.capabilities.0),
             send_counted_via_msg_sender(
                 &mut msg_sender,
                 slot.routing_opts.clone(),
-                HoprStartProtocol::SessionEstablished(StartEstablished {
-                    orig_challenge: session_req.challenge,
-                    session_id: pseudonym,
-                }),
+                answer,
                 &slot.surb_estimator,
                 &pseudonym,
                 "repeated session establishment message",
@@ -10399,6 +10414,12 @@ where
                 moka::ops::compute::Op::Put(SessionSlot {
                     session_tx: new_tx.take().expect("the swap closure runs once"),
                     instance: instance.clone(),
+                    // The repeat of this attempt is answered with the same `SessionResumed`.
+                    opening: Some(Arc::new(ExitOpening {
+                        challenge: session_req.challenge,
+                        answered_repeats: Default::default(),
+                        resumed_stream_base: Some(stream_base),
+                    })),
                     ..old.clone()
                 })
             });
@@ -10905,6 +10926,7 @@ where
             opening: Some(Arc::new(ExitOpening {
                 challenge: session_req.challenge,
                 answered_repeats: Default::default(),
+                resumed_stream_base: None,
             })),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
@@ -34744,6 +34766,35 @@ mod tests {
         Ok(())
     }
 
+    /// Forgetting the pseudonym's PIX state after a `NotResumable` refusal also starts a new SURB generation for it.
+    #[test_log::test(tokio::test)]
+    async fn a_not_resumable_refusal_starts_a_new_surb_generation() -> anyhow::Result<()> {
+        struct Generations(parking_lot::Mutex<Vec<SessionId>>);
+        impl SurbAdmissionControl for Generations {
+            fn admit(&self, _: &SessionId, _: usize) -> AdmissionToken {
+                AdmissionToken::NONE
+            }
+
+            fn retire(&self, _: &SessionId, _: AdmissionToken) {}
+
+            fn advance_generation(&self, pseudonym: &SessionId) {
+                self.0.lock().push(*pseudonym);
+            }
+        }
+
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.hold_state(pseudonym).await?;
+        let generations = Arc::new(Generations(Default::default()));
+        assert!(rig.mgr.set_surb_admission(generations.clone()));
+        assert!(generations.0.lock().is_empty());
+
+        rig.reply_with(StubReply::Refused(StartErrorReason::NotResumable));
+        rig.connect_pix(Some(pseudonym)).await.expect_err("refused");
+        assert_eq!(vec![pseudonym], *generations.0.lock());
+        Ok(())
+    }
+
     /// A fresh `SessionEstablished` answering a resume attempt is refused: the Exit is told to close its
     /// Session, no slot exists, and the state is forgotten, so a concurrent opening request deposits nothing.
     #[test_log::test(tokio::test)]
@@ -36805,6 +36856,90 @@ mod tests {
         new.session.flush().await?;
         let progress = exit.instance()?.stream_progress.get().cloned().context("progress")?;
         assert_eq!(base, progress.highest_sent());
+        Ok(())
+    }
+
+    /// A repeat of a resume attempt whose takeover is done is answered with the same `SessionResumed`, over a
+    /// counted SURB, and not with a `SessionEstablished` the Entry would refuse.
+    #[test_log::test(tokio::test)]
+    async fn a_repeated_resume_attempt_is_answered_with_the_same_session_resumed() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        let (mut exit, _first) = paid_exit(PaidExitOptions::default()).await?;
+        let _ = exit.originated(Duration::from_millis(50)).await;
+        probe::reset();
+
+        exit.reconnect(MIN_CHALLENGE + 1).await?;
+        let _second = exit.next_session().await?;
+        let seen = exit.originated(Duration::from_millis(200)).await;
+        assert_eq!(1, seen.resumed.len(), "{seen:?}");
+        let base = seen.resumed[0].stream_base;
+        let consumed = exit.slot()?.surb_estimator.consumed.load(Ordering::Relaxed);
+
+        let repeat = HoprStartProtocol::StartSession(exit.request(MIN_CHALLENGE + 1)?);
+        exit.mgr.dispatch_message(exit.pseudonym, start_packet(repeat)?)?;
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        assert_eq!(0, seen.established, "{seen:?}");
+        assert!(seen.errors.is_empty(), "{seen:?}");
+        assert_eq!(1, seen.resumed.len(), "{seen:?}");
+        assert_eq!(
+            (MIN_CHALLENGE + 1, exit.pseudonym, base),
+            (
+                seen.resumed[0].orig_challenge,
+                seen.resumed[0].session_id,
+                seen.resumed[0].stream_base
+            )
+        );
+        assert_eq!(
+            consumed + 1,
+            exit.slot()?.surb_estimator.consumed.load(Ordering::Relaxed),
+            "the replay is counted as a used SURB"
+        );
+        assert_eq!(1, probe::get("exit_control/session_established_replay/pix/sent"));
+        assert_eq!(1, exit.mgr.num_active_sessions());
+        Ok(())
+    }
+
+    /// A repeat of a resume attempt that arrives while its takeover is still being admitted is dropped: no `Busy`,
+    /// no second takeover, and the one answer is the original's.
+    #[test_log::test(tokio::test)]
+    async fn a_repeat_of_a_resume_attempt_during_its_takeover_is_dropped() -> anyhow::Result<()> {
+        let gated = GatedAdmission::default();
+        let (mut exit, _first) = paid_exit(PaidExitOptions {
+            session_admission: Some(gated.sink()),
+            ..Default::default()
+        })
+        .await?;
+        let _ = exit.originated(Duration::from_millis(50)).await;
+        let before = gated.requests();
+
+        gated.hold_next.store(true, Ordering::SeqCst);
+        let attempt = HoprStartProtocol::StartSession(exit.request(MIN_CHALLENGE + 1)?);
+        exit.mgr
+            .dispatch_message(exit.pseudonym, start_packet(attempt.clone())?)?;
+        timeout(Duration::from_secs(5), async {
+            while gated.requests() == before {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .context("the takeover never asked the session server")?;
+        exit.mgr.dispatch_message(exit.pseudonym, start_packet(attempt)?)?;
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        assert!(seen.errors.is_empty(), "the repeat is dropped, not refused: {seen:?}");
+        assert_eq!(
+            before + 1,
+            gated.requests(),
+            "the repeat does not start a second takeover"
+        );
+
+        gated.release.notify_one();
+        let _second = exit.next_session().await?;
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        assert_eq!(1, seen.resumed.len(), "{seen:?}");
+        assert!(seen.errors.is_empty(), "{seen:?}");
+        assert_eq!(0, seen.established, "{seen:?}");
+        assert!(!exit.instance()?.is_superseded());
         Ok(())
     }
 
