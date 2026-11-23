@@ -863,12 +863,18 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
     SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
 {
+    // A pure relay resolves no exit shares, so it has nothing to hand these to.
+    #[cfg(not(any(feature = "exit", feature = "raw-exit")))]
+    let _ = (&exit_ack_proc, &recovered_ssa);
+
     ack_incoming
         .for_each_concurrent(concurrency, move |message| {
             let ((peer, acks), span) = message.into().into_parts();
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
+            #[cfg(any(feature = "exit", feature = "raw-exit"))]
             let exit_proc = exit_ack_proc.clone();
+            #[cfg(any(feature = "exit", feature = "raw-exit"))]
             let mut ssa_evt = recovered_ssa.clone();
             async move {
                 tracing::trace!(num = acks.len(), "received acknowledgements");
@@ -888,27 +894,38 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                 // When there are no pending shares, avoid the clone and move acks directly into
                 // the ticket future — a single blocking spawn, no concurrent join needed.
                 // Clone before the `if` so it stays alive for `is_expected_error` after the join.
-                let exit_proc_for_spawn = exit_proc.clone();
-                let (ticket_result, exit_result) = if exit_proc.has_pending_shares(&peer) {
-                    let ack_clone = acks.clone();
-                    let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                        move || ticket_proc.acknowledge_tickets(peer, ack_clone),
-                        "ack_decode",
-                    );
-                    let exit_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                        move || exit_proc_for_spawn.acknowledge_shares(peer, acks),
-                        "exit_ack_decode",
-                    );
-                    let (t_r, e_r) = futures::future::join(ticket_fut, exit_fut).await;
-                    (t_r, Some(e_r))
-                } else {
-                    let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                        move || ticket_proc.acknowledge_tickets(peer, acks),
-                        "ack_decode",
-                    );
-                    let t_r = ticket_fut.await;
-                    (t_r, None)
+                #[cfg(any(feature = "exit", feature = "raw-exit"))]
+                let (ticket_result, exit_result) = {
+                    let exit_proc_for_spawn = exit_proc.clone();
+                    if exit_proc.has_pending_shares(&peer) {
+                        let ack_clone = acks.clone();
+                        let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                            move || ticket_proc.acknowledge_tickets(peer, ack_clone),
+                            "ack_decode",
+                        );
+                        let exit_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                            move || exit_proc_for_spawn.acknowledge_shares(peer, acks),
+                            "exit_ack_decode",
+                        );
+                        let (t_r, e_r) = futures::future::join(ticket_fut, exit_fut).await;
+                        (t_r, Some(e_r))
+                    } else {
+                        let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                            move || ticket_proc.acknowledge_tickets(peer, acks),
+                            "ack_decode",
+                        );
+                        let t_r = ticket_fut.await;
+                        (t_r, None)
+                    }
                 };
+
+                // A pure relay has no exit shares: one blocking spawn for the tickets.
+                #[cfg(not(any(feature = "exit", feature = "raw-exit")))]
+                let ticket_result = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                    move || ticket_proc.acknowledge_tickets(peer, acks),
+                    "ack_decode",
+                )
+                .await;
 
                 match ticket_result {
                     Ok(Ok(resolutions)) if !resolutions.is_empty() => {
@@ -955,28 +972,31 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                     }
                 }
 
-                // Process PIX share acknowledgements (skipped when no pending shares).
-                if let Some(result) = exit_result {
-                    match result {
-                        Ok(Ok(ssa_priv_keys)) if !ssa_priv_keys.is_empty() => {
-                            if let Err(error) = ssa_evt
-                                .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
-                                .await
-                            {
-                                tracing::error!(%peer, %error, "failed to send pix resolution");
+                #[cfg(any(feature = "exit", feature = "raw-exit"))]
+                {
+                    // Process PIX share acknowledgements (skipped when no pending shares).
+                    if let Some(result) = exit_result {
+                        match result {
+                            Ok(Ok(ssa_priv_keys)) if !ssa_priv_keys.is_empty() => {
+                                if let Err(error) = ssa_evt
+                                    .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
+                                    .await
+                                {
+                                    tracing::error!(%peer, %error, "failed to send pix resolution");
+                                }
                             }
-                        }
-                        Ok(Ok(_)) => {
-                            tracing::trace!(%peer, "empty pix share resolution batch");
-                        }
-                        Ok(Err(ref error)) if exit_proc.is_expected_error(error) => {
-                            tracing::trace!(%peer, %error, "pix share acknowledgement skipped");
-                        }
-                        Ok(Err(error)) => {
-                            tracing::error!(%peer, %error, "pix share acknowledgement failed");
-                        }
-                        Err(error) => {
-                            tracing::error!(%peer, %error, "failed to spawn pix share acknowledgement")
+                            Ok(Ok(_)) => {
+                                tracing::trace!(%peer, "empty pix share resolution batch");
+                            }
+                            Ok(Err(ref error)) if exit_proc.is_expected_error(error) => {
+                                tracing::trace!(%peer, %error, "pix share acknowledgement skipped");
+                            }
+                            Ok(Err(error)) => {
+                                tracing::error!(%peer, %error, "pix share acknowledgement failed");
+                            }
+                            Err(error) => {
+                                tracing::error!(%peer, %error, "failed to spawn pix share acknowledgement")
+                            }
                         }
                     }
                 }

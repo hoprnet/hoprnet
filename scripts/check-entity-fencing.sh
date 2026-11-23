@@ -64,6 +64,15 @@ reports_missing() {
   grep -qE "^error(\[E[0-9]+\])?: .*(cannot find|no .*named|has no field|unresolved|not found).*\`$1\`" <<<"$2"
 }
 
+# True when `$1` (compiler output) holds no error other than "type annotations needed". The fixtures
+# name items without their generic parameters, so an item that exists still fails inference; any other
+# error means the build broke for an unrelated reason and the item's presence was not shown.
+only_inference_errors() {
+  local errors
+  errors=$(grep -E "^error" <<<"$1" | grep -vE "^error\[E028[234]\]|^error: could not compile" || true)
+  [ -z "$errors" ]
+}
+
 # `$1`: entity set that must lack the item. `$2`: an entity set that has it (the control).
 # `$3`: the item's name, as the compiler reports it. `$4`: source that names the item.
 expect_absent() {
@@ -73,8 +82,8 @@ expect_absent() {
 
   local with_item
   with_item=$(build_fixture "$name" "$control" "$code" || true)
-  if reports_missing "$item" "$with_item"; then
-    echo "FENCE CHECK ERROR: \`$item\` is reported missing even with [$control], so the fixture proves nothing:" >&2
+  if reports_missing "$item" "$with_item" || ! only_inference_errors "$with_item"; then
+    echo "FENCE CHECK ERROR: \`$item\` is not shown present with [$control], so the fixture proves nothing:" >&2
     echo "$with_item" >&2
     failures=$((failures + 1))
     return
@@ -100,8 +109,8 @@ expect_has() {
   local features=$1 item=$2 code=$3
   local out
   out=$(build_fixture "has-$item" "$features" "$code" || true)
-  if reports_missing "$item" "$out"; then
-    echo "FENCE BROKEN: \`$item\` is missing with features [$features]" >&2
+  if reports_missing "$item" "$out" || ! only_inference_errors "$out"; then
+    echo "FENCE BROKEN: \`$item\` is not shown present with features [$features]" >&2
     failures=$((failures + 1))
     return
   fi
@@ -142,6 +151,19 @@ expect_crate() {
   echo "ok: \`$crate\` is $mode with features [$features]"
 }
 
+# `$1`: entity set. `$2`: a `hopr-transport` feature that must stay off for it.
+expect_transport_feature_off() {
+  local features=$1 feature=$2
+  if cargo tree --quiet --manifest-path "$repo_root/Cargo.toml" -p hopr-lib --no-default-features \
+    --features "$features,pix-bjj,transport-announce-quic" -e features -i hopr-transport 2>/dev/null |
+    grep -q "hopr-transport feature \"$feature\""; then
+    echo "FENCE BROKEN: hopr-transport feature \`$feature\` is on with [$features]" >&2
+    failures=$((failures + 1))
+    return
+  fi
+  echo "ok: hopr-transport feature \`$feature\` is off with features [$features]"
+}
+
 # Source snippets shared between the entities.
 BUILD_RELAY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_relay; }'
 BUILD_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_exit; }'
@@ -155,6 +177,7 @@ WITH_SESSION_SERVER='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigur
 check_entry() {
   # An entry relays nothing, runs no PIX exit, and admits no Sessions.
   expect_present entry
+  expect_transport_feature_off entry raw-exit
   expect_absent entry relay build_relay "$BUILD_RELAY"
   expect_absent entry relay run_relay "$RUN_RELAY"
   expect_absent entry relay out_index_sync_period "$RELAY_CFG"
@@ -166,6 +189,7 @@ check_entry() {
 check_relay() {
   # A pure relay carries no Session stack, no PIX exit and no source role.
   expect_present relay
+  expect_transport_feature_off relay raw-exit
   for crate in hopr-transport-session hopr-protocol-session hopr-protocol-start; do
     expect_crate relay absent "$crate"
     expect_crate entry linked "$crate"
@@ -184,6 +208,7 @@ check_relay() {
 check_exit() {
   # The exit keeps the relay's ticket path and adds the Session server, but has no source role.
   expect_present exit
+  expect_transport_feature_off exit raw-exit
   expect_has exit build_exit "$BUILD_EXIT"
   expect_absent exit entry build_entry "$BUILD_ENTRY"
 }
