@@ -5018,56 +5018,63 @@ fn cap_unbalanced_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize)
     data.packet_info.get_or_insert_default().max_surbs_in_packet = max_surbs;
 }
 
-/// Caps how many SURBs an outgoing Session data packet may carry, per the SURB balancer, and
-/// returns the exact SURB count assigned to the packet.
-///
-/// Every finite `max_surbs` is gated by the balancer's target via
-/// [`BalancerStateValues::claim_organic_surbs`]: each packet claims at most
-/// `min(max_surbs, fittable_surbs, remaining_deficit)` while the counterparty is estimated to be
-/// below its target, and none once the in-tick production reaches target. Because
-/// `claim_organic_surbs` advances the shared monotonic `produced` counter inside the same critical
-/// section as the budget check, bursts of data packets, concurrent keep-alives, and balancer tick
-/// boundaries cannot double-claim or overshoot the counterparty's SURB store (where evictions
-/// destroy PIX shares).
-///
-/// While the counterparty signals distress, the gate still allows up to
-/// `min(max_surbs, fittable_surbs, deficit.max(1))` so a genuinely depleted peer fills at full
-/// packet space while a peer at target (or with `target < distress_threshold`) gets 1 SURB per
-/// packet without overflowing its ring. When the balancer is disabled, the caller's explicit
-/// `max_surbs` limit is preserved. An explicit `0` always wins; `usize::MAX` opts out of the gate.
-///
-/// One exception: while data goes out into a silence (see [`BalancerStateValues::silence_sustain`])
-/// and the packet has physical room for at least one SURB (`limit > 0`), a closed gate gives
-/// exactly one SURB per packet.
-#[cfg(test)]
-fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt: &BalancerStateValues) -> usize {
+/// Outcome of applying the balanced organic SURB capping policy to one outgoing Session data
+/// packet.
+enum OrganicCapOutcome {
+    /// `max_surbs == usize::MAX` bypassed the gate; caller must record `produced` SURBs.
+    Bypassed(usize),
+    /// Gate chose `cap` SURBs and `claim_organic_surbs` already incremented the shared `produced`
+    /// counter atomically under the checkpoint lock.
+    Claimed(usize),
+    /// Gate was closed, but `silence_sustain()` granted 1 SURB (not yet added to `produced`).
+    SilenceSustain,
+    /// Zero SURBs attached (`max_surbs == 0`, no payload room, or target reached).
+    Zero,
+}
+
+/// Applies the organic SURB capping policy to `data` and returns how many SURBs were assigned and
+/// whether the shared `produced` counter was already incremented inside `claim_organic_surbs`.
+fn apply_organic_surb_cap(
+    data: &mut ApplicationDataOut,
+    max_surbs: usize,
+    surb_mgmt: &BalancerStateValues,
+) -> OrganicCapOutcome {
     match max_surbs {
-        usize::MAX => data.estimate_surbs_with_msg(),
+        usize::MAX => OrganicCapOutcome::Bypassed(data.estimate_surbs_with_msg()),
         0 => {
             surb_mgmt.note_sent();
             data.packet_info.get_or_insert_default().max_surbs_in_packet = 0;
-            0
+            OrganicCapOutcome::Zero
         }
         _ => {
             // This packet is going out, which is what a silence is measured against.
             surb_mgmt.note_sent();
             let fittable = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(data.data.total_len());
             let limit = max_surbs.min(fittable);
-            let cap = if limit == 0 {
-                0
+            let (cap, outcome) = if limit == 0 {
+                (0, OrganicCapOutcome::Zero)
             } else {
                 let claimed = surb_mgmt.claim_organic_surbs(limit);
                 if claimed > 0 {
-                    claimed
+                    (claimed, OrganicCapOutcome::Claimed(claimed))
                 } else if surb_mgmt.silence_sustain() {
-                    1
+                    (1, OrganicCapOutcome::SilenceSustain)
                 } else {
-                    0
+                    (0, OrganicCapOutcome::Zero)
                 }
             };
             data.packet_info.get_or_insert_default().max_surbs_in_packet = cap;
-            cap
+            outcome
         }
+    }
+}
+
+#[cfg(test)]
+fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt: &BalancerStateValues) -> usize {
+    match apply_organic_surb_cap(data, max_surbs, surb_mgmt) {
+        OrganicCapOutcome::Bypassed(n) | OrganicCapOutcome::Claimed(n) => n,
+        OrganicCapOutcome::SilenceSustain => 1,
+        OrganicCapOutcome::Zero => 0,
     }
 }
 
@@ -5080,41 +5087,22 @@ fn cap_and_record_organic_surbs(
     estimator: &AtomicSurbFlowEstimator,
     session_id: &SessionId,
 ) {
-    match max_surbs {
-        usize::MAX => {
-            let produced = data.estimate_surbs_with_msg() as u64;
-            record_surb_produced(estimator, session_id, produced);
+    match apply_organic_surb_cap(data, max_surbs, surb_mgmt) {
+        OrganicCapOutcome::Bypassed(produced) => {
+            record_surb_produced(estimator, session_id, produced as u64);
         }
-        0 => {
-            surb_mgmt.note_sent();
-            data.packet_info.get_or_insert_default().max_surbs_in_packet = 0;
+        OrganicCapOutcome::Claimed(_claimed) => {
+            // `claim_organic_surbs` already incremented the shared `estimator.produced`
+            // counter atomically under the checkpoint lock.
+            #[cfg(feature = "telemetry")]
+            telemetry::record_session_surb_produced(session_id, _claimed as u64);
+        }
+        OrganicCapOutcome::SilenceSustain => {
+            record_surb_produced(estimator, session_id, 1);
+        }
+        OrganicCapOutcome::Zero => {
             #[cfg(feature = "telemetry")]
             telemetry::record_session_surb_produced(session_id, 0);
-        }
-        _ => {
-            surb_mgmt.note_sent();
-            let fittable = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(data.data.total_len());
-            let limit = max_surbs.min(fittable);
-            let produced = if limit == 0 {
-                0
-            } else {
-                let claimed = surb_mgmt.claim_organic_surbs(limit);
-                if claimed > 0 {
-                    // `claim_organic_surbs` already incremented the shared `estimator.produced`
-                    // counter atomically under the checkpoint lock.
-                    #[cfg(feature = "telemetry")]
-                    telemetry::record_session_surb_produced(session_id, claimed as u64);
-                    claimed
-                } else if surb_mgmt.silence_sustain() {
-                    record_surb_produced(estimator, session_id, 1);
-                    1
-                } else {
-                    #[cfg(feature = "telemetry")]
-                    telemetry::record_session_surb_produced(session_id, 0);
-                    0
-                }
-            };
-            data.packet_info.get_or_insert_default().max_surbs_in_packet = produced;
         }
     }
 }
