@@ -4343,6 +4343,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-platform"
+version = "0.4.0"
+dependencies = [
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-protocol-app"
 version = "1.2.0"
 dependencies = [
