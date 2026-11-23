@@ -37,15 +37,14 @@ tracing-context = ["hopr-utils-tracing/tracing-context"]
 # for one role does not carry the packet processing of the others. None of them is a default: role
 # selection is the consumer's decision, and `hopr-lib` turns on exactly the role its entity needs.
 #
-# The roles: `entry` (a source node that admits no incoming Sessions), `relay` (the full ticket and
-# incoming-acknowledgement pipeline) and `exit` (a relay that also terminates Sessions and resolves
-# PIX shares). `raw-exit` is the legacy non-relaying destination node: it processes no tickets, and
-# no `hopr-lib` entity enables it. They are the transport side of the entity split, whose entity
-# sets in `hopr-lib` are `edge`, `relay` and `exit`.
+# The roles are additive building blocks: `entry` (a source node that admits no incoming Sessions),
+# `relay` (the full ticket and incoming-acknowledgement pipeline) and `exit` (terminates Sessions and
+# resolves PIX shares, processes no tickets). `relay` together with `exit` is the relaying exit: it
+# keeps the ticket path and adds the Session exit. They are the transport side of the entity split in
+# `hopr-lib`.
 relay = ["hopr-protocol-hopr/relaying"]
 entry = ["session-entry"]
-exit = ["relay", "session-exit"]
-raw-exit = ["session-exit"]
+exit = ["session-exit"]
 # The session stack: the `SessionManager` wiring, incoming-Session admission and the client-side
 # Session API. `session-exit` implies `session-entry` because both are served by one manager and
 # an Exit establishes Sessions on its return path too.
@@ -80,7 +79,6 @@ testing = [
   "dep:tokio",
   "entry",
   "exit",
-  "raw-exit",
   "relay",
   "hopr-utils/runtime-tokio",
 ]
@@ -192,12 +190,7 @@ tokio = { workspace = true, optional = true }
 [dev-dependencies]
 # The unit tests drive every role, so they need every role compiled in whatever the invoking command
 # selected (`cargo nextest run --lib` enables none of them).
-hopr-transport = { path = ".", features = [
-  "entry",
-  "relay",
-  "exit",
-  "raw-exit",
-] }
+hopr-transport = { path = ".", features = ["entry", "relay", "exit"] }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bimap = { workspace = true }

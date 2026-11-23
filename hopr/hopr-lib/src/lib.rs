@@ -16,13 +16,13 @@
 // build one are unused by design. Only that combination is affected; consumers that build a node
 // enable one of `edge`, `relay` or `exit`.
 #![cfg_attr(
-    not(any(feature = "entry", feature = "relay", feature = "exit", feature = "raw-exit")),
+    not(any(feature = "entry", feature = "relay", feature = "exit")),
     allow(dead_code, unused_imports, unused_variables)
 )]
 
 // Only the exit entity has the Session exit (server) capability; an entry establishes Sessions and a
 // relay neither establishes nor admits them.
-#[cfg(all(feature = "session-exit", not(any(feature = "exit", feature = "raw-exit"))))]
+#[cfg(all(feature = "session-exit", not(feature = "exit")))]
 compile_error!("the `session-exit` feature belongs to the `exit` entity: enable `exit` instead");
 
 /// Helper functions.
@@ -415,13 +415,18 @@ pub type HoprEntry<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
 /// Produced by [`builder::HoprBuilder`]'s `build_relay`.
 pub type HoprRelay<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
 
-/// An exit: a relay that also terminates Sessions and resolves PIX shares.
+/// A relaying exit: a relay that also terminates Sessions and resolves PIX shares.
 ///
-/// For now an exit keeps the relay capacity, so it has the same parameters and the same `TMgr`
-/// requirement as [`HoprRelay`].
+/// Built when both `relay` and `exit` are enabled; same parameters and `TMgr` requirement as
+/// [`HoprRelay`].
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_relay_exit`.
+pub type HoprRelayExit<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
+
+/// An exit that terminates Sessions without relaying: no ticket manager, like [`HoprEntry`].
 ///
 /// Produced by [`builder::HoprBuilder`]'s `build_exit`.
-pub type HoprExit<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
+pub type HoprExit<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
 
 impl<Chain, Graph, Net, TMgr> std::fmt::Debug for Hopr<Chain, Graph, Net, TMgr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

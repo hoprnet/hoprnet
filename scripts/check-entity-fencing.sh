@@ -12,7 +12,7 @@
 # fence (an unresolvable path is "absent" everywhere).
 #
 # Usage: scripts/check-entity-fencing.sh [entity ...]
-#   Without arguments it checks every entity. Entities: entry, relay, exit, and the raw-exit test target — the basic division is
+#   Without arguments it checks every entity. Entities: entry, relay, exit and relay-exit (the `relay` and `exit` features together) — the basic division is
 #   entry <-> relay <-> exit.
 #
 # The fixture crates live in a temporary directory and are their own workspaces, so they resolve
@@ -33,12 +33,14 @@ failures=0
 # `$3`: the source of the fixture crate. Prints the compiler's stderr and returns its status.
 build_fixture() {
   local name=$1 features=$2 code=$3
-  local dir="$workdir/$name-$features"
+  local dir="$workdir/$name-${features//,/-}"
+  local features_list
+  features_list=$(sed 's/[^,][^,]*/"&"/g' <<<"$features")
 
   mkdir -p "$dir/src"
   cat >"$dir/Cargo.toml" <<EOF
 [package]
-name = "fence-$name-$features"
+name = "fence-$name-${features//,/-}"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -46,7 +48,7 @@ publish = false
 [workspace]
 
 [dependencies]
-hopr-lib = { path = "${repo_root}/hopr/hopr-lib", default-features = false, features = ["${features}"] }
+hopr-lib = { path = "${repo_root}/hopr/hopr-lib", default-features = false, features = [${features_list}] }
 EOF
   # The fixture is its own workspace, so it takes the repository's lockfile and `[patch]` section to
   # resolve the same dependency versions as the real build.
@@ -136,7 +138,7 @@ expect_crate() {
   local features=$1 mode=$2 crate=$3
   local tree
   tree=$(cargo tree --quiet --manifest-path "$repo_root/Cargo.toml" -p hopr-lib --no-default-features \
-    --features "$features,pix-bjj,transport-announce-quic" -e normal --prefix none 2>/dev/null | sed 's/ (.*//' | awk '{print $1}')
+    --features "$features" -e normal --prefix none 2>/dev/null | sed 's/ (.*//' | awk '{print $1}')
   if grep -qx "$crate" <<<"$tree"; then
     if [ "$mode" = absent ]; then
       echo "FENCE BROKEN: \`$crate\` is linked with features [$features]" >&2
@@ -156,7 +158,7 @@ expect_feature() {
   local features=$1 state=$2 crate=$3 feature=$4
   local enabled=no
   if cargo tree --quiet --manifest-path "$repo_root/Cargo.toml" -p hopr-lib --no-default-features \
-    --features "$features,pix-bjj,transport-announce-quic" -e features -i "$crate" 2>/dev/null |
+    --features "$features" -e features -i "$crate" 2>/dev/null |
     grep -q "$crate feature \"$feature\""; then
     enabled=yes
   fi
@@ -170,24 +172,24 @@ expect_feature() {
 
 # Source snippets shared between the entities.
 BUILD_RELAY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_relay; }'
-BUILD_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_exit; }'
+BUILD_RELAY_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_relay_exit; }'
 SESSION_BUILDER='pub fn f() -> Option<hopr_lib::builder::HoprBuilderWithSession> { None }'
-BUILD_RAW_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_raw_exit; }'
+BUILD_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_exit; }'
 BUILD_ENTRY='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::build_entry; }'
 RUN_RELAY='pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::run_relay; }'
 RELAY_CFG='pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { out_index_sync_period: core::time::Duration::from_secs(1), ..Default::default() } }'
 SESSION_CAP_CFG='pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { incoming_session_capacity: 1, ..Default::default() } }'
-WITH_SESSION_SERVER='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_exit; }'
+WITH_SESSION_EXIT='pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_exit; }'
 
 check_entry() {
   # An entry relays nothing, runs no PIX exit, and admits no Sessions.
   expect_present entry
-  expect_feature entry off hopr-transport raw-exit
+  expect_feature entry off hopr-transport exit
   expect_feature entry off hopr-protocol-hopr relaying
   expect_absent entry relay build_relay "$BUILD_RELAY"
   expect_absent entry relay run_relay "$RUN_RELAY"
   expect_absent entry relay out_index_sync_period "$RELAY_CFG"
-  expect_absent entry exit with_session_exit "$WITH_SESSION_SERVER"
+  expect_absent entry exit with_session_exit "$WITH_SESSION_EXIT"
   expect_absent entry exit HoprBuilderWithSession "$SESSION_BUILDER"
   expect_absent entry exit incoming_session_capacity "$SESSION_CAP_CFG"
 }
@@ -195,7 +197,7 @@ check_entry() {
 check_relay() {
   # A pure relay carries no Session stack, no PIX exit and no source role.
   expect_present relay
-  expect_feature relay off hopr-transport raw-exit
+  expect_feature relay off hopr-transport exit
   expect_feature relay on hopr-protocol-hopr relaying
   for crate in hopr-transport-session hopr-protocol-session hopr-protocol-start; do
     expect_crate relay absent "$crate"
@@ -209,31 +211,34 @@ check_relay() {
   expect_absent relay entry new_session \
     'pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::new_session; }'
   expect_absent relay exit incoming_session_capacity "$SESSION_CAP_CFG"
-  expect_absent relay exit with_session_exit "$WITH_SESSION_SERVER"
-}
-
-check_raw_exit() {
-  # The raw exit terminates Sessions without relaying: a test target, not an entity.
-  expect_present raw-exit
-  expect_feature raw-exit on hopr-transport raw-exit
-  expect_feature raw-exit off hopr-protocol-hopr relaying
-  expect_has raw-exit build_raw_exit "$BUILD_RAW_EXIT"
-  expect_absent raw-exit relay build_relay "$BUILD_RELAY"
-  expect_absent raw-exit relay out_index_sync_period "$RELAY_CFG"
+  expect_absent relay exit with_session_exit "$WITH_SESSION_EXIT"
 }
 
 check_exit() {
-  # The exit keeps the relay's ticket path and adds the Session server, but has no source role.
+  # An exit terminates Sessions and resolves PIX, but relays nothing and has no source role.
   expect_present exit
-  expect_feature exit off hopr-transport raw-exit
-  expect_feature exit on hopr-protocol-hopr relaying
+  expect_feature exit on hopr-transport exit
+  expect_feature exit off hopr-protocol-hopr relaying
   expect_has exit build_exit "$BUILD_EXIT"
+  expect_absent exit relay build_relay "$BUILD_RELAY"
+  expect_absent exit relay,exit build_relay_exit "$BUILD_RELAY_EXIT"
+  expect_absent exit relay out_index_sync_period "$RELAY_CFG"
   expect_absent exit entry build_entry "$BUILD_ENTRY"
+}
+
+check_relay_exit() {
+  # Relay and exit together are the relaying exit: the ticket path plus the Session exit.
+  expect_present relay,exit
+  expect_feature relay,exit on hopr-transport exit
+  expect_feature relay,exit on hopr-protocol-hopr relaying
+  expect_has relay,exit build_relay_exit "$BUILD_RELAY_EXIT"
+  expect_has relay,exit build_exit "$BUILD_EXIT"
+  expect_absent relay,exit entry build_entry "$BUILD_ENTRY"
 }
 
 entities=("$@")
 if [ ${#entities[@]} -eq 0 ]; then
-  entities=(entry relay exit raw-exit)
+  entities=(entry relay exit relay-exit)
 fi
 
 for entity in "${entities[@]}"; do
@@ -241,9 +246,9 @@ for entity in "${entities[@]}"; do
   entry) check_entry ;;
   relay) check_relay ;;
   exit) check_exit ;;
-  raw-exit) check_raw_exit ;;
+  relay-exit) check_relay_exit ;;
   *)
-    echo "unknown entity: $entity (expected one of entry, relay, exit, raw-exit)" >&2
+    echo "unknown entity: $entity (expected one of entry, relay, exit, relay-exit)" >&2
     exit 2
     ;;
   esac

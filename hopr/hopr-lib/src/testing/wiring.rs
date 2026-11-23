@@ -11,7 +11,7 @@ use hopr_ticket_manager::{
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 
 use crate::{
-    HoprEntry, HoprExit, HoprRelay,
+    HoprEntry, HoprExit, HoprRelay, HoprRelayExit,
     builder::{ChainKeypair, HoprBuilder, Keypair, OffchainKeypair},
     config::HoprLibConfig,
     errors::HoprLibError,
@@ -176,7 +176,7 @@ where
 ///
 /// An exit is a relay that also terminates Sessions and resolves PIX shares, so it takes a ticket
 /// manager like [`build_relay_with_chain`] does.
-pub async fn build_exit_with_chain<
+pub async fn build_relay_exit_with_chain<
     Chain,
     Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
@@ -190,7 +190,7 @@ pub async fn build_exit_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<HoprExit<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager>>>
+) -> anyhow::Result<Arc<HoprRelayExit<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -212,7 +212,7 @@ where
 
     let node = builder
         .with_session_exit(server)
-        .build_exit(ticket_manager, ticket_factory)
+        .build_relay_exit(ticket_manager, ticket_factory)
         .await?;
 
     Ok(Arc::new(node))
@@ -222,8 +222,8 @@ where
 ///
 /// A test target: it terminates Sessions and resolves PIX shares but processes no tickets, so it
 /// takes no ticket manager.
-#[cfg(feature = "raw-exit")]
-pub async fn build_raw_exit_with_chain<
+#[cfg(feature = "exit")]
+pub async fn build_exit_with_chain<
     Chain,
     Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
@@ -237,7 +237,7 @@ pub async fn build_raw_exit_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<crate::Hopr<Chain, SharedChannelGraph, HoprNetwork, ()>>>
+) -> anyhow::Result<Arc<HoprExit<Chain, SharedChannelGraph, HoprNetwork>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -257,7 +257,7 @@ where
         chain_connector,
     )?;
 
-    let node = builder.with_session_exit(server).build_raw_exit(ticket_factory).await?;
+    let node = builder.with_session_exit(server).build_exit(ticket_factory).await?;
 
     Ok(Arc::new(node))
 }

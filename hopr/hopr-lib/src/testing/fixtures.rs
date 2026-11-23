@@ -923,7 +923,7 @@ enum RawRoleNode {
     ),
     Exit(
         Arc<
-            crate::HoprExit<
+            crate::HoprRelayExit<
                 TestingConnector,
                 hopr_network_graph::SharedChannelGraph,
                 hopr_transport_p2p::HoprNetwork,
@@ -1096,7 +1096,7 @@ where
                         .await?;
                         Ok(RawRoleNode::Entry(instance, connector))
                     } else if is_exit {
-                        let instance = crate::testing::wiring::build_exit_with_chain(
+                        let instance = crate::testing::wiring::build_relay_exit_with_chain(
                             &onchain_keys[i],
                             &offchain_keys[i],
                             config,

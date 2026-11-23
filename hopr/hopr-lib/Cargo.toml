@@ -88,24 +88,32 @@ state-dump = [
   "hopr-network-graph?/state-dump",
   "hopr-transport-p2p?/state-dump",
 ]
-# Entity sets. The node split's basic functional division is `entry` <-> `relay` <-> `exit`, and each
-# set compiles in exactly one of those, fenced down into the components:
+# Entity sets. The node split's basic functional division is `entry` <-> `relay` <-> `exit`. The three
+# are additive building blocks, each carrying the network-wide presets (`pix-bjj`,
+# `transport-announce-quic`), so a consumer takes one with `default-features = false, features = ["entry"]`
+# and nothing else:
 #
 # * `entry` — a source node: establishes Sessions, relays nothing, admits none.
 # * `relay` — a pure relay: ticket and acknowledgement processing, no Session stack and no PIX.
-# * `exit`  — a relay that also terminates Sessions and resolves PIX shares. For now an exit keeps the
-#             relay capacity, so it builds with `build_exit`, which takes a ticket manager like a relay.
+# * `exit`  — terminates Sessions and resolves PIX shares; processes no tickets, so it takes no ticket
+#             manager (`build_exit`).
 #
-# Like every Cargo feature the sets are additive, so nothing in Cargo stops a build from enabling
-# several of them (the `testing` utility feature below enables two); a node build still takes
-# exactly one. `default` carries `relay`, which is what the workspace and its tests build today.
-entry = ["session-entry", "hopr-transport/entry"]
-relay = ["hopr-transport/relay"]
-exit = ["relay", "session-exit", "hopr-transport/exit"]
-# Test target: an exit that terminates Sessions without relaying, so no ticket manager. It is not part
-# of the entity division, which keeps the relay capacity on every exit.
-raw-exit = ["session-exit", "hopr-transport/raw-exit"]
-default = ["pix-bjj", "transport-announce-quic", "relay"]
+# Enabling `relay` and `exit` together is the relaying exit (`build_relay_exit`): the ticket path plus
+# the Session exit. The `testing` feature enables all three.
+entry = [
+  "session-entry",
+  "hopr-transport/entry",
+  "pix-bjj",
+  "transport-announce-quic",
+]
+relay = ["hopr-transport/relay", "pix-bjj", "transport-announce-quic"]
+exit = [
+  "session-exit",
+  "hopr-transport/exit",
+  "pix-bjj",
+  "transport-announce-quic",
+]
+default = ["relay"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]
 # Overrides `pix-bjj`, giving Ethereum deposit addresses that a plain transfer can reach.
@@ -166,8 +174,8 @@ profiling = ["dep:pprof"]
 
 testing = [
   "entry",
+  "relay",
   "exit",
-  "raw-exit",
   "runtime-tokio",
   "dep:bytesize",
   "dep:hex-literal",
