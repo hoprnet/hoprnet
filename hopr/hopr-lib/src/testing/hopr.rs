@@ -37,6 +37,7 @@ pub fn create_hopr_instance_config(
     transit_latency: Option<TransitLatencyConfig>,
     pipeline: Option<crate::exports::transport::protocol::PacketPipelineConfig>,
     surb_balance_notify_period: Option<Duration>,
+    establish_retry_timeout: Option<Duration>,
 ) -> HoprLibConfig {
     HoprLibConfig {
         host: crate::config::HostConfig {
@@ -60,6 +61,8 @@ pub fn create_hopr_instance_config(
                 // session expiration tests, so a test that wants the Exit's keep-alive stream has
                 // to set a period explicitly.
                 surb_balance_notify_period,
+                establish_retry_timeout: establish_retry_timeout
+                    .unwrap_or_else(|| SessionGlobalConfig::default().establish_retry_timeout),
                 ..Default::default()
             },
             probe: crate::config::ProbeConfig {

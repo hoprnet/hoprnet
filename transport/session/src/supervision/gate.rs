@@ -73,6 +73,12 @@ pub struct ServiceGate {
     remaining: AtomicU64,
     /// Whether the current front cycle is funded.
     funded: AtomicBool,
+    /// Whether any front of this gate has ever been funded.
+    ///
+    /// Monotone, unlike [`funded`](Self::funded), which a [`withhold_service`](Self::withhold_service)
+    /// takes back for an unfunded successor. A Session that has been paid once holds something worth
+    /// keeping across a reconnect, whichever front it stands at now.
+    ever_funded: AtomicBool,
     /// Incremented after every mode publication.
     ///
     /// Permit acquisition performs an RMW on this epoch before committing its counter update. That
@@ -80,6 +86,12 @@ pub struct ServiceGate {
     /// old front or observes the new mode, rather than loading `funded` before a transition and
     /// committing after it.
     mode_epoch: AtomicU64,
+    /// Whether the Session's data plane is detached, awaiting its client's return.
+    ///
+    /// Carried on the gate because it is the one object the slot and the supervisor's worker share,
+    /// and a level in a shared cell cannot be lost or reordered the way a pair of events on a bounded
+    /// channel can. The worker reads it on every turn.
+    data_plane_detached: AtomicBool,
     /// Whether the gate is poisoned.
     poisoned: AtomicBool,
     /// Waker for parked writers.
@@ -99,7 +111,9 @@ impl ServiceGate {
             predeposit_budget,
             remaining: AtomicU64::new(predeposit_budget),
             funded: AtomicBool::new(false),
+            ever_funded: AtomicBool::new(false),
             mode_epoch: AtomicU64::new(0),
+            data_plane_detached: AtomicBool::new(false),
             poisoned: AtomicBool::new(false),
             notify: SlotNotify::new(),
             ceiling: AtomicU64::new(max_served_without_progress),
@@ -254,6 +268,26 @@ impl ServiceGate {
             .saturating_sub(self.remaining.load(Ordering::Acquire))
     }
 
+    /// Whether any front of this gate has ever been funded. Monotone; see the field.
+    pub fn ever_funded(&self) -> bool {
+        self.ever_funded.load(Ordering::Acquire)
+    }
+
+    /// Marks the Session's data plane detached (`true`) or attached (`false`).
+    pub fn set_data_plane_detached(&self, detached: bool) {
+        self.data_plane_detached.store(detached, Ordering::Release);
+    }
+
+    /// Whether the Session's data plane is detached.
+    pub fn data_plane_detached(&self) -> bool {
+        self.data_plane_detached.load(Ordering::Acquire)
+    }
+
+    /// Whether the gate has been poisoned, which is permanent.
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned.load(Ordering::Acquire)
+    }
+
     #[cfg(test)]
     pub fn funded(&self) -> bool {
         self.funded.load(Ordering::Acquire)
@@ -288,6 +322,7 @@ impl ServiceGate {
         // since the wake below releases whoever parked in it, but it costs a spurious refusal on
         // every funding event for nothing.
         self.funded.store(true, Ordering::Release);
+        self.ever_funded.store(true, Ordering::Release);
         self.mode_epoch.fetch_add(1, Ordering::Release);
         // Wake all parkers — predeposit-parked writers re-enter and take the
         // funded path, which checks the ceiling.
