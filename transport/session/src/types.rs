@@ -609,6 +609,14 @@ pub struct HoprSessionConfig {
     /// may still arrive, this bounds how much already-received data is held while it waits. `None`
     /// keeps the timeout as the only rule.
     pub max_frames_behind_gap: Option<usize>,
+    /// First frame ID of the stream in both directions, set when this Session takes over a predecessor's;
+    /// see [`SessionSocketConfig::stream_base`].
+    ///
+    /// Only the stateless socket supports a base; the manager does not set one on a stateful Session.
+    /// Default is `None`: the stream starts at 1. Not serialised: it is wiring set by the manager from the
+    /// Exit's `SessionResumed` message, not a Session property.
+    #[serde(skip_serializing)]
+    pub stream_base: Option<u32>,
 }
 
 /// Converts a transport sink error into an [`std::io::Error`], keeping an `io::Error` (and its kind) as is.
@@ -833,6 +841,7 @@ impl HoprSession {
                 // that is never coming and holds everything already received behind it. The
                 // sessions that need this bound most are exactly the ones flow control excludes.
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
+                stream_base: cfg.stream_base,
                 ..Default::default()
             };
 
@@ -1315,9 +1324,21 @@ mod tests {
         Ok(())
     }
 
+    /// Bits of the capability byte that no known flag uses. Non-zero while the byte has spare bits.
+    fn unknown_capability_bits() -> u8 {
+        let unknown = !Capabilities::full().bits();
+        assert_ne!(
+            unknown, 0,
+            "all capability bits are now in use; revisit the unknown-bit tests"
+        );
+        unknown
+    }
+
     #[test]
     fn byte_capabilities_unknown_bits_alone_are_empty() -> anyhow::Result<()> {
-        for bits in [0b0100_0000_u8, 0b1000_0000, 0b1100_0000] {
+        let unknown = unknown_capability_bits();
+        let single_bits = (0..u8::BITS).map(|i| 1_u8 << i).filter(|b| b & unknown != 0);
+        for bits in single_bits.chain([unknown]) {
             assert_eq!(HoprSessionCapabilities::try_from(bits)?.0, Capabilities::empty());
         }
         Ok(())
@@ -1326,14 +1347,17 @@ mod tests {
     #[test]
     fn byte_capabilities_unknown_bits_are_dropped_from_known_flags() -> anyhow::Result<()> {
         let known: Capabilities = Capability::Segmentation | Capability::UsePIX;
-        let bits = u8::from(HoprSessionCapabilities::from(known)) | 0b1000_0000;
+        let bits = u8::from(HoprSessionCapabilities::from(known)) | unknown_capability_bits();
         assert_eq!(HoprSessionCapabilities::try_from(bits)?.0, known);
         Ok(())
     }
 
     #[test]
     fn byte_capabilities_all_bits_set_is_full() -> anyhow::Result<()> {
-        assert_eq!(HoprSessionCapabilities::try_from(0xFF_u8)?.0, Capabilities::full());
+        assert_eq!(
+            HoprSessionCapabilities::try_from(Capabilities::full().bits() | unknown_capability_bits())?.0,
+            Capabilities::full()
+        );
         Ok(())
     }
 
@@ -1359,6 +1383,15 @@ mod tests {
         let byte_val: u8 = byte_caps.into();
         let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(*restored.as_ref(), caps);
+        Ok(())
+    }
+
+    #[test]
+    fn byte_capabilities_resumable_round_trip() -> anyhow::Result<()> {
+        let caps: Capabilities = Capability::UsePIX | Capability::Resumable;
+        let byte_val: u8 = HoprSessionCapabilities::from(caps).into();
+        assert_eq!(byte_val, 0b0110_0000);
+        assert_eq!(*HoprSessionCapabilities::try_from(byte_val)?.as_ref(), caps);
         Ok(())
     }
 

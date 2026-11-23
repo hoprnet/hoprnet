@@ -139,6 +139,8 @@ pub(crate) enum ExitControlKind {
     RefusalNoSessionSlot,
     /// Refused: the node could not decide right now.
     RefusalBusy,
+    /// Refused: the Entry asked to resume a Session this node cannot resume.
+    RefusalNotResumable,
     /// The SURB-level report of how many SURBs the Exit holds. Backs off on idle Sessions.
     SurbReport,
     /// A PIX fill packet, sent above the report rate.
@@ -165,6 +167,7 @@ impl From<PixAdmissionRejection> for ExitControlKind {
             PixAdmissionRejection::NoSessionSlot => Self::RefusalNoSessionSlot,
             PixAdmissionRejection::Busy => Self::RefusalBusy,
             PixAdmissionRejection::DirectReturnPath => Self::RefusalDirectReturnPath,
+            PixAdmissionRejection::NotResumable => Self::RefusalNotResumable,
         }
     }
 }
@@ -306,6 +309,7 @@ mod tests {
             PixAdmissionRejection::NoSessionSlot,
             PixAdmissionRejection::Busy,
             PixAdmissionRejection::DirectReturnPath,
+            PixAdmissionRejection::NotResumable,
         ];
 
         let labels: std::collections::BTreeSet<String> = rejections

@@ -63,8 +63,8 @@ fn cycle_quota(params: &PixParams) -> u64 {
 ///    - `SsaRequest` (from Bob) → delivered to Alice
 ///    - `SsaCommit` messages (from Alice, one per polynomial group) → each delivered to Bob
 ///    - terminating segment (from Alice) → delivered to Bob
-/// 4. Both sessions are established and `UsePIX | Segmentation | NoRateControl` capabilities are confirmed on both
-///    sides.
+/// 4. Both sessions are established and `UsePIX | Segmentation | NoRateControl | Resumable` capabilities are confirmed
+///    on both sides. The session manager adds `Resumable` to every PIX Session.
 /// 5. Alice receives a `HoprSessionOutPixEvent::ReadyToDeposit` on her PIX event stream, and Bob receives
 ///    `DepositNeeded`, confirming the SSA handshake produced events on both sides.
 /// 6. Alice closes the session; `ping_session` on the closed session returns `NonExistingSession`.
@@ -299,7 +299,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
 
     assert_eq!(
         alice_session.config().capabilities,
-        Capability::Segmentation | Capability::NoRateControl | Capability::UsePIX
+        Capability::Segmentation | Capability::NoRateControl | Capability::UsePIX | Capability::Resumable
     );
     assert_eq!(
         alice_session.config().capabilities,

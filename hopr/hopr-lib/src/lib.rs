@@ -447,6 +447,7 @@ where
             async { self.transport_api.new_session(destination, target, cfg).await }
         })
         .retry(backoff)
+        .when(is_retryable_session_error)
         .sleep(backon::FuturesTimerSleeper)
         .await?)
     }
@@ -842,9 +843,41 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
     Ok(hopr_transport::peer_id_to_public_key(peer_id)?)
 }
 
+/// Whether a failed Session establishment is worth repeating: not when the peer permanently rejected it.
+#[cfg(feature = "session-client")]
+fn is_retryable_session_error(error: &errors::HoprTransportError) -> bool {
+    !matches!(
+        error,
+        errors::HoprTransportError::Session(hopr_transport::TransportSessionError::Rejected(reason))
+            if reason.is_permanent()
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "session-client")]
+    #[test]
+    fn permanent_session_rejections_are_not_retried() {
+        use hopr_transport::{StartErrorReason, TransportSessionError};
+
+        for reason in [
+            StartErrorReason::NotResumable,
+            StartErrorReason::UnacceptablePixParams,
+            StartErrorReason::TargetNotAdmitted,
+        ] {
+            let error = errors::HoprTransportError::Session(TransportSessionError::Rejected(reason));
+            assert!(!is_retryable_session_error(&error), "{reason}");
+        }
+        for reason in [StartErrorReason::Busy, StartErrorReason::NoSlotsAvailable] {
+            let error = errors::HoprTransportError::Session(TransportSessionError::Rejected(reason));
+            assert!(is_retryable_session_error(&error), "{reason}");
+        }
+        assert!(is_retryable_session_error(&errors::HoprTransportError::Session(
+            TransportSessionError::Timeout
+        )));
+    }
 
     #[test]
     fn network_health_green_is_ready() {
