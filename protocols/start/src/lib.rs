@@ -49,6 +49,19 @@ pub enum StartErrorReason {
     /// will not be served by this recipient however the request is phrased. Distinct from
     /// [`Busy`](Self::Busy) because that one is transient and worth retrying.
     TargetNotAdmitted = 4,
+    /// The recipient cannot resume the Session under this pseudonym; open a new one under a fresh
+    /// pseudonym.
+    NotResumable = 5,
+}
+
+impl StartErrorReason {
+    /// Whether repeating the same request cannot succeed.
+    pub fn is_permanent(&self) -> bool {
+        matches!(
+            self,
+            Self::NotResumable | Self::UnacceptablePixParams | Self::TargetNotAdmitted
+        )
+    }
 }
 
 /// Identifies which entity a [`StartErrorType`] refers to.
@@ -101,8 +114,10 @@ pub struct StartInitiation<T, C> {
     /// and the lower 32 bits of them are the SURB balancer target.
     ///
     /// The least significant 64 bits are reserved: the lowest 32 carry the sender's session idle timeout in
-    /// whole seconds (`0` if not announced), and the 32 above them are unused. Senders set unused bits to `0`
-    /// and receivers ignore them, so that they can be allocated later without breaking older decoders.
+    /// whole seconds (`0` if not announced), bit 32 is reserved for forward receipts (hoprnet#8702), and bit 33
+    /// marks an attempt to resume a Session (answered by [`StartProtocol::SessionResumed`]). Bits 34 to 63 stay
+    /// reserved (for a resume secret, see hoprnet#8723). Senders set unused bits to `0` and receivers ignore
+    /// them, so that they can be allocated later without breaking older decoders.
     pub additional_data: u128,
 }
 
@@ -116,6 +131,26 @@ pub struct StartEstablished<I> {
     pub orig_challenge: StartChallenge,
     /// Session ID that was selected by the recipient.
     pub session_id: I,
+}
+
+/// Message of the Start protocol that confirms a takeover of a Session the Exit still held.
+///
+/// It is sent by an Exit only in answer to a resume attempt (see [`StartInitiation::additional_data`]),
+/// in place of [`StartEstablished`], after the Exit took over a Session
+/// it was still holding for the same pseudonym. The Entry then keeps its accounting state for the
+/// pseudonym, numbers its stream from [`stream_base`](Self::stream_base) and expects the Exit's frames
+/// to be numbered from it, so that the predecessor's frames are all below the base.
+///
+/// ## Generic parameters
+/// `I` is for session identifier.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartResumed<I> {
+    /// Challenge that was used in the [initiation message](StartInitiation) to establish correspondence.
+    pub orig_challenge: StartChallenge,
+    /// Session ID that was selected by the recipient.
+    pub session_id: I,
+    /// First frame ID of the successor stream in both directions.
+    pub stream_base: u32,
 }
 
 #[cfg_attr(doc, aquamarine::aquamarine)]
@@ -137,6 +172,7 @@ pub struct StartEstablished<I> {
 ///      Note right of Exit: SessionID [Pseudonym, Tag]
 ///      Exit->>Entry: SessionEstablished (Challenge, SessionID)
 ///      Note left of Entry: SessionID [Pseudonym, Tag]
+///      Note over Entry,Exit: after a takeover of a held Session, to a resume attempt only, SessionResumed (Challenge, SessionID, StreamBase) replaces SessionEstablished
 ///      Exit->>Entry: SsaRequest (SessionID, SsaIndex, ServerCommitments)
 ///      Entry->>Exit: SsaCommit (SessionID, SsaIndex, CoeffIndex, PolyCoeffs)
 ///      Entry->>Exit: KeepAlive (SessionID)
@@ -151,7 +187,8 @@ pub struct StartEstablished<I> {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
+#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount))]
+#[repr(u8)]
 pub enum StartProtocol<I, T, C, G, K, D> {
     /// Request to initiate a new session.
     StartSession(StartInitiation<T, C>),
@@ -165,6 +202,12 @@ pub enum StartProtocol<I, T, C, G, K, D> {
     SessionError(StartErrorType<I>),
     /// A ping message to keep the session alive.
     KeepAlive(KeepAliveMessage<I>),
+    /// Confirmation that the counterparty took over a Session it still held (see [`StartResumed`]).
+    ///
+    /// Sent only in answer to a resume attempt, in place of
+    /// [`SessionEstablished`](StartProtocol::SessionEstablished). It has tag 7 because tag 6 is reserved for
+    /// forward receipts (hoprnet#8702).
+    SessionResumed(StartResumed<I>) = 7,
 }
 
 /// Filling up the Client's commitment to the Session Stealth Address (SSA).
@@ -633,6 +676,12 @@ where
                 let session_id = serde_cbor_2::to_vec(&est.session_id)?;
                 data.extend(session_id);
             }
+            StartProtocol::SessionResumed(res) => {
+                data.extend_from_slice(&res.orig_challenge.to_be_bytes());
+                data.extend_from_slice(&res.stream_base.to_be_bytes());
+                let session_id = serde_cbor_2::to_vec(&res.session_id)?;
+                data.extend(session_id);
+            }
             StartProtocol::SessionError(err) => {
                 match err.identifier {
                     ErrorIdentifier::Challenge(challenge) => {
@@ -928,6 +977,26 @@ where
                                 .map_err(|_| StartProtocolError::ParseError("est.challenge".into()))?,
                         ),
                         session_id: serde_cbor_2::from_slice(&body[size_of::<StartChallenge>()..])?,
+                    })
+                }
+                StartProtocolDiscriminants::SessionResumed => {
+                    if body.len() < size_of::<StartChallenge>() + size_of::<u32>() {
+                        return Err(StartProtocolError::InvalidLength);
+                    }
+                    let base_start = size_of::<StartChallenge>();
+                    let id_start = base_start + size_of::<u32>();
+                    StartProtocol::SessionResumed(StartResumed {
+                        orig_challenge: StartChallenge::from_be_bytes(
+                            body[..base_start]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("res.challenge".into()))?,
+                        ),
+                        stream_base: u32::from_be_bytes(
+                            body[base_start..id_start]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("res.stream_base".into()))?,
+                        ),
+                        session_id: serde_cbor_2::from_slice(&body[id_start..])?,
                     })
                 }
                 StartProtocolDiscriminants::SessionError => {
@@ -1321,6 +1390,73 @@ mod tests {
     type MinimalDeposit = ();
 
     #[test]
+    fn session_resumed_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let msg =
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionResumed(StartResumed {
+                orig_challenge: 0x0102_0304_0506_0708,
+                session_id: "session".to_string(),
+                stream_base: 0x0001_0000,
+            });
+        let (tag, data) = msg.clone().encode()?;
+        assert_eq!(7, data[1]);
+        assert_eq!(StartProtocolDiscriminants::SessionResumed as u8, data[1]);
+        assert_eq!(&0x0102_0304_0506_0708u64.to_be_bytes(), &data[4..12]);
+        assert_eq!(&0x0001_0000u32.to_be_bytes(), &data[12..16]);
+        assert_eq!(msg, StartProtocol::decode(tag, &data)?);
+
+        // A truncated message is rejected
+        assert!(matches!(
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &data[..15]),
+            Err(StartProtocolError::InvalidLength)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn reserved_tag_6_should_decode_as_unknown_message() {
+        let data = [
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::START_PROTOCOL_VERSION,
+            6,
+            0,
+            1,
+            0,
+        ];
+        assert!(matches!(
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(
+                StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG,
+                &data
+            ),
+            Err(StartProtocolError::UnknownMessage)
+        ));
+    }
+
+    #[test]
+    fn start_protocol_discriminants_should_stay_stable_and_resumed_should_be_last() -> anyhow::Result<()> {
+        assert_eq!(0, StartProtocolDiscriminants::StartSession as u8);
+        assert_eq!(1, StartProtocolDiscriminants::SessionEstablished as u8);
+        assert_eq!(2, StartProtocolDiscriminants::SsaCommit as u8);
+        assert_eq!(3, StartProtocolDiscriminants::SsaRequest as u8);
+        assert_eq!(4, StartProtocolDiscriminants::SessionError as u8);
+        assert_eq!(5, StartProtocolDiscriminants::KeepAlive as u8);
+        assert_eq!(7, StartProtocolDiscriminants::SessionResumed as u8);
+        // Tag 6 is skipped (reserved for forward receipts), so the count is one less than the last tag + 1.
+        assert_eq!(7, <StartProtocolDiscriminants as strum::EnumCount>::COUNT);
+        assert!(StartProtocolDiscriminants::from_repr(6).is_none());
+
+        // A message of an existing kind, as an old peer encodes it, still decodes
+        let old = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionEstablished(
+            StartEstablished {
+                orig_challenge: 7,
+                session_id: "session".to_string(),
+            },
+        );
+        let (tag, data) = old.clone().encode()?;
+        assert_eq!(1, data[1]);
+        assert_eq!(old, StartProtocol::decode(tag, &data)?);
+        Ok(())
+    }
+
+    #[test]
     fn start_protocol_start_session_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::StartSession(StartInitiation {
             challenge: 0,
@@ -1415,6 +1551,7 @@ mod tests {
             StartErrorReason::Busy,
             StartErrorReason::UnacceptablePixParams,
             StartErrorReason::TargetNotAdmitted,
+            StartErrorReason::NotResumable,
         ] {
             let sent = StartProtocol::SessionError(StartErrorType {
                 identifier: ErrorIdentifier::Challenge(10),
@@ -1428,6 +1565,26 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn not_resumable_has_a_stable_wire_value_and_is_permanent() {
+        assert_eq!(StartErrorReason::NotResumable as u8, 5);
+        assert_eq!(StartErrorReason::from_repr(5), Some(StartErrorReason::NotResumable));
+        for reason in [
+            StartErrorReason::NotResumable,
+            StartErrorReason::UnacceptablePixParams,
+            StartErrorReason::TargetNotAdmitted,
+        ] {
+            assert!(reason.is_permanent(), "{reason}");
+        }
+        for reason in [
+            StartErrorReason::Unknown,
+            StartErrorReason::NoSlotsAvailable,
+            StartErrorReason::Busy,
+        ] {
+            assert!(!reason.is_permanent(), "{reason}");
+        }
     }
 
     /// A reason byte this build does not know must still decode, as `Unknown`.

@@ -555,6 +555,8 @@ pub struct TestNodeConfig {
     /// than `idle_timeout` each notification resets the moka TTI and breaks session expiration tests.
     /// This is the override for tests that need the Exit's keep-alive stream to actually run.
     pub surb_balance_notify_period: Option<Duration>,
+    /// The delay between this node's Session establishment retries, or `None` for the default.
+    pub establish_retry_timeout: Option<Duration>,
 }
 
 impl Default for TestNodeConfig {
@@ -567,6 +569,7 @@ impl Default for TestNodeConfig {
             transit_latency: None,
             pipeline: None,
             surb_balance_notify_period: None,
+            establish_retry_timeout: None,
         }
     }
 }
@@ -778,6 +781,7 @@ fn cluster_fixture_inner(
             let transit_latency = configs[i].transit_latency;
             let pipeline = configs[i].pipeline;
             let surb_balance_notify_period = configs[i].surb_balance_notify_period;
+            let establish_retry_timeout = configs[i].establish_retry_timeout;
             let echo_counter = echo_received.clone();
 
             let blokli_client = chain_client
@@ -829,6 +833,7 @@ fn cluster_fixture_inner(
                         transit_latency,
                         pipeline,
                         surb_balance_notify_period,
+                        establish_retry_timeout,
                     );
 
                     let instance = crate::testing::wiring::build_full_with_chain(
@@ -1061,6 +1066,7 @@ where
                         cfg.transit_latency,
                         cfg.pipeline,
                         cfg.surb_balance_notify_period,
+                        cfg.establish_retry_timeout,
                     );
 
                     let prober = Some(hopr_ct_full_network::EgressConfig {

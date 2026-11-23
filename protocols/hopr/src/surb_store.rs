@@ -4962,6 +4962,35 @@ mod tests {
         Ok(())
     }
 
+    /// Closing a Session retires the pseudonym's admitted SURB ring and nothing else: the sending-side
+    /// reply openers and the SURB generation survive, so an Entry that reconnects under the same
+    /// pseudonym can still open a reply sealed on a SURB it minted before the close, and its new
+    /// SURBs carry a generation the Exit does not take for an older one.
+    #[test]
+    fn retiring_a_pseudonym_keeps_its_reply_openers_and_surb_generation() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let sender_id = HoprSenderId::from_pseudonym_and_id(&pseudonym, [7u8; 8]);
+
+        store.insert_reply_opener(sender_id, cheap_opener());
+        let generation = store.bump_generation(&pseudonym);
+        let token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+
+        store.retire(&pseudonym, token);
+        store.pseudonym_openers.run_pending_tasks();
+
+        assert!(
+            store.find_reply_opener(&sender_id).is_some(),
+            "a reply sealed on a SURB minted before the close must still open afterwards"
+        );
+        assert_eq!(
+            generation.wrapping_add(1),
+            store.bump_generation(&pseudonym),
+            "the generation must carry on from where the closed Session left it"
+        );
+        Ok(())
+    }
+
     /// A retire whose token names no admission must be a no-op: a rolled-back Session was never
     /// admitted, and its teardown still runs the retire through the same seam as every other teardown.
     #[test]
