@@ -224,8 +224,9 @@ pub struct BalancerStateValues {
     ///
     /// Subtracted from the remaining deficit in [`claim_organic_surbs`](Self::claim_organic_surbs)
     /// so a burst of packets within one balancer tick cannot collectively overshoot the target and
-    /// overflow the counterparty's SURB store. Reset to `0` whenever `update()` absorbs the tick's
-    /// estimator delta into `buffer_level`.
+    /// overflow the counterparty's SURB store. Re-armed whenever `update()` absorbs the tick's
+    /// estimator delta into `buffer_level`: grants made before the estimator snapshot are
+    /// subtracted, and grants made after it remain counted until the next tick.
     organic_surbs_granted_in_tick: AtomicU64,
 }
 
@@ -499,18 +500,19 @@ impl BalancerStateValues {
             .store(surbs_per_sec, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// How many SURBs an outgoing Session data packet should carry along with its payload.
+    /// Whether the organic-SURB gate is open (`1`) or closed (`0`).
     ///
     /// Entry-side only. [`BalancerStateValues`] is shared by both ends of a Session, but only the
     /// initiator mints SURBs for its counterparty, so on the Exit this answer is meaningless.
     ///
+    /// Production outgoing data packets call [`claim_organic_surbs`](Self::claim_organic_surbs) to
+    /// claim up to the remaining deficit per packet; this non-mutating helper reports only whether
+    /// organic SURB production is currently open (`1`) or closed (`0`).
+    ///
     /// Returning `0` is the point: a SURB delivered to a counterparty that is already at its target
     /// evicts the oldest one it holds, and under PIX that destroys an SSA share rather than merely
-    /// wasting a SURB. Production resumes at one per packet as soon as the estimate falls back below
-    /// target, or immediately if the counterparty signals it is running low.
-    ///
-    /// This uses the usable level: SURBs the counterparty holds through a relayer judged dead do not
-    /// hold the gate shut.
+    /// wasting a SURB. This uses the usable level: SURBs the counterparty holds through a relayer
+    /// judged dead do not hold the gate shut.
     pub fn organic_surbs_per_packet(&self) -> usize {
         usize::from(self.organic_surbs_deficit() > 0)
     }
@@ -526,61 +528,74 @@ impl BalancerStateValues {
         }
     }
 
-    /// Remaining number of SURBs outgoing Session data packets may piggyback during the current
-    /// balancer tick without pushing the estimated counterparty stock above its effective target.
-    ///
-    /// Returns `1` while the balancer is disabled or the counterparty signalled distress (matching
-    /// the single-SURB fallback invariant), `0` once the usable level plus SURBs already claimed
-    /// in this tick reaches the effective target, and the exact remaining shortfall otherwise.
-    pub fn organic_surbs_deficit(&self) -> usize {
-        if self.is_disabled()
-            || self
-                .counterparty_in_surb_distress
-                .load(std::sync::atomic::Ordering::Relaxed)
-        {
+    /// Computes how many organic SURBs may still be piggybacked given `granted` SURBs already
+    /// claimed in the current balancer tick:
+    /// - balancer disabled (`target_surb_buffer_size == 0`): `1` (safe 1:1 fallback without a balancer tracking
+    ///   counterparty stock);
+    /// - balancer active: exact remaining shortfall `effective_target - (usable + granted)`, floored at `1` while the
+    ///   counterparty signals distress (`SurbDistress` / `OutOfSurbs`) so a below-target distressed peer fills at full
+    ///   packet capacity (`min(max_surbs, deficit)`) while a peer at target (or with `target < distress_threshold`)
+    ///   gets 1 SURB/packet without flooding its ring.
+    fn organic_surbs_budget(&self, granted: u64) -> usize {
+        if self.is_disabled() {
             return 1;
         }
 
         let effective_target = self.effective_target();
         let usable = self.usable_level(self.buffer_level());
+        let deficit =
+            usize::try_from(effective_target.saturating_sub(usable.saturating_add(granted))).unwrap_or(usize::MAX);
+        if self
+            .counterparty_in_surb_distress
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            deficit.max(1)
+        } else {
+            deficit
+        }
+    }
+
+    /// Remaining number of SURBs outgoing Session data packets may piggyback during the current
+    /// balancer tick without pushing the estimated counterparty stock above its effective target.
+    ///
+    /// Returns `1` while the balancer is disabled, `deficit.max(1)` while the counterparty
+    /// signalled distress, `0` once the usable level plus SURBs already claimed in this tick
+    /// reaches the effective target without distress, and the exact remaining shortfall otherwise.
+    pub fn organic_surbs_deficit(&self) -> usize {
         let granted = self
             .organic_surbs_granted_in_tick
             .load(std::sync::atomic::Ordering::Acquire);
-        usize::try_from(effective_target.saturating_sub(usable.saturating_add(granted))).unwrap_or(usize::MAX)
+        self.organic_surbs_budget(granted)
     }
 
     /// Atomically claims up to `max_surbs` from the remaining SURB deficit for one outgoing data
     /// packet, counting down per packet within each balancer tick so bursts cannot overshoot the
     /// counterparty's target or evict stored SURBs (and PIX shares).
     ///
-    /// When the balancer is disabled or the counterparty signalled distress, returns
-    /// `max_surbs.min(1)` (preserving the single-SURB fallback without unbounded bursts).
+    /// While the counterparty signals distress, claims up to `max_surbs` against any remaining
+    /// deficit and floors at `1` once the estimate reaches target. When the balancer is disabled,
+    /// returns `max_surbs.min(1)`.
     pub fn claim_organic_surbs(&self, max_surbs: usize) -> usize {
         use std::sync::atomic::Ordering;
 
         if max_surbs == 0 {
             return 0;
         }
-        if self.is_disabled() || self.counterparty_in_surb_distress.load(Ordering::Relaxed) {
+        if self.is_disabled() {
             return 1;
         }
 
-        let effective_target = self.effective_target();
-        let usable = self.usable_level(self.buffer_level());
-        let cap = max_surbs as u64;
         let mut claimed = 0usize;
-
         let _ = self
             .organic_surbs_granted_in_tick
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |granted| {
-                let remaining = effective_target.saturating_sub(usable.saturating_add(granted));
-                let grant = cap.min(remaining);
+                let grant = max_surbs.min(self.organic_surbs_budget(granted));
                 if grant == 0 {
                     claimed = 0;
                     None
                 } else {
-                    claimed = grant as usize;
-                    Some(granted.saturating_add(grant))
+                    claimed = grant;
+                    Some(granted.saturating_add(grant as u64))
                 }
             });
 
@@ -3054,5 +3069,153 @@ mod tests {
         });
         organic_only.set_pacing_floor(8);
         assert_eq!(0, organic_only.pacing_cap(), "a ceiling of nothing paces nothing");
+    }
+
+    /// Variable multi-SURB organic claims across multiple balancer ticks must fill up to the target,
+    /// silence the balancer's keep-alive output, and then stop producing so the counterparty's SURB
+    /// stock never overshoots or grows without bound.
+    #[test_log::test]
+    fn organic_multi_surb_claims_converge_to_target_and_silence_balancer_without_overshoot() {
+        const TARGET: u64 = 100;
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: TARGET,
+            max_surbs_per_sec: 1_000,
+            surb_decay: None,
+        };
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+
+        // Simulate outgoing data packets of varying SURB capacities (full-MTU 4, medium 6, small 8)
+        // across several balancer ticks with zero replies (worst-case asymmetric upload).
+        let packet_caps_per_tick: &[&[usize]] = &[
+            &[8, 4, 8, 6, 8],          // 34 SURBs
+            &[8, 8, 4, 8, 8],          // 36 SURBs (cumulative 70)
+            &[8, 8, 8, 8, 8, 8],       // deficit is 30 → grants 8 + 8 + 8 + 6 + 0 + 0 = 30 (cumulative 100)
+            &[8, 8, 4, 8, 8, 8, 8, 8], // at target → all 0
+            &[8, 8, 8, 8],             // stays 0 on later ticks too
+        ];
+
+        let mut per_tick_totals = Vec::new();
+        let mut peak_output = 0u64;
+        for caps in packet_caps_per_tick {
+            let mut tick_claimed = 0u64;
+            for &cap in *caps {
+                let claimed = state.claim_organic_surbs(cap) as u64;
+                tick_claimed += claimed;
+                surb_estimator
+                    .produced
+                    .fetch_add(claimed, std::sync::atomic::Ordering::Relaxed);
+            }
+            per_tick_totals.push(tick_claimed);
+
+            std::thread::sleep(Duration::from_millis(20));
+            balancer.update();
+            peak_output = peak_output.max(output.load(std::sync::atomic::Ordering::Relaxed));
+        }
+
+        assert_eq!(vec![34, 36, 30, 0, 0], per_tick_totals);
+        assert_eq!(TARGET, surb_estimator.estimate_surbs_produced());
+        assert_eq!(TARGET, state.buffer_level());
+        assert_eq!(0, state.organic_surbs_deficit());
+        assert!(
+            output.load(std::sync::atomic::Ordering::Relaxed) < peak_output,
+            "reaching target via organic claims must drop balancer output below its ramp peak ({} vs peak \
+             {peak_output})",
+            output.load(std::sync::atomic::Ordering::Relaxed)
+        );
+
+        // Once the balancer's own integral residual settles, keep-alive output decays to 0 and
+        // organic claims stay 0 across further packets.
+        for _ in 0..10 {
+            assert_eq!(0, state.claim_organic_surbs(8));
+            tick(&mut balancer, &surb_estimator, &output, 0);
+        }
+        assert_eq!(
+            0,
+            output.load(std::sync::atomic::Ordering::Relaxed),
+            "balancer must settle to 0 keep-alive SURBs/s once target is reached"
+        );
+    }
+
+    /// Under steady consumption, variable organic SURB claims subtract directly from the balancer's
+    /// remaining refill expectation so keep-alive demand stays bounded and far below what a
+    /// balancer without organic piggybacking would command.
+    #[test_log::test]
+    fn organic_multi_surb_claims_subtract_from_balancer_expectation_under_consumption() {
+        const TARGET: u64 = 100;
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: TARGET,
+            max_surbs_per_sec: 1_000,
+            surb_decay: None,
+        };
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+
+        // Pre-fill to target.
+        surb_estimator
+            .produced
+            .fetch_add(TARGET, std::sync::atomic::Ordering::Relaxed);
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+        assert_eq!(TARGET, state.buffer_level());
+        assert_eq!(0, output.load(std::sync::atomic::Ordering::Relaxed));
+
+        // Each cycle the counterparty consumes 11 SURBs; outgoing packets with capacities [4, 8, 8]
+        // claim 4 + 7 + 0 = 11 to cover the exact deficit, bringing `buffer_level` back to TARGET
+        // without overshooting and dropping the balancer's commanded output back below its
+        // post-consumption spike.
+        for _ in 0..5 {
+            surb_estimator
+                .consumed
+                .fetch_add(11, std::sync::atomic::Ordering::Relaxed);
+            std::thread::sleep(Duration::from_millis(20));
+            balancer.update();
+            let post_consume_output = output.load(std::sync::atomic::Ordering::Relaxed);
+            assert_eq!(TARGET - 11, state.buffer_level());
+            assert_eq!(11, state.organic_surbs_deficit());
+            assert!(post_consume_output > 0, "deficit must raise balancer output");
+
+            let claims = [4usize, 8, 8]
+                .into_iter()
+                .map(|cap| {
+                    let c = state.claim_organic_surbs(cap);
+                    surb_estimator
+                        .produced
+                        .fetch_add(c as u64, std::sync::atomic::Ordering::Relaxed);
+                    c
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(vec![4, 7, 0], claims);
+            assert_eq!(0, state.organic_surbs_deficit());
+
+            std::thread::sleep(Duration::from_millis(20));
+            balancer.update();
+            assert_eq!(TARGET, state.buffer_level());
+            assert!(
+                output.load(std::sync::atomic::Ordering::Relaxed) < post_consume_output,
+                "organic replenishment must reduce balancer output from its deficit spike ({} vs \
+                 {post_consume_output})",
+                output.load(std::sync::atomic::Ordering::Relaxed)
+            );
+        }
+    }
+
+    #[test]
+    fn claim_organic_surbs_uses_full_deficit_under_distress_and_floors_at_one() {
+        let disabled = BalancerStateValues::default();
+        assert_eq!(1, disabled.claim_organic_surbs(8));
+        assert_eq!(0, disabled.claim_organic_surbs(0));
+
+        // Below target + distress: claims full packet space up to the deficit, then floors at 1
+        // once the deficit is exhausted (instead of flooding 8/packet into a full ring).
+        let below_distressed = gate_state(100, 90);
+        below_distressed.observe_counterparty_signals(hopr_crypto_packet::prelude::PacketSignal::SurbDistress.into());
+        assert_eq!(10, below_distressed.organic_surbs_deficit());
+        assert_eq!(8, below_distressed.claim_organic_surbs(8));
+        assert_eq!(2, below_distressed.claim_organic_surbs(8));
+        assert_eq!(1, below_distressed.claim_organic_surbs(8));
+
+        // Clearing distress at/above target shuts the gate completely.
+        below_distressed.observe_counterparty_signals(hopr_crypto_packet::prelude::PacketSignals::empty());
+        assert_eq!(0, below_distressed.organic_surbs_deficit());
+        assert_eq!(0, below_distressed.claim_organic_surbs(8));
     }
 }

@@ -1832,7 +1832,7 @@ impl SurbShareInfo for HoprSurb {
 /// to seal once the committed cycle is exhausted, so every SURB it mints from then on is share-less. The
 /// next cycle's shares are minted only after the Exit has requested that cycle, which is to say *behind*
 /// every share-less SURB minted in between. While the Entry produces SURBs faster than the Exit spends
-/// them — `max_surbs_per_data_packet > 1` bypasses the balancer's gate, so a 512 B write carries about
+/// them — `max_surbs_per_data_packet == usize::MAX` bypasses the balancer's gate, so a 512 B write carries about
 /// six against the one a reply spends — that share-less backlog grows faster than it drains. In a single
 /// FIFO queue the next cycle's shares are then reached late or never, and the supervisor closes the
 /// Session on `RecoveryIdle` (hoprnet#8466).

@@ -4018,7 +4018,10 @@ fn initialize_session_telemetry(
 /// below its target, and none once the per-tick grant accumulator reaches target. Because the
 /// remaining deficit is counted down per packet within each balancer tick, even a burst of data
 /// packets cannot overflow the counterparty's SURB store (where evictions destroy PIX shares).
-/// When the balancer is disabled or the counterparty signalled distress, the gate falls back to
+/// While the counterparty signals distress, the gate still allows up to
+/// `min(max_surbs, fittable_surbs, deficit.max(1))` so a genuinely depleted peer fills at full
+/// packet space while a peer at target (or with `target < distress_threshold`) gets 1 SURB per
+/// packet without overflowing its ring. When the balancer is disabled, it falls back to
 /// `min(max_surbs, 1)`. An explicit `0` always wins; `usize::MAX` opts out of the gate.
 ///
 /// One exception: while data goes out into a silence (see [`BalancerStateValues::silence_sustain`]),
@@ -5420,19 +5423,21 @@ where
                     let surb_estimator = AtomicSurbFlowEstimator::default();
                     let surbs_per_keep_alive = KeepAliveMessage::from(session_id).max_surbs()? as u32;
 
-                    // Sender responsible for keep-alive and Session data will be counting produced SURBs
-                    let surb_estimator_clone = surb_estimator.clone();
+                    // Sender responsible for keep-alives counts produced SURBs.
+                    let surb_estimator_for_ka = surb_estimator.clone();
                     let full_surb_scoring_sender =
-                        msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                            let produced = data.estimate_surbs_with_msg() as u64;
-                            // Count how many SURBs we sent with each packet
-                            surb_estimator_clone
-                                .produced
-                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            telemetry::record_session_surb_produced(&session_id, produced);
-                            futures::future::ok::<_, S::Error>((routing, data))
-                        });
+                        msg_sender
+                            .clone()
+                            .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                                let produced = data.estimate_surbs_with_msg() as u64;
+                                // Count how many SURBs we sent with each packet
+                                surb_estimator_for_ka
+                                    .produced
+                                    .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                                #[cfg(feature = "telemetry")]
+                                telemetry::record_session_surb_produced(&session_id, produced);
+                                futures::future::ok::<_, S::Error>((routing, data))
+                            });
 
                     let surb_mgmt = Arc::new(BalancerStateValues::from(balancer_config));
                     // The counterparty's store is the same bounded ring buffer as ours, so its
@@ -5440,19 +5445,23 @@ where
                     // claim it is holding.
                     surb_mgmt.set_counterparty_buffer_capacity(self.cfg.maximum_surb_buffer_size as u64);
 
-                    // For standard Session data we first reduce the number of SURBs we want to produce,
-                    // unless requested to always max them out
+                    // For standard Session data, cap organic SURBs and immediately record the
+                    // resulting production in the same sink step so no async backpressure gap can
+                    // separate a claimed grant from its estimator count.
                     let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
-                    let reduced_surb_scoring_sender = full_surb_scoring_sender.clone().with(
-                        // NOTE: this is put in-front of the `full_surb_scoring_sender`,
-                        // so that its estimate of SURBs gets automatically updated based on
-                        // the `max_surbs_in_packets` set here.
-                        move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                    let surb_estimator_for_tx = surb_estimator.clone();
+                    let reduced_surb_scoring_sender =
+                        msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
                             cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
+                            let produced = data.estimate_surbs_with_msg() as u64;
+                            surb_estimator_for_tx
+                                .produced
+                                .fetch_add(produced, std::sync::atomic::Ordering::Release);
+                            #[cfg(feature = "telemetry")]
+                            telemetry::record_session_surb_produced(&session_id, produced);
                             futures::future::ok::<_, S::Error>((routing, data))
-                        },
-                    );
+                        });
 
                     // Spawn the SURB-bearing keep alive stream towards the Exit. Suspended until the
                     // balancer below gives the controller a rate.
@@ -9972,18 +9981,28 @@ mod tests {
     }
 
     #[test]
-    fn cap_organic_surbs_falls_back_to_one_when_disabled_or_in_distress() -> anyhow::Result<()> {
+    fn cap_organic_surbs_falls_back_to_one_when_disabled_and_uses_deficit_floor_in_distress() -> anyhow::Result<()> {
         let disabled = BalancerStateValues::default();
         let mut data = small_outgoing_packet()?;
         cap_organic_surbs(&mut data, 8, &disabled);
         assert_eq!(Some(1), data.packet_info.map(|info| info.max_surbs_in_packet));
 
-        let distressed = gate_state(100, 100);
-        distressed
+        // Distressed and below target: uses full packet capacity against the remaining deficit.
+        let distressed_below = gate_state(100, 90);
+        distressed_below
             .counterparty_in_surb_distress
             .store(true, std::sync::atomic::Ordering::Relaxed);
         let mut data = small_outgoing_packet()?;
-        cap_organic_surbs(&mut data, 8, &distressed);
+        cap_organic_surbs(&mut data, 8, &distressed_below);
+        assert_eq!(Some(8), data.packet_info.map(|info| info.max_surbs_in_packet));
+
+        // Distressed while estimate is already at target: floors at 1 SURB/packet (no 8× flood).
+        let distressed_at_target = gate_state(100, 100);
+        distressed_at_target
+            .counterparty_in_surb_distress
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 8, &distressed_at_target);
         assert_eq!(Some(1), data.packet_info.map(|info| info.max_surbs_in_packet));
         Ok(())
     }
