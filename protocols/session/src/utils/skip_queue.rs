@@ -216,6 +216,32 @@ impl<T> SkipDelaySender<T> {
             Self::finalize_closure(queue);
         }
     }
+
+    /// Cancels every item in the queue that satisfies `matches`, in one pass over the queue.
+    ///
+    /// This is the same as sending a [`Skip`] for each such item, except that the queue is locked and
+    /// scanned once, however many items match. The receiver drops a cancelled item when it reaches it,
+    /// so it does not need to be woken.
+    pub fn cancel_where(&mut self, matches: impl Fn(&T) -> bool) -> Result<(), std::io::Error> {
+        if let Some(queue) = self.0.as_ref() {
+            let queue = queue.lock().map_err(|_| std::io::ErrorKind::BrokenPipe)?;
+
+            // This can happen only when the receiver was dropped.
+            if queue.is_closed {
+                return Err(std::io::ErrorKind::BrokenPipe.into());
+            }
+
+            queue
+                .entries
+                .iter()
+                .filter(|e| matches(&e.item))
+                .for_each(|e| e.cancelled.store(true, std::sync::atomic::Ordering::SeqCst));
+
+            Ok(())
+        } else {
+            Err(std::io::ErrorKind::NotConnected.into())
+        }
+    }
 }
 
 impl<T: Ord> SkipDelaySender<T> {
@@ -441,6 +467,34 @@ mod tests {
         assert_eq!(None, rx.next().await);
 
         Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn skip_delay_queue_should_not_yield_items_cancelled_by_a_predicate() -> anyhow::Result<()> {
+        let (mut tx, rx) = skip_delay_channel();
+        pin_mut!(rx);
+
+        let now = Instant::now();
+        for item in 1..=5 {
+            tx.send((item, now + Duration::from_millis(50)).into()).await?;
+        }
+        tx.cancel_where(|item| (2..=4).contains(item))?;
+        tx.close().await?;
+
+        assert_eq!(vec![1, 5], rx.collect::<Vec<_>>().await);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn skip_delay_queue_should_not_cancel_by_a_predicate_once_the_receiver_is_gone() {
+        let (mut tx, rx) = skip_delay_channel::<u32>();
+        drop(rx);
+
+        assert!(matches!(
+            tx.cancel_where(|_| true),
+            Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe
+        ));
     }
 
     #[test_log::test(tokio::test)]

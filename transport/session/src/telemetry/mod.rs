@@ -590,20 +590,22 @@ fn increment_frame_assembly_gauge(session_id: &SessionId) {
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[session_id_str], 1.0);
 }
 
+/// Decrements the gauge of frames being assembled by `by`, but never below zero.
 #[allow(dead_code)]
-fn decrement_frame_assembly_gauge(session_id: &SessionId) {
+fn decrement_frame_assembly_gauge(session_id: &SessionId, by: u32) {
     let mut state = SESSION_RUNTIME.lock();
     let Some(runtime) = state.get_mut(session_id) else {
         return;
     };
 
-    if runtime.frames_being_assembled == 0 {
+    let by = u64::from(by).min(runtime.frames_being_assembled);
+    if by == 0 {
         return;
     }
 
-    runtime.frames_being_assembled -= 1;
+    runtime.frames_being_assembled -= by;
     let session_id_str: &str = session_id.as_ref();
-    METRIC_SESSION_FRAME_BEING_ASSEMBLED.decrement(&[session_id_str], 1.0);
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.decrement(&[session_id_str], by as f64);
 }
 
 impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
@@ -613,16 +615,21 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
 
     fn frame_completed(&self) {
         METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[self.label()]);
-        decrement_frame_assembly_gauge(&self.0);
+        decrement_frame_assembly_gauge(&self.0, 1);
     }
 
     fn frame_discarded(&self) {
         METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[self.label()]);
-        decrement_frame_assembly_gauge(&self.0);
+        decrement_frame_assembly_gauge(&self.0, 1);
+    }
+
+    fn frames_discarded(&self, count: u32) {
+        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment_by(&[self.label()], count.into());
+        decrement_frame_assembly_gauge(&self.0, count);
     }
 
     fn incomplete_frame(&self) {
-        decrement_frame_assembly_gauge(&self.0);
+        decrement_frame_assembly_gauge(&self.0, 1);
     }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {
@@ -685,6 +692,38 @@ mod tests {
         assert!(text.contains(&ingress_metric));
         assert!(text.contains(&frame_metric));
         assert!(text.contains(&mode_metric));
+    }
+
+    /// A run of discarded frames is one update, however long it is: the counter grows by the length of the run, and
+    /// the assembly gauge drops by it too, but never below zero.
+    #[test]
+    fn a_run_of_discarded_frames_is_counted_by_its_length() -> anyhow::Result<()> {
+        let id: SessionId = HoprPseudonym::random();
+        initialize_session_metrics(id, HoprSessionConfig::default(), 0);
+        let tracker = SessionIdWrapper::from(id);
+
+        (0..3).for_each(|_| increment_frame_assembly_gauge(&id));
+        tracker.frames_discarded(2);
+        assert_eq!(1.0, gauge(&METRIC_SESSION_FRAME_BEING_ASSEMBLED, &id));
+
+        tracker.frame_discarded();
+        tracker.frames_discarded(1 << 31);
+        assert_eq!(
+            0.0,
+            gauge(&METRIC_SESSION_FRAME_BEING_ASSEMBLED, &id),
+            "the gauge does not go below zero"
+        );
+
+        let text = hopr_api::types::telemetry::gather_all_metrics().context("must gather metrics")?;
+        let session_id: &str = id.as_ref();
+        assert_eq!(
+            Some(f64::from(1u32 << 31) + 3.0),
+            series_value(
+                &text,
+                &format!("hopr_session_frame_discarded_total{{session_id=\"{session_id}\"}}")
+            )
+        );
+        Ok(())
     }
 
     #[test]
