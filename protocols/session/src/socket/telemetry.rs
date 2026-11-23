@@ -9,6 +9,11 @@ pub trait SessionTelemetryTracker {
     fn frame_completed(&self);
     /// Records a frame that has been discarded due to timeout or other errors.
     fn frame_discarded(&self);
+    /// Records `count` consecutive frames that have been discarded at once.
+    ///
+    /// Each run of consecutive frame ids the Sequencer gives up on is reported in one call, and a run
+    /// can span nearly the whole frame id range, so it must be accounted for in one step.
+    fn frames_discarded(&self, count: u32);
     /// Records an incomplete frame that could not be reassembled.
     fn incomplete_frame(&self);
     /// Records an incoming Session message.
@@ -29,6 +34,8 @@ impl SessionTelemetryTracker for NoopTracker {
     fn frame_completed(&self) {}
 
     fn frame_discarded(&self) {}
+
+    fn frames_discarded(&self, _: u32) {}
 
     fn incomplete_frame(&self) {}
 
@@ -106,6 +113,10 @@ pub mod tests {
 
         fn frame_discarded(&self) {
             self.increment("frames_discarded");
+        }
+
+        fn frames_discarded(&self, count: u32) {
+            *self.0.lock().entry("frames_discarded".into()).or_insert(0) += count as usize;
         }
 
         fn incomplete_frame(&self) {

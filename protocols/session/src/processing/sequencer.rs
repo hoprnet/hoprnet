@@ -12,13 +12,60 @@ use futures_time::future::Timer;
 use tracing::instrument;
 
 use crate::{
-    errors::SessionError,
     processing::reorder::{ABANDONED_MEMORY, SharedReorder},
-    protocol::FrameId,
+    protocol::{FrameId, OrderedFrame},
 };
 
 /// Floor on a gap timer, so a gap already past its wait still yields to the runtime once.
 const MIN_GAP_WAIT: Duration = Duration::from_millis(1);
+
+/// A run of consecutive frame ids that a [`Sequencer`] gave up on, in a single step.
+///
+/// A frame far ahead of the one due next leaves a gap of any length, up to the whole [`FrameId`]
+/// range. A run is reported as one item, so the cost of giving up on a gap does not grow with its length.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("frames {first} to {last} have expired or have been discarded")]
+pub struct DiscardedFrames {
+    /// The first frame id of the run.
+    pub first: FrameId,
+    /// The last frame id of the run, never less than [`Self::first`].
+    pub last: FrameId,
+}
+
+impl DiscardedFrames {
+    /// A run of a single frame.
+    fn single(id: FrameId) -> Self {
+        Self { first: id, last: id }
+    }
+
+    /// The number of frame ids in the run.
+    ///
+    /// Cannot overflow: a run starts at frame 1 or later.
+    pub fn count(&self) -> u32 {
+        self.last - self.first + 1
+    }
+}
+
+/// An item that knows which [`FrameId`] it holds a place for.
+///
+/// The [`Sequencer`] needs it to skip to the first frame it has, which comparing against a
+/// [`FrameId`] cannot tell it.
+pub trait Sequenced {
+    /// The id of the frame this item holds.
+    fn frame_id(&self) -> FrameId;
+}
+
+impl Sequenced for FrameId {
+    fn frame_id(&self) -> FrameId {
+        *self
+    }
+}
+
+impl Sequenced for OrderedFrame {
+    fn frame_id(&self) -> FrameId {
+        self.0.frame_id
+    }
+}
 
 /// Buffer entry pairing an item with when it entered the buffer.
 ///
@@ -75,14 +122,14 @@ impl<T: PartialOrd<FrameId>> PartialOrd<FrameId> for Buffered<T> {
 /// The `max_wait` indicates the maximum amount of time to wait for a certain `FrameId` to
 /// be yielded from the underlying stream. Each gap is timed from when the frame behind it was
 /// buffered, so gaps queued behind one another drain together rather than one `max_wait` each.
-/// If this does not happen, the Segmenter yields an error,
-/// indicating that the given frame was discarded.
+/// If this does not happen, the Sequencer yields an error naming the run of frames it gave up on:
+/// one item per run, however long the run is. With `max_frames_behind_gap`, a gap can go in two runs.
 ///
 /// The `capacity` parameter sets the maximum number of buffered elements inside the Sequencer.
 /// If this value is reached, the Sequencer will stop polling the underlying stream, waiting for the
 /// next element to expire.
 ///
-/// By definition, Sequencer is a fallible stream, yielding either `Ok(Item)`, `Err(`[`SessionError::FrameDiscarded`]`)`
+/// By definition, Sequencer is a fallible stream, yielding either `Ok(Item)`, `Err(`[`DiscardedFrames`]`)`
 /// or `Ok(None)` when the underlying stream is closed and no more elements can be yielded.
 ///
 /// Use [`SequencerExt`] methods to turn a stream into a sequenced stream.
@@ -110,7 +157,7 @@ pub struct Sequencer<S: futures::Stream> {
 impl<S> Sequencer<S>
 where
     S: futures::Stream,
-    S::Item: Ord + PartialOrd<FrameId>,
+    S::Item: Ord + PartialOrd<FrameId> + Sequenced,
 {
     /// Creates a new instance, wrapping the given `inner` Segment sink.
     ///
@@ -153,9 +200,9 @@ enum State {
 impl<S> futures::Stream for Sequencer<S>
 where
     S: futures::Stream,
-    S::Item: Ord + PartialOrd<FrameId>,
+    S::Item: Ord + PartialOrd<FrameId> + Sequenced,
 {
-    type Item = Result<S::Item, SessionError>;
+    type Item = Result<S::Item, DiscardedFrames>;
 
     #[instrument(name = "Sequencer::poll_next", level = "trace", skip(self, cx), fields(next_frame_id = self.next_id, state = ?self.state))]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -269,47 +316,54 @@ where
                                 let discarded = this.next_id.wrapping_sub(1);
                                 this.buffer.pop();
                                 tracing::trace!(discarded, "discard frame that exceeded max age");
-                                return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
+                                return Poll::Ready(Some(Err(DiscardedFrames::single(discarded))));
                             }
 
                             tracing::trace!("emit next frame");
 
                             return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)));
+                        } else if next.lt(this.next_id) {
+                            // A copy of a frame that was already emitted, as a retransmission can leave.
+                            // It could never be emitted itself, and left at the head it would keep the
+                            // frames behind it from ever being reached.
+                            tracing::debug!(frame_id = next.item.frame_id(), "dropping copy of an emitted frame");
+                            this.buffer.pop();
+                            continue;
                         // Each gap waits `max_wait` from the arrival of the frame right behind it, so
                         // emissions in between don't push it back: K gaps left by one outage drain
                         // together instead of one per `max_wait`.
-                        } else if next.buffered_at.elapsed() >= max_wait
-                            || this.buffer.len() == this.buffer.capacity()
-                            // The sequence has moved far enough past the gap to conclude the
-                            // missing frame was lost rather than reordered. Waiting out `max_wait`
-                            // cannot change that verdict, and on a session with no retransmission
-                            // nothing else can either.
-                            || this.max_frames_behind_gap.is_some_and(|n| {
-                                // Two readings of the same evidence, because each is blind where
-                                // the other sees. The count catches a run of frames arriving
-                                // behind the gap. The distance catches the case that actually
-                                // dominates under loss: the frames in between never completed, so
-                                // they never reach the sequencer and the buffer stays nearly
-                                // empty however far the sender has moved on.
-                                this.buffer.len() >= n
-                                    // Saturating, not `as`: the bound is configuration, and a value past `FrameId`'s
-                                // range would wrap into a small threshold rather than a large one.
-                                || next.gt(&this.next_id.saturating_add(
-                                    FrameId::try_from(n).unwrap_or(FrameId::MAX).saturating_sub(1),
-                                ))
-                            })
-                        {
-                            let discarded = *this.next_id;
-                            *this.next_id = this.next_id.wrapping_add(1);
+                        } else if let Some(resume_at) = give_up_at(
+                            *this.next_id,
+                            next.item.frame_id(),
+                            next.buffered_at.elapsed() >= max_wait,
+                            this.buffer.len(),
+                            this.buffer.capacity(),
+                            *this.max_frames_behind_gap,
+                        ) {
+                            // Decided at one instant, with nothing polled or emitted in between, so the
+                            // whole run goes at once.
+                            let discarded = DiscardedFrames {
+                                first: *this.next_id,
+                                last: resume_at - 1,
+                            };
+                            *this.next_id = resume_at;
                             *this.state = State::BufferUpdated;
 
-                            tracing::trace!(discarded, "discard frame");
+                            tracing::trace!(discarded.first, discarded.last, "discard frames");
+                            // Only the latest `ABANDONED_MEMORY` abandoned ids are remembered, so the
+                            // earlier ids of a long run are not worth noting at all.
                             let behind_since = next.buffered_at;
                             if let Some(reorder) = this.reorder.as_ref() {
-                                reorder.note_abandoned(discarded, behind_since);
+                                let remembered_from = discarded
+                                    .last
+                                    .saturating_sub(ABANDONED_MEMORY as FrameId - 1)
+                                    .max(discarded.first);
+                                for id in remembered_from..=discarded.last {
+                                    reorder.note_abandoned(id, behind_since);
+                                }
                             }
 
-                            return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
+                            return Poll::Ready(Some(Err(discarded)));
                         }
                         let remaining = max_wait.saturating_sub(next.buffered_at.elapsed());
                         // The floor only stands in for a deadline already past, so a sub-millisecond
@@ -336,11 +390,14 @@ where
 
                             Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)))
                         } else {
-                            let discarded = *this.next_id;
-                            *this.next_id = this.next_id.wrapping_add(1);
-                            tracing::trace!(discarded, "discard frame when done");
+                            let discarded = DiscardedFrames {
+                                first: *this.next_id,
+                                last: next.item.frame_id() - 1,
+                            };
+                            *this.next_id = next.item.frame_id();
+                            tracing::trace!(discarded.first, discarded.last, "discard frames when done");
 
-                            Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))))
+                            Poll::Ready(Some(Err(discarded)))
                         }
                     } else {
                         tracing::trace!("buffer is empty and done");
@@ -350,6 +407,46 @@ where
             }
         }
     }
+}
+
+/// Decides whether to give up on the frames missing between `next_id`, the frame due next, and `head`,
+/// the lowest frame buffered, and if so, returns the first frame id that is not given up on: `head`, or
+/// a little before it when only the distance decided.
+///
+/// `timed_out` is whether the frame at `head` has already waited the gap wait out.
+fn give_up_at(
+    next_id: FrameId,
+    head: FrameId,
+    timed_out: bool,
+    buffered: usize,
+    capacity: usize,
+    max_frames_behind_gap: Option<usize>,
+) -> Option<FrameId> {
+    // Time or room has run out, which is true of the whole gap alike.
+    if timed_out || buffered == capacity {
+        return Some(head);
+    }
+
+    // The sequence has moved far enough past the gap to conclude the missing frame was lost
+    // rather than reordered. Waiting out `max_wait` cannot change that verdict, and on a session
+    // with no retransmission nothing else can either.
+    let n = max_frames_behind_gap?;
+
+    // Two readings of the same evidence, because each is blind where the other sees. The count
+    // catches a run of frames arriving behind the gap. The distance catches the case that
+    // actually dominates under loss: the frames in between never completed, so they never reach
+    // the sequencer and the buffer stays nearly empty however far the sender has moved on.
+    if buffered >= n {
+        return Some(head);
+    }
+
+    // Saturating, not `as`: the bound is configuration, and a value past `FrameId`'s range would
+    // wrap into a small threshold rather than a large one.
+    let window = FrameId::try_from(n).unwrap_or(FrameId::MAX).saturating_sub(1);
+    // A missing frame is lost once the sequence is more than `window` frames past it. The last
+    // `window` frames before `head` are still inside the reordering window, so they keep waiting
+    // for the timeout.
+    (head > next_id.saturating_add(window)).then(|| head - window)
 }
 
 /// How a [`Sequencer`] decides to stop waiting for a frame that has not arrived.
@@ -399,7 +496,7 @@ pub trait SequencerExt: futures::Stream {
     /// of items.
     fn sequencer(self, timeout: Duration, capacity: usize) -> Sequencer<Self>
     where
-        Self::Item: Ord + PartialOrd<FrameId>,
+        Self::Item: Ord + PartialOrd<FrameId> + Sequenced,
         Self: Sized,
     {
         Sequencer::new(self, timeout, capacity, None, None, None, 1)
@@ -414,7 +511,7 @@ pub trait SequencerExt: futures::Stream {
         max_item_age: Option<Duration>,
     ) -> Sequencer<Self>
     where
-        Self::Item: Ord + PartialOrd<FrameId>,
+        Self::Item: Ord + PartialOrd<FrameId> + Sequenced,
         Self: Sized,
     {
         Sequencer::new(self, timeout, capacity, max_item_age, None, None, 1)
@@ -423,7 +520,7 @@ pub trait SequencerExt: futures::Stream {
     /// As [`SequencerExt::sequencer`], with every stopping rule stated explicitly.
     fn sequencer_with(self, cfg: SequencerConfig) -> Sequencer<Self>
     where
-        Self::Item: Ord + PartialOrd<FrameId>,
+        Self::Item: Ord + PartialOrd<FrameId> + Sequenced,
         Self: Sized,
     {
         self.sequencer_sharing(cfg, None)
@@ -435,7 +532,7 @@ pub trait SequencerExt: futures::Stream {
     /// sequencer's own samples alone.
     fn sequencer_sharing(self, cfg: SequencerConfig, reorder: Option<SharedReorder>) -> Sequencer<Self>
     where
-        Self::Item: Ord + PartialOrd<FrameId>,
+        Self::Item: Ord + PartialOrd<FrameId> + Sequenced,
         Self: Sized,
     {
         Sequencer::new(
@@ -509,7 +606,7 @@ mod tests {
 
         assert_eq!(Some(1), seq_stream.try_next().await?, "the fresh frame is delivered");
         assert!(
-            matches!(seq_stream.try_next().await, Err(SessionError::FrameDiscarded(2))),
+            matches!(seq_stream.try_next().await, Err(DiscardedFrames { first: 2, last: 2 })),
             "the stale frame must be discarded, not delivered late"
         );
 
@@ -603,7 +700,7 @@ mod tests {
         // `max_wait`, so a regression trips the timeout instead of blocking the suite for 5 s.
         let released: Vec<u32> = tokio::time::timeout(max_wait / 2, async {
             assert!(
-                matches!(seq_stream.try_next().await, Err(SessionError::FrameDiscarded(1))),
+                matches!(seq_stream.try_next().await, Err(DiscardedFrames { first: 1, last: 1 })),
                 "the gap must be reported as loss, the signal the consumer already handles"
             );
             seq_stream.by_ref().take(3).try_collect().await
@@ -653,15 +750,10 @@ mod tests {
         // far enough past *them* to call them lost -- so they keep the timeout, which is the
         // conservative half of the same rule.
         let now = Instant::now();
-        for expected_gap in 1..=36u32 {
-            assert!(
-                matches!(
-                    seq_stream.try_next().await,
-                    Err(SessionError::FrameDiscarded(id)) if id == expected_gap
-                ),
-                "frame {expected_gap} is behind the advanced sequence and must be given up on"
-            );
-        }
+        assert!(
+            matches!(seq_stream.try_next().await, Err(DiscardedFrames { first: 1, last: 36 })),
+            "frames 1..=36 are behind the advanced sequence and must be given up on, in one step"
+        );
         assert!(
             now.elapsed() < max_wait / 2,
             "a single frame far ahead is evidence enough, with no frames buffered behind the gap to count; took {:?}",
@@ -697,7 +789,7 @@ mod tests {
         let now = Instant::now();
         assert!(matches!(
             seq_stream.try_next().await,
-            Err(SessionError::FrameDiscarded(1))
+            Err(DiscardedFrames { first: 1, last: 1 })
         ));
         assert!(
             now.elapsed() >= max_wait,
@@ -734,7 +826,7 @@ mod tests {
         let now = Instant::now();
         assert!(matches!(
             seq_stream.try_next().await,
-            Err(SessionError::FrameDiscarded(1))
+            Err(DiscardedFrames { first: 1, last: 1 })
         ));
         assert!(
             now.elapsed() >= max_wait,
@@ -775,7 +867,7 @@ mod tests {
         let now = Instant::now();
         assert!(matches!(
             seq_stream.try_next().await,
-            Err(SessionError::FrameDiscarded(3))
+            Err(DiscardedFrames { first: 3, last: 3 })
         ));
         assert!(now.elapsed() >= timeout);
 
@@ -784,7 +876,7 @@ mod tests {
 
         assert!(matches!(
             seq_stream.try_next().await,
-            Err(SessionError::FrameDiscarded(6))
+            Err(DiscardedFrames { first: 6, last: 6 })
         ));
 
         assert_eq!(Some(7), seq_stream.try_next().await?);
@@ -818,20 +910,12 @@ mod tests {
         assert_eq!(Some(5), seq_stream.try_next().await?);
         assert!(matches!(
             seq_stream.try_next().await,
-            Err(SessionError::FrameDiscarded(6))
-        ));
-        assert!(matches!(
-            seq_stream.try_next().await,
-            Err(SessionError::FrameDiscarded(7))
+            Err(DiscardedFrames { first: 6, last: 7 })
         ));
         assert_eq!(Some(8), seq_stream.try_next().await?);
         assert!(matches!(
             seq_stream.try_next().await,
-            Err(SessionError::FrameDiscarded(9))
-        ));
-        assert!(matches!(
-            seq_stream.try_next().await,
-            Err(SessionError::FrameDiscarded(10))
+            Err(DiscardedFrames { first: 9, last: 10 })
         ));
         assert_eq!(Some(11), seq_stream.try_next().await?);
         assert_eq!(None, seq_stream.try_next().await?);
@@ -854,7 +938,10 @@ mod tests {
         assert!(matches!(rx.next().await, Some(Ok(2))));
         assert!(matches!(rx.next().await, Some(Ok(3))));
         assert!(matches!(rx.next().await, Some(Ok(4))));
-        assert!(matches!(rx.next().await, Some(Err(SessionError::FrameDiscarded(5)))));
+        assert!(matches!(
+            rx.next().await,
+            Some(Err(DiscardedFrames { first: 5, last: 5 }))
+        ));
         assert!(matches!(rx.next().await, Some(Ok(6))));
         assert!(matches!(rx.next().await, Some(Ok(7))));
         assert!(matches!(rx.next().await, Some(Ok(8))));
@@ -873,9 +960,10 @@ mod tests {
         let rx = rx.sequencer(Duration::from_millis(10), 4);
         pin_mut!(rx);
 
-        assert!(matches!(rx.next().await, Some(Err(SessionError::FrameDiscarded(1)))));
-        assert!(matches!(rx.next().await, Some(Err(SessionError::FrameDiscarded(2)))));
-        assert!(matches!(rx.next().await, Some(Err(SessionError::FrameDiscarded(3)))));
+        assert!(matches!(
+            rx.next().await,
+            Some(Err(DiscardedFrames { first: 1, last: 3 }))
+        ));
         assert!(matches!(rx.next().await, Some(Ok(4))));
         assert!(matches!(rx.next().await, Some(Ok(5))));
         assert!(matches!(rx.next().await, Some(Ok(6))));
@@ -901,12 +989,10 @@ mod tests {
         assert_eq!(Some(2), rx.try_next().await?);
 
         let now = Instant::now();
-        for expected in 3u32..=9 {
-            assert!(matches!(
-                rx.next().await,
-                Some(Err(SessionError::FrameDiscarded(id))) if id == expected
-            ));
-        }
+        assert!(matches!(
+            rx.next().await,
+            Some(Err(DiscardedFrames { first: 3, last: 9 }))
+        ));
         assert_eq!(Some(10), rx.try_next().await?);
         assert_eq!(Some(11), rx.try_next().await?);
         assert_eq!(Some(12), rx.try_next().await?);
@@ -941,7 +1027,7 @@ mod tests {
         for frame in [3u32, 5, 7, 9, 11] {
             assert!(matches!(
                 rx.next().await,
-                Some(Err(SessionError::FrameDiscarded(id))) if id == frame - 1
+                Some(Err(DiscardedFrames { first, last })) if first == frame - 1 && last == frame - 1
             ));
             assert_eq!(Some(frame), rx.try_next().await?);
         }
@@ -1047,7 +1133,7 @@ mod tests {
         apart: Duration,
     ) -> anyhow::Result<()>
     where
-        S: futures::Stream<Item = Result<u32, SessionError>>,
+        S: futures::Stream<Item = Result<u32, DiscardedFrames>>,
     {
         sink.unbounded_send(early)?;
         // The sequencer buffers `early` here and holds it behind the gap.
@@ -1069,11 +1155,13 @@ mod tests {
         behind: u32,
     ) -> anyhow::Result<Duration>
     where
-        S: futures::Stream<Item = Result<u32, SessionError>>,
+        S: futures::Stream<Item = Result<u32, DiscardedFrames>>,
     {
         sink.unbounded_send(behind)?;
         let start = Instant::now();
-        assert!(matches!(seq.next().await, Some(Err(SessionError::FrameDiscarded(id))) if id == missing));
+        assert!(
+            matches!(seq.next().await, Some(Err(DiscardedFrames { first, last })) if first == missing && last == missing)
+        );
         let took = start.elapsed();
         assert_eq!(Some(behind), seq.next().await.transpose()?);
         Ok(took)
@@ -1154,6 +1242,237 @@ mod tests {
         Ok(())
     }
 
+    /// The frame id a successor stream may start at, as far from the start as an id can reasonably be.
+    const FAR: FrameId = 1 << 31;
+
+    /// What the sequencer yields until it delivers a frame, within `budget` items: the runs it gave up
+    /// on, then the frame, if it got to one.
+    async fn runs_until_a_frame<S>(
+        seq: &mut std::pin::Pin<&mut S>,
+        budget: usize,
+    ) -> anyhow::Result<(Vec<DiscardedFrames>, Option<u32>)>
+    where
+        S: futures::Stream<Item = Result<u32, DiscardedFrames>>,
+    {
+        let mut runs = Vec::new();
+        for _ in 0..budget {
+            match seq.next().await {
+                Some(Err(run)) => runs.push(run),
+                Some(Ok(frame)) => return Ok((runs, Some(frame))),
+                None => break,
+            }
+        }
+        Ok((runs, None))
+    }
+
+    /// One frame far ahead of the one due next used to cost an item for every id in between, which for
+    /// a frame at 2^31 kept the receiver busy for minutes. The item budget is the assertion: giving up
+    /// one id per item runs out of it long before the far frame.
+    ///
+    /// With a gap bound, the sequence has clearly moved past the gap, so all but the last 255 ids before
+    /// the far frame are given up at once. Those 255 are still inside the reordering window, and are
+    /// given up once the gap wait has run out.
+    #[test_log::test(tokio::test)]
+    async fn a_frame_far_ahead_should_be_reached_in_two_runs_with_a_gap_bound() -> anyhow::Result<()> {
+        let max_wait = Duration::from_millis(200);
+        let (sink, stream) = futures::channel::mpsc::unbounded();
+        let seq = stream.sequencer_with(SequencerConfig {
+            max_wait,
+            capacity: 4096,
+            max_item_age: None,
+            max_frames_behind_gap: Some(256),
+            adapt_to_reordering: true,
+            stream_base: None,
+        });
+        pin_mut!(seq);
+
+        sink.unbounded_send(1u32)?;
+        assert_eq!(Some(1), seq.next().await.transpose()?);
+
+        sink.unbounded_send(FAR)?;
+        let start = Instant::now();
+        let (runs, frame) = runs_until_a_frame(&mut seq, 8).await?;
+
+        assert_eq!(
+            vec![
+                DiscardedFrames {
+                    first: 2,
+                    last: FAR - 256
+                },
+                DiscardedFrames {
+                    first: FAR - 255,
+                    last: FAR - 1
+                },
+            ],
+            runs
+        );
+        assert_eq!(Some(FAR), frame);
+        assert!(start.elapsed() >= max_wait, "the last 255 ids wait for the timeout");
+        assert!(start.elapsed() < Duration::from_secs(5), "{:?}", start.elapsed());
+        Ok(())
+    }
+
+    /// A closed stream drains what is buffered through its own path, which gives a gap up at once.
+    #[test_log::test(tokio::test)]
+    async fn a_frame_far_ahead_should_be_reached_in_one_run_when_the_stream_is_done() -> anyhow::Result<()> {
+        // Long enough that the timeout cannot be what gives the gap up. The stream is always ready, so
+        // the item budget is what bounds a walk that gives the gap up one id at a time.
+        let items: Vec<Result<u32, DiscardedFrames>> = futures::stream::iter([1u32, FAR])
+            .sequencer(Duration::from_secs(30), 4096)
+            .take(8)
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
+
+        assert_eq!(
+            vec![
+                Ok(1),
+                Err(DiscardedFrames {
+                    first: 2,
+                    last: FAR - 1
+                }),
+                Ok(FAR),
+            ],
+            items
+        );
+        Ok(())
+    }
+
+    /// Without a gap bound, only the timeout gives a gap up, and it gives all of it up as one run.
+    ///
+    /// The abandoned gaps are remembered to tell a frame that comes after its gap was given up. Only the
+    /// latest are kept however long the run, so a run is remembered by its last ids, as it would be had
+    /// it been given up one id at a time.
+    #[test_log::test(tokio::test)]
+    async fn a_long_run_should_be_one_item_and_be_remembered_by_its_latest_ids_only() -> anyhow::Result<()> {
+        let max_wait = Duration::from_millis(100);
+        let (sink, stream) = futures::channel::mpsc::unbounded();
+        let window = SharedReorder::default();
+        let seq = stream.sequencer_sharing(adaptive(max_wait), Some(window.clone()));
+        pin_mut!(seq);
+
+        sink.unbounded_send(1u32)?;
+        assert_eq!(Some(1), seq.next().await.transpose()?);
+        sink.unbounded_send(FAR)?;
+        let start = Instant::now();
+        let (runs, frame) = runs_until_a_frame(&mut seq, 8).await?;
+        assert_eq!(
+            vec![DiscardedFrames {
+                first: 2,
+                last: FAR - 1
+            }],
+            runs
+        );
+        assert_eq!(Some(FAR), frame);
+        assert!(start.elapsed() >= max_wait, "only the timeout gives the gap up");
+        assert!(start.elapsed() < Duration::from_secs(5), "{:?}", start.elapsed());
+
+        let now = Instant::now();
+        let last = FAR - 1;
+        let oldest_remembered = last - (ABANDONED_MEMORY as FrameId - 1);
+        for id in oldest_remembered..=last {
+            assert!(
+                window.late(id, now).is_some_and(|late| late >= max_wait),
+                "frame {id} was given up behind a frame that had waited the gap wait out"
+            );
+        }
+        for id in [2, oldest_remembered - 1] {
+            assert_eq!(None, window.late(id, now), "frame {id} is no longer remembered");
+        }
+        Ok(())
+    }
+
+    /// A run shorter than the memory is remembered whole.
+    #[test_log::test(tokio::test)]
+    async fn a_short_run_should_be_remembered_whole() -> anyhow::Result<()> {
+        let max_wait = Duration::from_millis(100);
+        let (sink, stream) = futures::channel::mpsc::unbounded();
+        let window = SharedReorder::default();
+        let seq = stream.sequencer_sharing(adaptive(max_wait), Some(window.clone()));
+        pin_mut!(seq);
+
+        sink.unbounded_send(1u32)?;
+        assert_eq!(Some(1), seq.next().await.transpose()?);
+        sink.unbounded_send(11)?;
+        let (runs, frame) = runs_until_a_frame(&mut seq, 8).await?;
+        assert_eq!(vec![DiscardedFrames { first: 2, last: 10 }], runs);
+        assert_eq!(Some(11), frame);
+
+        let now = Instant::now();
+        for id in 2..=10 {
+            assert!(window.late(id, now).is_some(), "frame {id} was given up");
+        }
+        for id in [1, 11] {
+            assert_eq!(None, window.late(id, now), "frame {id} was delivered");
+        }
+        Ok(())
+    }
+
+    /// A copy of a frame that was already emitted can sit at the head of the buffer, because it arrived
+    /// before the frame was emitted. It cannot be emitted, and must not hold up the frames behind it.
+    #[test_log::test(tokio::test)]
+    async fn a_copy_of_an_emitted_frame_should_not_hold_the_frames_behind_it() -> anyhow::Result<()> {
+        let (sink, stream) = futures::channel::mpsc::unbounded();
+        let seq = stream.sequencer(Duration::from_millis(50), 4096);
+        pin_mut!(seq);
+
+        for frame in [3u32, 3, 1, 2] {
+            sink.unbounded_send(frame)?;
+        }
+        for expected in [1u32, 2, 3] {
+            assert_eq!(Some(expected), seq.next().await.transpose()?);
+        }
+
+        sink.unbounded_send(4)?;
+        let next = tokio::time::timeout(Duration::from_secs(2), seq.next())
+            .await
+            .map_err(|_| anyhow::anyhow!("a frame waited behind a copy of an emitted frame"))?;
+        assert_eq!(Some(4), next.transpose()?);
+        Ok(())
+    }
+
+    /// Giving up on a gap in one step must end where giving up one id at a time did, judging the evidence
+    /// as it is at one instant: the walk ran until a rule stopped holding or the frame buffered was reached.
+    #[test]
+    fn giving_up_a_gap_in_one_step_should_end_where_giving_up_one_id_at_a_time_did() {
+        /// The walk the sequencer did before: one id per step, each judged on its own.
+        fn walked(
+            next_id: FrameId,
+            head: FrameId,
+            timed_out: bool,
+            buffered: usize,
+            capacity: usize,
+            n: Option<usize>,
+        ) -> FrameId {
+            let gives_up = |id: FrameId| {
+                timed_out
+                    || buffered == capacity
+                    || n.is_some_and(|n| buffered >= n || head > id.saturating_add(n as FrameId - 1))
+            };
+            (next_id..head).find(|id| !gives_up(*id)).unwrap_or(head)
+        }
+
+        let starts = (1..=10).chain(FrameId::MAX - 20..=FrameId::MAX - 1);
+        for next_id in starts {
+            for head in next_id + 1..=next_id.saturating_add(20) {
+                for (buffered, capacity) in [(1, 8), (3, 8), (8, 8)] {
+                    for timed_out in [false, true] {
+                        for n in [None, Some(1), Some(2), Some(4), Some(16), Some(100)] {
+                            let ended_at = walked(next_id, head, timed_out, buffered, capacity, n);
+                            let expected = (ended_at > next_id).then_some(ended_at);
+                            assert_eq!(
+                                expected,
+                                give_up_at(next_id, head, timed_out, buffered, capacity, n),
+                                "next {next_id}, head {head}, timed out {timed_out}, {buffered}/{capacity} buffered, \
+                                 bound {n:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn based(base: FrameId, max_wait: Duration) -> SequencerConfig {
         SequencerConfig {
             max_wait,
@@ -1182,7 +1501,7 @@ mod tests {
     -> anyhow::Result<()> {
         // Old frame 900 first, then 899 new frames: nothing may be reported discarded.
         let frames: Vec<u32> = std::iter::once(900).chain(1000..1900).collect();
-        let out: Vec<Result<u32, SessionError>> = futures::stream::iter(frames)
+        let out: Vec<Result<u32, DiscardedFrames>> = futures::stream::iter(frames)
             .sequencer_with(based(1000, Duration::from_secs(30)))
             .collect()
             .timeout(futures_time::time::Duration::from_secs(5))
@@ -1204,13 +1523,13 @@ mod tests {
         for frame in [49, 51, 52, 53, 54] {
             tx.unbounded_send(frame)?;
         }
-        let out: Vec<Result<u32, SessionError>> = rx
+        let out: Vec<Result<u32, DiscardedFrames>> = rx
             .sequencer_with(cfg)
             .take(5)
             .collect()
             .timeout(futures_time::time::Duration::from_secs(5))
             .await?;
-        assert!(matches!(out[0], Err(SessionError::FrameDiscarded(50))), "{out:?}");
+        assert_eq!(Err(DiscardedFrames { first: 50, last: 50 }), out[0], "{out:?}");
         let delivered: Vec<u32> = out.into_iter().filter_map(Result::ok).collect();
         assert_eq!(vec![51, 52, 53, 54], delivered);
         Ok(())
