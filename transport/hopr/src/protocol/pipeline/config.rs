@@ -3,7 +3,7 @@
 use validator::{Validate, ValidationError, ValidationErrors};
 
 fn default_ack_buffer_interval() -> std::time::Duration {
-    std::time::Duration::from_millis(500)
+    std::time::Duration::from_millis(200)
 }
 
 fn default_ack_grouping_capacity() -> usize {
@@ -28,7 +28,7 @@ pub struct AcknowledgementPipelineConfig {
     /// low-rate peers wait at most this interval before their partial batch flushes. Retains the
     /// `ack_buffer_interval` field/YAML key name for configuration backwards compatibility.
     ///
-    /// Default is 500 ms.
+    /// Default is 200 ms.
     #[default(default_ack_buffer_interval())]
     #[cfg_attr(
         feature = "serde",
@@ -281,9 +281,9 @@ mod tests {
     }
 
     #[test]
-    fn ack_pipeline_config_default_interval_is_500ms_and_valid() {
+    fn ack_pipeline_config_default_interval_is_200ms_and_valid() {
         let cfg = AcknowledgementPipelineConfig::default();
-        assert_eq!(std::time::Duration::from_millis(500), cfg.ack_buffer_interval);
+        assert_eq!(std::time::Duration::from_millis(200), cfg.ack_buffer_interval);
         assert!(cfg.validate().is_ok());
     }
 }

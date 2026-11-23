@@ -15,7 +15,7 @@ use libp2p::PeerId;
 use serial_test::serial;
 
 const TIMEOUT: Duration = Duration::from_secs(10);
-const SHORT_WAIT: Duration = Duration::from_millis(900);
+const SHORT_WAIT: Duration = Duration::from_millis(600);
 
 /// Random bytes injected into the wire must be silently dropped — no delivery to the application,
 /// no panic, no WinningTicket at the relay.
@@ -37,7 +37,7 @@ async fn random_bytes_dropped_no_delivery() -> anyhow::Result<()> {
         inject_raw_wire(&relay_wire_tx, sender_id, garbage)?;
     }
 
-    // Wait longer than PACKET_DECODING_TIMEOUT (150ms) + ack_buffer_interval (500ms)
+    // Wait longer than PACKET_DECODING_TIMEOUT (150ms) + ack_buffer_interval (200ms)
     tokio::time::sleep(SHORT_WAIT).await;
 
     // Nothing should have been delivered to the recipient
