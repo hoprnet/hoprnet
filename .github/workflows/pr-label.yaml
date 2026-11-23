@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Build candidate binary
-        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@ff4c0b7afc400ee6cf217841dc576f8a1289bcc0 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
