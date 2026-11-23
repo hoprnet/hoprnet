@@ -1396,6 +1396,7 @@ where
             return;
         }
         let Ok(destination) = self.resolve_node_id_to_offchain_key(&destination).await else {
+            tracing::trace!(%destination, "destination key unresolved, return-path diversity not observed");
             return;
         };
 
@@ -1415,12 +1416,14 @@ where
     async fn record_route_diversity(
         &self,
         destination: NodeId,
-        hops: u32,
+        forward_hops: u32,
+        return_hops: Option<u32>,
         forward: &ValidatedPath,
         return_paths: &[ValidatedPath],
         forward_planned: bool,
     ) {
         let Ok(destination) = self.resolve_node_id_to_offchain_key(&destination).await else {
+            tracing::trace!(%destination, "destination key unresolved, path diversity not observed");
             return;
         };
         // A relay is what the score counts, so an explicit path the caller fixed contributes
@@ -1434,7 +1437,14 @@ where
             .collect::<Vec<_>>();
 
         let mut tracker = self.paths.return_path_diversity.lock();
-        tracker.record_forward((destination, hops), first_relayer, &routes);
+        if let Some(first_relayer) = first_relayer {
+            // Keyed by the forward leg's hops: a session's two legs are scored in the sessions
+            // their own hop counts name, so a differing return leg cannot move the forward score.
+            tracker.record_forward_first_hop((destination, forward_hops), first_relayer);
+        }
+        if let Some(return_hops) = return_hops {
+            tracker.record_routes((destination, return_hops), &routes);
+        }
         publish_path_diversity(&tracker);
     }
 
@@ -1530,7 +1540,8 @@ where
                 if forward_planned || return_hops.is_some() {
                     self.record_route_diversity(
                         *destination,
-                        return_hops.unwrap_or(forward_hops),
+                        forward_hops,
+                        return_hops,
                         &forward_path,
                         &return_paths,
                         forward_planned,
@@ -2837,8 +2848,8 @@ mod tests {
             .return_first_hop
             .context("a draw must have populated the window")?;
         assert!(
-            score > 1.0 && score <= 2.0,
-            "a valuation spread over two relayers must score strictly between 1 and 2, got {score}"
+            score > 1.0 && score <= 2.0 + 1e-9,
+            "a valuation spread over two relayers must score between 1 and 2, got {score}"
         );
         assert_eq!(
             None,
@@ -2964,7 +2975,8 @@ mod tests {
         let _other_dispatch = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
         let logs = crate::tests::support::Logs::default();
         async {
-            for _ in 0..4 {
+            // Two return paths per packet, and the check waits for a window worth judging.
+            for _ in 0..6 {
                 planner
                     .resolve_diverse_return_paths(
                         NodeId::Offchain(pubkey(&SECRET_DEST)),
