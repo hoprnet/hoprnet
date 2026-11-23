@@ -194,6 +194,42 @@ fn acquire_egress_permit(
     }
 }
 
+/// [`acquire_egress_permit`] for a packet of the slot `instance`, which is refused once the instance
+/// is superseded.
+///
+/// Checked twice by the callers' design: before the packet is counted (the caller's own
+/// `instance.is_superseded()` test, ahead of any accounting), and here once the gate has admitted a
+/// *parked* packet. A writer parked on the gate while its slot is torn down is woken by the gate's
+/// poisoning with an error, but a permit granted in the same breath must not slip through either. The
+/// synchronous admission has no suspension between the caller's check and the permit, so it needs no
+/// second look. A cut packet gives back the SURB its sender counted.
+fn acquire_egress_permit_for(
+    instance: &Arc<SlotInstance>,
+    gate: Option<Arc<ServiceGate>>,
+    routing: DestinationRouting,
+    data: ApplicationDataOut,
+) -> EgressPermit {
+    match acquire_egress_permit(gate, routing, data) {
+        parked @ futures::future::Either::Left(_) => parked,
+        futures::future::Either::Right(parked) => {
+            let instance = instance.clone();
+            futures::future::Either::Right(Box::pin(async move {
+                let (routing, data) = match parked.await {
+                    Ok(admitted) => admitted,
+                    // A teardown poisons the gate; the writer still learns it was superseded.
+                    Err(_) if instance.is_superseded() => return Err(superseded_write_error()),
+                    Err(error) => return Err(error),
+                };
+                if instance.is_superseded() {
+                    data.surb_refund.give_back();
+                    return Err(superseded_write_error());
+                }
+                Ok((routing, data))
+            }))
+        }
+    }
+}
+
 /// The SURB refund of a packet parked at the PIX egress gate, given back unless the gate admits the
 /// packet.
 ///
@@ -536,11 +572,17 @@ fn exit_data_egress<Si>(
     balancer: Arc<BalancerStateValues>,
     gate: Option<Arc<ServiceGate>>,
     keeps_alive: bool,
+    instance: Arc<SlotInstance>,
 ) -> impl Sink<EgressItem, Error = std::io::Error>
 where
     Si: Sink<EgressItem, Error = std::io::Error>,
 {
     sink.with(move |(routing, data): EgressItem| -> EgressPermit {
+        // Before anything is counted: a Session whose slot is gone sends nothing, and a refused
+        // packet must leave the SURB accounting as it found it.
+        if instance.is_superseded() {
+            return futures::future::Either::Left(std::future::ready(Err(superseded_write_error())));
+        }
         // Each outgoing packet consumes one SURB, given back if the packet never takes it
         let book_consumed = move |estimator: &AtomicSurbFlowEstimator, data: ApplicationDataOut| {
             #[cfg(feature = "telemetry")]
@@ -551,12 +593,16 @@ where
             .then(|| hold_for_surb_reserve(session_id, &estimator, &balancer, gate.is_some()))
             .flatten();
         match held {
-            None => acquire_egress_permit(gate.clone(), routing, book_consumed(&estimator, data)),
+            None => acquire_egress_permit_for(&instance, gate.clone(), routing, book_consumed(&estimator, data)),
             Some(held) => {
-                let (estimator, gate) = (estimator.clone(), gate.clone());
+                let (estimator, gate, instance) = (estimator.clone(), gate.clone(), instance.clone());
                 futures::future::Either::Right(Box::pin(async move {
                     held.await;
-                    acquire_egress_permit(gate, routing, book_consumed(&estimator, data)).await
+                    // The hold can last as long as the stock is thin; the slot may be gone by its end.
+                    if instance.is_superseded() {
+                        return Err(superseded_write_error());
+                    }
+                    acquire_egress_permit_for(&instance, gate, routing, book_consumed(&estimator, data)).await
                 }))
             }
         }
@@ -637,11 +683,21 @@ fn release_session_slot(
     // channel bookkeeping that follow the retire.
     defer_admission_retire(admission, grace, &session_id, token);
 
+    // The teardown is of this slot's instance only: a successor under the same pseudonym keeps its own
+    // lifecycle state and gauges.
     #[cfg(feature = "telemetry")]
     {
-        set_session_state(&session_id, SessionLifecycleState::Closed);
-        remove_session_metrics_state(&session_id, session_data.pix_egress_gate.get().is_some());
+        let owner = session_data.instance.id();
+        if telemetry::owns_session_metrics(&session_id, owner) {
+            set_session_state(&session_id, SessionLifecycleState::Closed);
+        }
+        remove_session_metrics_state(&session_id, session_data.pix_egress_gate.get().is_some(), owner);
     }
+
+    // The data plane is gone: a `HoprSession` still held for it must not send any more. Idempotent
+    // with `remove_slot_if`; this is the path of idle and size evictions.
+    session_data.instance.supersede();
+    session_data.pix_supervisor.mark_torn_down();
 
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
@@ -1553,6 +1609,211 @@ impl SessionSsaState {
     }
 }
 
+/// The identity of one *establishment* of a Session slot.
+///
+/// A pseudonym ([`SessionId`]) is client-chosen and reusable, so a successor Session can take the key
+/// of a predecessor whose `HoprSession`, notifier closures, driver tasks or telemetry are still alive.
+/// Everything that can outlive a slot's data plane therefore carries the `Arc<SlotInstance>` of the
+/// slot it belongs to, and acts only while the cached slot for its pseudonym still *is* that instance
+/// (by `Arc::ptr_eq`). Keying a close by [`SessionId`] alone lets a stale object tear down, or drain,
+/// its successor.
+///
+/// Deliberately distinct from the slot's *control plane* (the PIX supervisor handle, see
+/// [`PixControlPlane`]): a later takeover may swap the data plane under a new instance while the
+/// control plane carries on.
+pub(crate) struct SlotInstance {
+    /// Unique within the process; also what a public handle (the `HoprSession`) carries to name it.
+    id: u64,
+    /// The `StartSession` challenge that established this slot. On the Exit it is the Entry's, on the
+    /// Entry the one `new_session` reserved.
+    challenge: StartChallenge,
+    /// Set by [`SessionSlotGuard::commit`]: the Session got as far as being established.
+    established: std::sync::atomic::AtomicBool,
+    /// Set once the slot's data plane is gone or replaced. A writer still holding the Session's sink
+    /// must not send through it any more.
+    superseded: std::sync::atomic::AtomicBool,
+    /// When this instance was created; the origin of `last_refresh_ms`.
+    created: std::time::Instant,
+    /// Milliseconds after `created` at which an Entry write last refreshed the slot's idle timer.
+    last_refresh_ms: std::sync::atomic::AtomicU64,
+}
+
+impl SlotInstance {
+    fn new(challenge: StartChallenge) -> Arc<Self> {
+        static NEXT_INSTANCE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        Arc::new(Self {
+            id: NEXT_INSTANCE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            challenge,
+            established: std::sync::atomic::AtomicBool::new(false),
+            superseded: std::sync::atomic::AtomicBool::new(false),
+            created: std::time::Instant::now(),
+            last_refresh_ms: std::sync::atomic::AtomicU64::new(0),
+        })
+    }
+
+    /// Counts an Entry data write as activity: reads the slot (which resets its `time_to_idle`), at
+    /// most once per `period`. With `period = idle_timeout / 4`, an Entry that stops writing can
+    /// expire as early as ¾ of the idle timeout after its last write. Call only after the `is_superseded` check:
+    /// removal supersedes inside the compute, so a successor under the same pseudonym exists only once this
+    /// instance is superseded.
+    fn touch_slot_on_write(
+        &self,
+        sessions: &moka::sync::Cache<SessionId, SessionSlot>,
+        id: &SessionId,
+        period: Duration,
+    ) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let now = self.created.elapsed().as_millis() as u64;
+        let last = self.last_refresh_ms.load(Relaxed);
+        if now.saturating_sub(last) >= period.as_millis() as u64
+            && self
+                .last_refresh_ms
+                .compare_exchange(last, now, Relaxed, Relaxed)
+                .is_ok()
+        {
+            let _ = sessions.get(id);
+        }
+    }
+
+    pub(crate) fn id(&self) -> u64 {
+        self.id
+    }
+
+    fn mark_established(&self) {
+        self.established.store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    fn is_established(&self) -> bool {
+        self.established.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Marks the data plane as gone. Idempotent.
+    fn supersede(&self) {
+        self.superseded.store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    fn is_superseded(&self) -> bool {
+        self.superseded.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+impl std::fmt::Debug for SlotInstance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SlotInstance")
+            .field("id", &self.id)
+            .field("challenge", &self.challenge)
+            .field("established", &self.is_established())
+            .field("superseded", &self.is_superseded())
+            .finish()
+    }
+}
+
+/// The error a write gets once the slot it belongs to has been torn down or replaced.
+fn superseded_write_error() -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::BrokenPipe,
+        "the session's slot was torn down or replaced",
+    )
+}
+
+/// What identifies a Session's PIX control plane: the supervisor cell its slots share.
+///
+/// Every clone of a [`SessionSlot`] shares this `Arc`, so it is the same value for the slot in the
+/// cache, in the guard and in the action driver. A driver that looks its Session up by pseudonym acts
+/// on the slot found only if it carries this very cell, so a lingering driver of a torn-down Session
+/// can never touch a fresh one under the same pseudonym.
+type PixControlPlane = Arc<PixPlane>;
+
+/// The shared state of a [`PixControlPlane`]: the supervisor handle and whether its slot is gone.
+#[derive(Default)]
+pub(crate) struct PixPlane {
+    supervisor: OnceLock<SessionPixSupervisorHandle>,
+    /// Set when the slot is removed or evicted, never by a mere change of instance. Lets a lingering
+    /// driver check ownership without a cache lookup, which would refresh a successor's idle timer.
+    torn_down: std::sync::atomic::AtomicBool,
+}
+
+impl PixPlane {
+    fn mark_torn_down(&self) {
+        self.torn_down.store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    fn is_torn_down(&self) -> bool {
+        self.torn_down.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+impl std::ops::Deref for PixPlane {
+    type Target = OnceLock<SessionPixSupervisorHandle>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.supervisor
+    }
+}
+
+/// Which slot a close is allowed to act on.
+#[derive(Clone, Copy)]
+enum CloseScope<'a> {
+    /// Whatever slot is current under the pseudonym: the operator's close.
+    Any,
+    /// Only this slot instance: a notification from the Session object that was built for it.
+    Instance(&'a Arc<SlotInstance>),
+    /// Only the slot instance with this id: the public handle's own close.
+    InstanceId(u64),
+    /// Only a slot driven by this control plane: the PIX action driver's own teardown.
+    ControlPlane(&'a PixControlPlane),
+}
+
+impl CloseScope<'_> {
+    fn admits(&self, slot: &SessionSlot) -> bool {
+        match self {
+            Self::Any => true,
+            Self::Instance(instance) => Arc::ptr_eq(&slot.instance, instance),
+            Self::InstanceId(id) => slot.instance.id() == *id,
+            Self::ControlPlane(plane) => Arc::ptr_eq(&slot.pix_supervisor, plane),
+        }
+    }
+}
+
+/// How [`begin_surb_drain`](SessionManager::begin_surb_drain)'s transition, run inside a compute on the
+/// slot, came out.
+enum DrainStep {
+    /// This call made the transition: the drain is ours to carry out.
+    Entered,
+    /// A concurrent close made it first.
+    Lost,
+    /// The slot is gone, or the scope does not admit what is there.
+    Gone,
+    /// The slot was replaced by another instance the scope admits.
+    Replaced,
+}
+
+/// Removes the slot under `id` if `pred` accepts it, atomically with respect to any other compute on
+/// the same key.
+///
+/// Built on the cache's compute rather than `remove`, which does not serialise with a concurrent
+/// compute: a plain `remove` could take out a successor allocated an instant after the check.
+fn remove_slot_if(
+    sessions: &moka::sync::Cache<SessionId, SessionSlot>,
+    id: &SessionId,
+    pred: impl FnOnce(&SessionSlot) -> bool,
+) -> Option<SessionSlot> {
+    match sessions
+        .entry(*id)
+        .and_compute_with(|entry: Option<moka::Entry<SessionId, SessionSlot>>| match entry {
+            Some(entry) if pred(entry.value()) => {
+                // Inside the removal, so no writer or driver of this slot outlives it into a successor.
+                entry.value().instance.supersede();
+                entry.value().pix_supervisor.mark_torn_down();
+                moka::ops::compute::Op::Remove
+            }
+            _ => moka::ops::compute::Op::Nop,
+        }) {
+        moka::ops::compute::CompResult::Removed(entry) => Some(entry.into_value()),
+        _ => None,
+    }
+}
+
 /// The admission-token cell a [`SessionSlot`] shares with the [`SessionSlotGuard`] that allocated it.
 ///
 /// Behind an `Arc` for two reasons. The slot is cloned into the sessions cache and into the guard, so
@@ -1583,7 +1844,7 @@ pub(crate) struct SessionSlot {
     /// Populated before the [`HoprSession`] is constructed, so the egress adapters below observe a
     /// gate rather than racing its installation. Empty on the Entry side and on non-PIX Sessions —
     /// the Exit is authoritative for the lifecycle, so the Entry runs no supervisor.
-    pix_supervisor: Arc<OnceLock<SessionPixSupervisorHandle>>,
+    pix_supervisor: PixControlPlane,
     /// The egress gate every outgoing data packet of a supervised Session must pass.
     ///
     /// Held separately from `pix_supervisor` because the egress path touches it per packet and has
@@ -1672,6 +1933,8 @@ pub(crate) struct SessionSlot {
     /// Entry announced it again. The commit applies this figure too, and every later raise widens the
     /// ring on the spot (see [`SurbAdmissionControl::raise_target`]).
     raised_surb_target: Arc<std::sync::atomic::AtomicUsize>,
+    /// Which establishment of this pseudonym the slot is. See [`SlotInstance`].
+    instance: Arc<SlotInstance>,
 }
 
 impl SessionSlot {
@@ -2675,6 +2938,8 @@ struct SessionSlotGuard<'a> {
     /// by key can tell its own slot from a successor's — see [`AdmissionCell`] and
     /// [`commit_slot_guard`].
     admission_cell: AdmissionCell,
+    /// The instance of the slot this guard allocated; `commit` marks it established.
+    instance: Arc<SlotInstance>,
     committed: bool,
 }
 
@@ -2686,6 +2951,7 @@ impl<'a> SessionSlotGuard<'a> {
         admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
         surb_resolution_wait: Duration,
         admission_cell: AdmissionCell,
+        instance: Arc<SlotInstance>,
     ) -> Self {
         Self {
             sessions,
@@ -2694,6 +2960,7 @@ impl<'a> SessionSlotGuard<'a> {
             admission,
             surb_resolution_wait,
             admission_cell,
+            instance,
             committed: false,
         }
     }
@@ -2749,6 +3016,7 @@ impl<'a> SessionSlotGuard<'a> {
     /// in flight for this admission, which was never visible to the pipeline.
     fn commit(&mut self, slot: Option<&SessionSlot>, admission: Option<&dyn SurbAdmissionControl>, capacity: usize) {
         self.committed = true;
+        self.instance.mark_established();
         tracing::info!(session_id = %self.session_id, "new session established");
 
         // Only a slot that is this Session's own can carry the admission's token to a teardown, so
@@ -2794,7 +3062,12 @@ impl Drop for SessionSlotGuard<'_> {
             // not block the pseudonym until idle eviction.
             let session_id = self.session_id;
             warn!(%session_id, "rolling back partially established session slot after setup failure");
-            if let Some(slot) = self.sessions.remove(&session_id) {
+            // Only this guard's own slot: the key is a reusable pseudonym, and the slot found there
+            // may by now be a successor's. Matched by the admission cell, the guard's identity for it.
+            let cell = &self.admission_cell;
+            if let Some(slot) = remove_slot_if(self.sessions, &session_id, |slot| {
+                Arc::ptr_eq(&slot.admission_token, cell)
+            }) {
                 self.active_sessions.fetch_sub(1, Ordering::Relaxed);
                 // Not `close_session`: the Session was never established, so there is no
                 // "session closed" line to pair with "new session established".
@@ -3488,7 +3761,7 @@ type BoxSink<T> = Pin<Box<dyn Sink<T, Error = SessionManagerError> + Send>>;
 
 type SessionNotifiers = (
     Arc<hopr_utils::runtime::prelude::Mutex<BoxSink<IncomingSession>>>,
-    crossfire::MTx<crossfire::mpsc::Array<(SessionId, ClosureReason)>>,
+    crossfire::MTx<crossfire::mpsc::Array<(SessionId, ClosureReason, Arc<SlotInstance>)>>,
 );
 
 /// What an incoming packet did to the SURB store, as the packet pipeline reported it.
@@ -4064,8 +4337,9 @@ fn initialize_session_telemetry(
     capabilities: Capabilities,
     surb_estimator: Option<&AtomicSurbFlowEstimator>,
     surb_mgmt: Option<&Arc<BalancerStateValues>>,
+    owner: u64,
 ) {
-    initialize_session_metrics(session_id, session_config(cfg, capabilities));
+    initialize_session_metrics(session_id, session_config(cfg, capabilities), owner);
     set_session_state(&session_id, SessionLifecycleState::Active);
     if let (Some(estimator), Some(mgmt)) = (surb_estimator, surb_mgmt) {
         set_session_balancer_data(&session_id, estimator.clone(), mgmt.clone());
@@ -4970,7 +5244,7 @@ where
             "session_close_notifications",
             session_close_rx.into_stream().for_each_concurrent(
                 self.cfg.maximum_sessions + 10,
-                move |(session_id, closure_reason)| {
+                move |(session_id, closure_reason, instance)| {
                     let myself = myself.clone();
                     let closure_diag = closure_diag.clone();
                     closure_diag.wrap(|| {
@@ -4982,12 +5256,25 @@ where
                         // here, so that this path — the one an Exit-side session server actually
                         // closes on — can answer with a SURB drain like every other. Identical
                         // behaviour when it does not.
-                        if !myself.close_session_with_reason(&session_id, closure_reason) {
+                        //
+                        // Scoped to the instance that reported: the pseudonym is reusable, so a late
+                        // notification of a torn-down Session must leave its successor alone.
+                        #[cfg(feature = "telemetry")]
+                        if myself
+                            .sessions
+                            .get(&session_id)
+                            .is_some_and(|slot| Arc::ptr_eq(&slot.instance, &instance))
+                        {
+                            set_session_state(&session_id, SessionLifecycleState::Closing);
+                        }
+                        if !myself.close_session_scoped(&session_id, closure_reason, CloseScope::Instance(&instance)) {
                             // Do not treat this as an error
                             debug!(
                                 ?session_id,
                                 ?closure_reason,
-                                "could not find session id to close, maybe the session is already closed"
+                                ?instance,
+                                "could not find the session instance to close, maybe the session is already closed or \
+                                 its pseudonym has been taken by a successor"
                             );
                         }
                         futures::future::ready(())
@@ -5211,6 +5498,7 @@ where
         // it so `commit_slot_guard` can recognise the cached slot as this establishment's own by cell
         // identity, even though the key it re-reads by is a reusable pseudonym.
         let admission_cell = slot.admission_token.clone();
+        let instance = slot.instance.clone();
 
         let result =
             self.sessions
@@ -5251,6 +5539,7 @@ where
                     self.surb_admission.clone(),
                     self.cfg.surb_resolution_wait,
                     admission_cell,
+                    instance,
                 ))
             }
             _ => None,
@@ -5464,14 +5753,19 @@ where
                 let mut abort_handles = AbortableList::default();
                 abort_handles.insert(SessionHandles::Ingress, session_rx_ah);
 
+                // Created before the notifier so the notifier names *this* establishment: a close it
+                // reports later is ignored once the pseudonym belongs to a successor.
+                let instance = SlotInstance::new(challenge);
+
                 let notifier = self
                     .session_notifiers
                     .get()
                     .map(|(_, notifier)| {
                         let notifier = notifier.clone();
+                        let instance = instance.clone();
                         Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             let _ = notifier
-                                .try_send((session_id, reason))
+                                .try_send((session_id, reason, instance))
                                 .inspect_err(|error| error!(%session_id, %error, "failed to notify session closure"));
                         })
                     })
@@ -5508,15 +5802,27 @@ where
                     // unless requested to always max them out
                     let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
-                    let reduced_surb_scoring_sender = full_surb_scoring_sender.clone().with(
-                        // NOTE: this is put in-front of the `full_surb_scoring_sender`,
-                        // so that its estimate of SURBs gets automatically updated based on
-                        // the `max_surbs_in_packets` set here.
-                        move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                            cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
-                            futures::future::ok::<_, S::Error>((routing, data))
-                        },
-                    );
+                    let egress_instance = instance.clone();
+                    let egress_sessions = self.sessions.clone();
+                    let egress_touch_period = self.cfg.idle_timeout / 4;
+                    let reduced_surb_scoring_sender = full_surb_scoring_sender
+                        .clone()
+                        .sink_map_err(std::io::Error::other)
+                        .with(
+                            // NOTE: this is put in-front of the `full_surb_scoring_sender`,
+                            // so that its estimate of SURBs gets automatically updated based on
+                            // the `max_surbs_in_packets` set here.
+                            move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                                // Ahead of the count behind it: a Session whose slot is gone sends
+                                // nothing, and produces no SURBs the Exit would answer on.
+                                if egress_instance.is_superseded() {
+                                    return futures::future::err(superseded_write_error());
+                                }
+                                egress_instance.touch_slot_on_write(&egress_sessions, &session_id, egress_touch_period);
+                                cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
+                                futures::future::ok::<_, std::io::Error>((routing, data))
+                            },
+                        );
 
                     // Spawn the SURB-bearing keep alive stream towards the Exit. Suspended until the
                     // balancer below gives the controller a rate.
@@ -5594,6 +5900,7 @@ where
                                 cycle_budget: None,
                                 admission_token: Default::default(),
                                 raised_surb_target: Default::default(),
+                                instance: instance.clone(),
                             },
                         )
                         .ok_or_else(|| {
@@ -5686,7 +5993,8 @@ where
                         Some(surb_mgmt.clone()),
                         cfg.flow_control,
                         None,
-                    )?;
+                    )?
+                    .with_slot_instance(instance.id());
 
                     #[cfg(feature = "telemetry")]
                     initialize_session_telemetry(
@@ -5695,6 +6003,7 @@ where
                         cfg.capabilities,
                         Some(&surb_estimator),
                         Some(&surb_mgmt),
+                        instance.id(),
                     );
 
                     // Admitted at the established point, not at allocation: this is the first moment
@@ -5748,6 +6057,7 @@ where
                                 cycle_budget: None,
                                 admission_token: Default::default(),
                                 raised_surb_target: Default::default(),
+                                instance: instance.clone(),
                             },
                         )
                         .ok_or_else(|| {
@@ -5773,11 +6083,19 @@ where
                     // unless requested to always max them out
                     let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
-                    let reduced_surb_sender =
-                        msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                    let egress_instance = instance.clone();
+                    let egress_sessions = self.sessions.clone();
+                    let egress_touch_period = self.cfg.idle_timeout / 4;
+                    let reduced_surb_sender = msg_sender.sink_map_err(std::io::Error::other).with(
+                        move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                            if egress_instance.is_superseded() {
+                                return futures::future::err(superseded_write_error());
+                            }
+                            egress_instance.touch_slot_on_write(&egress_sessions, &session_id, egress_touch_period);
                             cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
-                            futures::future::ok::<_, S::Error>((routing, data))
-                        });
+                            futures::future::ok::<_, std::io::Error>((routing, data))
+                        },
+                    );
 
                     let session = HoprSession::new(
                         session_id,
@@ -5790,10 +6108,11 @@ where
                             }),
                         ),
                         Some(notifier),
-                    )?;
+                    )?
+                    .with_slot_instance(instance.id());
 
                     #[cfg(feature = "telemetry")]
-                    initialize_session_telemetry(session_id, &self.cfg, cfg.capabilities, None, None);
+                    initialize_session_telemetry(session_id, &self.cfg, cfg.capabilities, None, None, instance.id());
 
                     // Same admission point as the balanced branch above, with the same announced
                     // target: a Session without SURB balancing still holds a return path worth
@@ -5857,12 +6176,31 @@ where
     /// brings, starts neither the Exit's SURB-level reports nor the reserve it keeps for them. An Exit
     /// that predates the mark does take it for one.
     pub async fn ping_session(&self, id: &SessionId) -> errors::Result<()> {
-        if let Some(session_data) = self.sessions.get(id) {
+        self.ping_session_scoped(id, None).await
+    }
+
+    /// Same as [`ping_session`](Self::ping_session), but only if the slot under `id` is the slot instance
+    /// `instance_id` (see [`HoprSession::slot_instance`]).
+    ///
+    /// For callers that hold a handle to one specific Session object: once its pseudonym is reused, a
+    /// ping through that stale handle must not be sent over the successor Session. Fails with
+    /// [`SessionManagerError::NonExistingSession`] when the slot is gone or belongs to another instance.
+    pub async fn ping_session_instance(&self, id: &SessionId, instance_id: u64) -> errors::Result<()> {
+        self.ping_session_scoped(id, Some(instance_id)).await
+    }
+
+    async fn ping_session_scoped(&self, id: &SessionId, instance_id: Option<u64>) -> errors::Result<()> {
+        let routing_opts = self
+            .sessions
+            .get(id)
+            .filter(|s| instance_id.is_none_or(|i| s.instance.id() == i))
+            .map(|s| s.routing_opts.clone());
+        if let Some(routing_opts) = routing_opts {
             trace!(session_id = ?id, "pinging manually session");
             let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
             send_via_msg_sender(
                 &mut msg_sender,
-                session_data.routing_opts.clone(),
+                routing_opts,
                 HoprStartProtocol::KeepAlive(KeepAliveMessage {
                     session_id: *id,
                     flags: KeepAliveFlag::ManualPing.into(),
@@ -5976,6 +6314,10 @@ where
         // Captured rather than looked up per report: the lookup that finds a slot refreshes its idle
         // timer, and the one arm that must not do that is the re-send of an unanswered request.
         let supervisor = slot.pix_supervisor.get().cloned();
+        // This driver's control plane. Every lookup below by pseudonym acts on the slot found only if
+        // it carries it, so a driver outliving its Session cannot touch a fresh one under the same
+        // pseudonym.
+        let control_plane = slot.pix_supervisor.clone();
 
         hopr_utils::spawn_as_abortable!(async move {
             let _retirement_scope = retirement_scope;
@@ -6001,13 +6343,13 @@ where
 
                 match action {
                     SessionPixAction::RequestSsa { ssa_ids, params } => {
-                        let Some(slot) = myself.sessions.get(&session_id) else {
+                        let Some(slot) = myself.slot_of_control_plane(&session_id, &control_plane) else {
                             // The Session went away underneath us; report the failure so the
                             // supervisor stops waiting on an action that can never complete.
                             myself
                                 .report_ssa_request(
                                     &session_id,
-                                    None,
+                                    &control_plane,
                                     SessionPixAction::RequestSsa { ssa_ids, params },
                                     false,
                                 )
@@ -6059,7 +6401,7 @@ where
                                     error,
                                     TransportSessionError::Manager(SessionManagerError::MissingDepositData(_))
                                 ) {
-                                    myself.stop_pix_fill(&session_id);
+                                    myself.stop_pix_fill(&session_id, &control_plane);
                                     gate.poison();
                                     owned_ssas.clear();
                                     myself
@@ -6070,7 +6412,11 @@ where
                                             "session error due to missing deposit data",
                                         )
                                         .await;
-                                    myself.close_session_with_reason(&session_id, ClosureReason::MissingDepositData);
+                                    myself.close_session_scoped(
+                                        &session_id,
+                                        ClosureReason::MissingDepositData,
+                                        CloseScope::ControlPlane(&control_plane),
+                                    );
                                     return;
                                 }
 
@@ -6097,7 +6443,7 @@ where
                         // `RequestSsa` this action is not a step the Session depends on: it repeats
                         // on its own interval, and the commitment deadline is still the backstop, so
                         // a dropped ask costs one interval rather than the Session.
-                        if let Some(slot) = myself.sessions.get(&session_id)
+                        if let Some(slot) = myself.slot_of_control_plane(&session_id, &control_plane)
                             && let Err(error) = myself
                                 .send_commitment_retransmission_request(session_id, &slot, ssa_id, params)
                                 .await
@@ -6110,7 +6456,8 @@ where
                         // timer: a Session that is otherwise dead would then be kept alive by its own
                         // re-sends for as long as the predecessor's clocks run. The routing needs no
                         // slot — it is the reply routing this driver was spawned with.
-                        if !myself.sessions.contains_key(&session_id) {
+                        // A torn-down plane is checked first: `contains_key` is true for a successor.
+                        if control_plane.is_torn_down() || !myself.sessions.contains_key(&session_id) {
                             continue;
                         }
 
@@ -6195,7 +6542,7 @@ where
                         // be gone: the supervisor plans against state it holds itself, and the slot
                         // can be evicted underneath it. A missing slot needs no rate — its stream is
                         // already aborted.
-                        if let Some(slot) = myself.sessions.get(&session_id)
+                        if let Some(slot) = myself.slot_of_control_plane(&session_id, &control_plane)
                             && let Some(fill) = slot.pix_fill.get()
                         {
                             fill.set_fill(rate);
@@ -6217,7 +6564,7 @@ where
                         crate::telemetry::pix::set_held_shares(share_processor.held_shares());
                         owned_ssas.retain(|guard| guard.ssa_id() != Some(&ssa_id));
                         forget_request_of(&mut last_request, &ssa_id);
-                        if let Some(slot) = myself.sessions.get(&session_id) {
+                        if let Some(slot) = myself.slot_of_control_plane(&session_id, &control_plane) {
                             slot.abort_handles
                                 .lock()
                                 .abort_one(&SessionHandles::PixDepositObserver(ssa_id.ssa_index().get()));
@@ -6240,8 +6587,7 @@ where
             // with `RecoveryIdle` or `RecoveryDeadline`, and that is likewise the ordinary end of a
             // Session an operator has already closed rather than something to page anyone about.
             let draining = myself
-                .sessions
-                .get(&session_id)
+                .slot_of_control_plane(&session_id, &control_plane)
                 .is_some_and(|slot| slot.pix_fill.get().is_some_and(|fill| fill.is_draining()));
             if draining {
                 info!(%session_id, %reason, "pix supervisor ended the post-close SURB drain");
@@ -6253,7 +6599,7 @@ where
             // have woken it is the thing that just stopped. Fill is silenced alongside it, and for a
             // sharper reason — the gate holds packets back, while fill would go on *originating*
             // them, return-routed to a pseudonym whose SURBs are about to be gone.
-            myself.stop_pix_fill(&session_id);
+            myself.stop_pix_fill(&session_id, &control_plane);
             gate.poison();
             owned_ssas.clear();
             // Releasing the guards removed the Session's cycles from the reconstructor; refresh the
@@ -6270,7 +6616,7 @@ where
             // has stopped and its gate is poisoned — while `hopr_pix_sessions_active` would still
             // be counting it. Idempotent, so `close_session` remains the backstop for every other
             // path into it.
-            if let Some(slot) = myself.sessions.get(&session_id)
+            if let Some(slot) = myself.slot_of_control_plane(&session_id, &control_plane)
                 && let Some(supervisor) = slot.pix_supervisor.get()
             {
                 supervisor.telemetry.release();
@@ -6289,7 +6635,9 @@ where
                 myself.notify_pix_failure(session_id, reply_routing).await;
             }
 
-            if let Some(slot) = myself.sessions.remove(&session_id) {
+            if let Some(slot) = remove_slot_if(&myself.sessions, &session_id, |slot| {
+                Arc::ptr_eq(&slot.pix_supervisor, &control_plane)
+            }) {
                 myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
                 let token = slot.claim_admission_token();
                 close_session(
@@ -6514,6 +6862,19 @@ where
         );
     }
 
+    /// The slot under `session_id`, if it is driven by `control_plane` (see [`PixControlPlane`]).
+    ///
+    /// A lookup that refreshes the slot's idle timer, like any `get`; skipped once the plane is torn
+    /// down, so a stale driver cannot refresh a successor's timer.
+    fn slot_of_control_plane(&self, session_id: &SessionId, control_plane: &PixControlPlane) -> Option<SessionSlot> {
+        if control_plane.is_torn_down() {
+            return None;
+        }
+        self.sessions
+            .get(session_id)
+            .filter(|slot| Arc::ptr_eq(&slot.pix_supervisor, control_plane))
+    }
+
     /// Silences a Session's PIX fill, leaving its SURB-level notification alone.
     ///
     /// Called on every path that is about to tear a Session down. `close_session` aborts the stream
@@ -6521,28 +6882,28 @@ where
     /// between a supervisor deciding the Session is over and the teardown reaching the stream. Every
     /// packet originated in that window is return-routed to a pseudonym whose SURBs are gone, and one
     /// packet the routing resolver cannot resolve holds up every packet this node originates.
-    fn stop_pix_fill(&self, session_id: &SessionId) {
-        if let Some(slot) = self.sessions.get(session_id)
+    ///
+    /// Acts only on the slot `control_plane` drives (see [`PixControlPlane`]): the driver of a torn-down
+    /// Session must not silence the fill of a fresh one under the same pseudonym.
+    fn stop_pix_fill(&self, session_id: &SessionId, control_plane: &PixControlPlane) {
+        if let Some(slot) = self.slot_of_control_plane(session_id, control_plane)
             && let Some(fill) = slot.pix_fill.get()
         {
             fill.set_fill(FillRate::ZERO);
         }
     }
 
-    /// Reports an action outcome to a Session's supervisor, if it still has one.
+    /// Reports an action outcome to the supervisor of `control_plane`, if it has one.
+    ///
+    /// Never looked up by pseudonym, which could find a successor Session's supervisor.
     async fn report_ssa_request(
         &self,
         session_id: &SessionId,
-        slot: Option<&SessionSlot>,
+        control_plane: &PixControlPlane,
         action: SessionPixAction,
         ok: bool,
     ) {
-        let slot = match slot {
-            Some(slot) => Some(slot.clone()),
-            None => self.sessions.get(session_id),
-        };
-        if let Some(slot) = slot
-            && let Some(supervisor) = slot.pix_supervisor.get()
+        if let Some(supervisor) = control_plane.get()
             && supervisor.send_action_result(action, ok).await.is_err()
         {
             error!(%session_id, "pix supervisor stopped accepting results");
@@ -6832,6 +7193,17 @@ where
         self.close_session_with_reason(id, ClosureReason::Eviction)
     }
 
+    /// Closes the Session under `id` only if it is the slot instance `instance_id` (see
+    /// [`HoprSession::slot_instance`]).
+    ///
+    /// For callers that hold a handle to one specific Session object and must not tear down a
+    /// successor that has since taken the same pseudonym. Same semantics as
+    /// [`close_session`](Self::close_session) when the instance matches; `false` when the slot is gone
+    /// or belongs to another instance.
+    pub fn close_session_instance(&self, id: &SessionId, instance_id: u64) -> bool {
+        self.close_session_scoped(id, ClosureReason::Eviction, CloseScope::InstanceId(instance_id))
+    }
+
     /// Answers an Exit-side close by draining the Session's buffered SURBs, when that is worth doing.
     ///
     /// A PIX Session can end long before the cycle it was funded for does. The deposit that cycle was
@@ -6869,13 +7241,16 @@ where
     /// `Balancer`, `KeepAlive`, `SurbNotifyDelay`, `PixActionDriver` and the deposit observers are
     /// all left running; only the ingress is aborted, so the session server sees its end of the
     /// stream as promptly as it would have.
-    fn begin_surb_drain(&self, id: &SessionId, reason: ClosureReason) -> Option<bool> {
+    fn begin_surb_drain(&self, id: &SessionId, reason: ClosureReason, scope: CloseScope<'_>) -> Option<bool> {
         let fill_cfg = &self.cfg.pix_config.supervision.fill;
         if !(fill_cfg.enabled && fill_cfg.drain_after_close) {
             return None;
         }
 
         let slot = self.sessions.get(id)?;
+        if !scope.admits(&slot) {
+            return Some(false);
+        }
         let supervisor = slot.pix_supervisor.get()?;
         let fill = slot.pix_fill.get()?;
 
@@ -6904,8 +7279,34 @@ where
         // both read it as false. The transition is what actually decides, and the loser is answered
         // as it would have been had the two been serialized rather than concurrent — which is what
         // keeps the supervisor from being told a Session closed twice.
-        if !fill.enter_drain() {
-            return answer_while_draining(reason);
+        //
+        // Taken inside a compute on the slot, so it serialises with a removal (and with a replacement
+        // of the slot) instead of racing it: a drain must not begin on a slot that has just gone, or
+        // on a successor's.
+        let mut step = DrainStep::Gone;
+        self.sessions
+            .entry(*id)
+            .and_compute_with(|entry: Option<moka::Entry<SessionId, SessionSlot>>| {
+                if let Some(entry) = entry {
+                    step = if !scope.admits(entry.value()) {
+                        DrainStep::Gone
+                    } else if !Arc::ptr_eq(&entry.value().instance, &slot.instance) {
+                        DrainStep::Replaced
+                    } else if fill.enter_drain() {
+                        DrainStep::Entered
+                    } else {
+                        DrainStep::Lost
+                    };
+                }
+                moka::ops::compute::Op::Nop
+            });
+        match step {
+            DrainStep::Entered => {}
+            DrainStep::Lost => return answer_while_draining(reason),
+            // Nothing of the one we meant to drain is left, and what is there is not ours to close.
+            DrainStep::Gone => return Some(false),
+            // The caller's scope admits the replacement: it is closed the ordinary way.
+            DrainStep::Replaced => return None,
         }
 
         // Re-read now that the reserve is frozen (see `PixFillControl::set_announced_target`): an
@@ -6951,11 +7352,17 @@ where
     /// draining its remaining SURBs into a funded cycle" — in which case the slot is deliberately
     /// left in place until the supervisor's own teardown removes it.
     fn close_session_with_reason(&self, id: &SessionId, reason: ClosureReason) -> bool {
-        if let Some(handled) = self.begin_surb_drain(id, reason) {
+        self.close_session_scoped(id, reason, CloseScope::Any)
+    }
+
+    /// [`close_session_with_reason`](Self::close_session_with_reason), acting only on a slot `scope`
+    /// admits. A slot it does not admit is left exactly as it is, and the answer is `false`.
+    fn close_session_scoped(&self, id: &SessionId, reason: ClosureReason, scope: CloseScope<'_>) -> bool {
+        if let Some(handled) = self.begin_surb_drain(id, reason, scope) {
             return handled;
         }
 
-        if let Some(slot) = self.sessions.remove(id) {
+        if let Some(slot) = remove_slot_if(&self.sessions, id, |slot| scope.admits(slot)) {
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
             // Reconstructor state is released by `close_session` aborting the PIX action driver,
             // whose commitment guards retire on drop.
@@ -6979,9 +7386,34 @@ where
     /// Returns an error if the Session with the given `id` does not exist, or
     /// if it does not use SURB balancing.
     pub fn update_surb_balancer_config(&self, id: &SessionId, config: SurbBalancerConfig) -> errors::Result<()> {
+        self.update_surb_balancer_config_scoped(id, None, config)
+    }
+
+    /// Same as [`update_surb_balancer_config`](Self::update_surb_balancer_config), but only if the slot
+    /// under `id` is the slot instance `instance_id` (see [`HoprSession::slot_instance`]).
+    ///
+    /// For callers that hold a handle to one specific Session object: once its pseudonym is reused, an
+    /// update through that stale handle must not change the successor Session's balancer. Fails with
+    /// [`SessionManagerError::NonExistingSession`] when the slot is gone or belongs to another instance.
+    pub fn update_surb_balancer_config_instance(
+        &self,
+        id: &SessionId,
+        instance_id: u64,
+        config: SurbBalancerConfig,
+    ) -> errors::Result<()> {
+        self.update_surb_balancer_config_scoped(id, Some(instance_id), config)
+    }
+
+    fn update_surb_balancer_config_scoped(
+        &self,
+        id: &SessionId,
+        instance_id: Option<u64>,
+        config: SurbBalancerConfig,
+    ) -> errors::Result<()> {
         let cfg = self
             .sessions
             .get(id)
+            .filter(|s| instance_id.is_none_or(|i| s.instance.id() == i))
             .ok_or(SessionManagerError::NonExistingSession)?
             .surb_mgmt;
 
@@ -6998,7 +7430,33 @@ where
     ///
     /// Returns an error if the Session with the given `id` does not exist.
     pub fn get_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
-        match self.sessions.get(id) {
+        self.get_surb_balancer_config_scoped(id, None)
+    }
+
+    /// Same as [`get_surb_balancer_config`](Self::get_surb_balancer_config), but only if the slot under
+    /// `id` is the slot instance `instance_id` (see [`HoprSession::slot_instance`]).
+    ///
+    /// For callers that hold a handle to one specific Session object: once its pseudonym is reused, a
+    /// read through that stale handle must not report the successor Session's balancer. Fails with
+    /// [`SessionManagerError::NonExistingSession`] when the slot is gone or belongs to another instance.
+    pub fn get_surb_balancer_config_instance(
+        &self,
+        id: &SessionId,
+        instance_id: u64,
+    ) -> errors::Result<Option<SurbBalancerConfig>> {
+        self.get_surb_balancer_config_scoped(id, Some(instance_id))
+    }
+
+    fn get_surb_balancer_config_scoped(
+        &self,
+        id: &SessionId,
+        instance_id: Option<u64>,
+    ) -> errors::Result<Option<SurbBalancerConfig>> {
+        match self
+            .sessions
+            .get(id)
+            .filter(|s| instance_id.is_none_or(|i| s.instance.id() == i))
+        {
             Some(session) => Ok(Some(session.surb_mgmt.as_ref())
                 .filter(|c| !c.is_disabled())
                 .map(|d| d.as_config())),
@@ -7430,6 +7888,7 @@ where
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            instance: SlotInstance::new(0),
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -7466,6 +7925,7 @@ where
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            instance: SlotInstance::new(0),
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -7926,6 +8386,7 @@ where
             crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
         let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
 
+        let instance = SlotInstance::new(session_req.challenge);
         let slot = SessionSlot {
             session_tx,
             routing_opts: reply_routing.clone(),
@@ -7941,6 +8402,7 @@ where
             cycle_budget,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            instance: instance.clone(),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -8066,9 +8528,12 @@ where
             self.cfg.maximum_surb_buffer_size as u64
         };
 
-        let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
-            if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
-                error!(%session_id, %error, %reason, "failed to notify session closure");
+        let closure_notifier = Box::new({
+            let instance = instance.clone();
+            move |session_id: SessionId, reason: ClosureReason| {
+                if let Err(error) = close_session_notifier.try_send((session_id, reason, instance)) {
+                    error!(%session_id, %error, %reason, "failed to notify session closure");
+                }
             }
         });
 
@@ -8125,6 +8590,7 @@ where
                         slot.surb_mgmt.clone(),
                         egress_gate,
                         self.cfg.surb_balance_notify_period.is_some() || pix.is_some(),
+                        instance.clone(),
                     )
                     // Where the limiter releases a reply, so a burst draining slowly stays activity until it is out.
                     .with(move |item: EgressItem| {
@@ -8156,7 +8622,8 @@ where
                 None,
                 None,
                 loss_signal.clone(),
-            )?;
+            )?
+            .with_slot_instance(instance.id());
 
             // The SURB balancer will start intervening by rate-limiting the
             // egress of the Session, once the estimated number of SURBs drops below
@@ -8212,6 +8679,7 @@ where
             let surb_estimator_rx = slot.surb_estimator.clone();
             let activity_tx = slot.pix_fill.clone();
             let activity_rx = slot.pix_fill.clone();
+            let egress_instance = instance.clone();
             let session = HoprSession::new_with_surb_state(
                 session_id,
                 reply_routing.clone(),
@@ -8219,6 +8687,12 @@ where
                 (
                     msg_sender.clone().sink_map_err(std::io::Error::other).with(
                         move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            // Before the activity note and the SURB count: see `exit_data_egress`.
+                            if egress_instance.is_superseded() {
+                                return futures::future::Either::Left(std::future::ready(
+                                    Err(superseded_write_error()),
+                                ));
+                            }
                             note_exit_data_activity(&activity_tx);
                             // Counted here too, though nothing on this branch balances anything. The
                             // estimate is what the fill reserve is measured against, and a reserve
@@ -8229,7 +8703,7 @@ where
                             let data = count_return_packet_surb(&surb_estimator_tx, data);
                             #[cfg(feature = "telemetry")]
                             telemetry::record_session_surb_consumed(&session_id, 1);
-                            acquire_egress_permit(egress_gate.clone(), routing, data)
+                            acquire_egress_permit_for(&egress_instance, egress_gate.clone(), routing, data)
                         },
                     ),
                     session_rx.inspect(move |data| {
@@ -8246,7 +8720,8 @@ where
                 None,
                 None,
                 loss_signal.clone(),
-            )?;
+            )?
+            .with_slot_instance(instance.id());
 
             self.spawn_exit_keep_alive(
                 session_id,
@@ -8308,23 +8783,31 @@ where
             .await,
         )?;
 
+        // The slot may have been torn down while the send was pending: its teardown has already
+        // aborted the handles, and initialising metrics would overwrite a successor's owner.
         #[cfg(feature = "telemetry")]
-        initialize_session_telemetry(
-            session_id,
-            &self.cfg,
-            session_req.capabilities.0,
-            Some(&slot.surb_estimator),
-            Some(&slot.surb_mgmt),
-        );
+        if !instance.is_superseded() {
+            initialize_session_telemetry(
+                session_id,
+                &self.cfg,
+                session_req.capabilities.0,
+                Some(&slot.surb_estimator),
+                Some(&slot.surb_mgmt),
+                instance.id(),
+            );
+        }
 
         // The session is published, so the supervisor's actions can now be carried out. The first of
         // them is the initial `RequestSsa`, which is why this runs after `SessionEstablished` has
         // gone out: the Entry must see the two in that order.
         if let Some(action_rx) = pix {
-            let driver = self.spawn_pix_action_driver(session_id, &slot, action_rx, reply_routing.clone());
-            slot.abort_handles
-                .lock()
-                .insert(SessionHandles::PixActionDriver, driver);
+            // Checked under the handles' lock: teardown supersedes before it takes the lock to abort,
+            // so a driver inserted here is never missed by it.
+            let mut handles = slot.abort_handles.lock();
+            if !instance.is_superseded() {
+                let driver = self.spawn_pix_action_driver(session_id, &slot, action_rx, reply_routing.clone());
+                handles.insert(SessionHandles::PixActionDriver, driver);
+            }
         }
 
         #[cfg(all(feature = "telemetry", not(test)))]
@@ -10422,6 +10905,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                instance: SlotInstance::new(0),
             },
         );
 
@@ -14372,6 +14856,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                instance: SlotInstance::new(0),
             },
         );
         Ok((mgr, control))
@@ -19992,6 +20477,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                instance: SlotInstance::new(0),
             },
         );
 
@@ -20085,6 +20571,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                instance: SlotInstance::new(0),
             }
         };
 
@@ -20157,6 +20644,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                instance: SlotInstance::new(0),
             },
         );
 
@@ -20250,6 +20738,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                instance: SlotInstance::new(0),
             },
         );
         (mgr, estimator)
@@ -27137,6 +27626,7 @@ mod tests {
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            instance: SlotInstance::new(0),
         };
         let guard = mgr.allocate_session_slot(session_id, slot.clone());
         assert!(guard.is_some(), "slot allocation must succeed");
@@ -27170,6 +27660,7 @@ mod tests {
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            instance: SlotInstance::new(0),
         }
     }
 
@@ -28231,6 +28722,7 @@ mod tests {
             balancer,
             None,
             true,
+            SlotInstance::new(0),
         ));
         let item = data_packet()?;
         let sending = tokio::spawn(async move { sink.send(item).await });
@@ -28294,6 +28786,7 @@ mod tests {
             balancer,
             None,
             true,
+            SlotInstance::new(0),
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
             .await
@@ -28321,6 +28814,7 @@ mod tests {
             balancer_with_target(3_200),
             Some(closed),
             true,
+            SlotInstance::new(0),
         ));
         assert!(
             timeout(Duration::from_secs(5), refused.send(data_packet()?))
@@ -28343,6 +28837,7 @@ mod tests {
             balancer_with_target(3_200),
             None,
             true,
+            SlotInstance::new(0),
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
             .await
@@ -28384,6 +28879,7 @@ mod tests {
             balancer,
             None,
             false,
+            SlotInstance::new(0),
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
             .await
@@ -28426,6 +28922,7 @@ mod tests {
             balancer.clone(),
             None,
             true,
+            SlotInstance::new(0),
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
             .await
@@ -28461,6 +28958,7 @@ mod tests {
             balancer.clone(),
             None,
             true,
+            SlotInstance::new(0),
         ));
         let item = data_packet()?;
         let sending = tokio::spawn(async move { sink.send(item).await });
@@ -28507,6 +29005,7 @@ mod tests {
             balancer,
             None,
             true,
+            SlotInstance::new(0),
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
             .await
@@ -28588,6 +29087,7 @@ mod tests {
             balancer.clone(),
             Some(gate),
             true,
+            SlotInstance::new(0),
         ));
         let item = data_packet()?;
         let sending = tokio::spawn(async move { with_pix.send(item).await });
@@ -28830,6 +29330,879 @@ mod tests {
             probe::get("gate_block_observations/predeposit_exhausted"),
             "closed on its own series too"
         );
+        Ok(())
+    }
+
+    // -- Slot instances: everything that outlives a data plane acts on its own instance only. --
+
+    /// Another Session taking the pseudonym of one that has ended: the manager's end of a pseudonym
+    /// reuse, with the predecessor's `HoprSession` still in hand.
+    async fn exit_successor_on(
+        mgr: &RecordingManager,
+        incoming: &mut futures::channel::mpsc::Receiver<IncomingSession>,
+        pseudonym: HoprPseudonym,
+    ) -> anyhow::Result<IncomingSession> {
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE + 1,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capabilities::empty()),
+                additional_data: 0,
+            },
+        )
+        .await?;
+        timeout(Duration::from_secs(2), incoming.next())
+            .await
+            .context("the successor must be handed to the application")?
+            .context("the incoming channel must stay open")
+    }
+
+    /// A close reported by a torn-down Session object, in each way one can arrive, must leave the
+    /// Session that has since taken its pseudonym untouched.
+    ///
+    /// ## Steps
+    /// 1. An Exit Session is established and its `HoprSession` kept; the Session is then closed.
+    /// 2. A successor is established under the same pseudonym.
+    /// 3. The predecessor reports `WriteClosed` and `EmptyRead` through the closure channel, reads to its end of stream
+    ///    (which reports `EmptyRead` on its own), and is closed by its instance id, as its configurator would.
+    /// 4. The successor's slot is the one it was, not superseded and still counted; closing it by its own instance id
+    ///    then works.
+    #[test_log::test(tokio::test)]
+    async fn a_late_close_of_a_torn_down_instance_leaves_its_successor_alone() -> anyhow::Result<()> {
+        use futures::AsyncReadExt;
+
+        let (mgr, _msg_rx, mut incoming, pseudonym) =
+            exit_session_originating_keep_alives(Default::default(), None).await?;
+        let mut predecessor = timeout(Duration::from_secs(2), incoming.next())
+            .await
+            .context("the Exit must hand over its Session")?
+            .context("the incoming channel must stay open")?;
+        let old_instance = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the first slot must exist")?
+            .instance
+            .clone();
+        assert_eq!(predecessor.session.slot_instance(), Some(old_instance.id()));
+
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+        assert!(
+            old_instance.is_superseded(),
+            "a torn-down slot's instance is superseded"
+        );
+
+        let successor = exit_successor_on(&mgr, &mut incoming, pseudonym).await?;
+        let new_instance = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the successor's slot must exist")?
+            .instance
+            .clone();
+        assert!(!Arc::ptr_eq(&old_instance, &new_instance));
+        assert_ne!(old_instance.id(), new_instance.id());
+        assert_eq!(successor.session.slot_instance(), Some(new_instance.id()));
+
+        let (_, closures) = mgr.session_notifiers.get().context("the manager is started")?.clone();
+        for reason in [ClosureReason::WriteClosed, ClosureReason::EmptyRead] {
+            assert!(
+                closures.try_send((pseudonym, reason, old_instance.clone())).is_ok(),
+                "{reason:?} must be accepted by the channel"
+            );
+        }
+        // The predecessor's own object reports the same way once it is read to its end.
+        let mut buf = [0u8; 16];
+        let read = timeout(Duration::from_millis(500), predecessor.session.read(&mut buf))
+            .await
+            .context("the predecessor's read must end")??;
+        assert_eq!(0, read, "the predecessor must read to its end");
+        assert!(
+            !mgr.close_session_instance(&pseudonym, old_instance.id()),
+            "a configurator of the predecessor must not close the successor"
+        );
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        let current = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the successor must survive the predecessor's late closes")?;
+        assert!(Arc::ptr_eq(&current.instance, &new_instance));
+        assert!(!new_instance.is_superseded());
+        assert_eq!(mgr.num_active_sessions(), 1);
+
+        assert!(mgr.close_session_instance(&pseudonym, new_instance.id()));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+        Ok(())
+    }
+
+    /// A configurator of a predecessor Session cannot read, update or ping the successor that took its pseudonym.
+    #[test_log::test(tokio::test)]
+    async fn instance_scoped_configurator_operations_do_not_reach_another_instance() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, mut incoming, pseudonym) =
+            exit_session_originating_keep_alives(Default::default(), None).await?;
+        let _predecessor = timeout(Duration::from_secs(2), incoming.next())
+            .await
+            .context("the Exit must hand over its Session")?
+            .context("the incoming channel must stay open")?;
+        let old_id = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the first slot must exist")?
+            .instance
+            .id();
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+
+        let _successor = exit_successor_on(&mgr, &mut incoming, pseudonym).await?;
+        let new_id = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the successor's slot must exist")?
+            .instance
+            .id();
+        assert_ne!(old_id, new_id);
+
+        let before = mgr.get_surb_balancer_config(&pseudonym)?;
+        let current = mgr.get_surb_balancer_config_instance(&pseudonym, new_id)?;
+        assert_eq!(current, before, "the current instance reads its own config");
+
+        let new_cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 12_345,
+            ..Default::default()
+        };
+        assert!(matches!(
+            mgr.get_surb_balancer_config_instance(&pseudonym, old_id),
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        assert!(matches!(
+            mgr.update_surb_balancer_config_instance(&pseudonym, old_id, new_cfg),
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        assert_eq!(
+            mgr.get_surb_balancer_config(&pseudonym)?,
+            before,
+            "a stale update must leave the successor's config unchanged"
+        );
+
+        // On the current instance the call reaches the slot (and is judged on its own merits).
+        let on_current = mgr.update_surb_balancer_config_instance(&pseudonym, new_id, new_cfg);
+        assert!(
+            !matches!(
+                on_current,
+                Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+            ),
+            "the current instance must be found, got {on_current:?}"
+        );
+        if before.is_some() {
+            assert_eq!(mgr.get_surb_balancer_config(&pseudonym)?, Some(new_cfg));
+        }
+
+        // Ping: stale sends nothing, current sends one manual keep-alive back over the reply route.
+        while msg_rx.try_recv().is_ok() {}
+        assert!(matches!(
+            mgr.ping_session_instance(&pseudonym, old_id).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        // The Exit also sends keep-alives of its own, so only manual pings are counted, each with its route.
+        let manual_pings = |sent: Vec<(DestinationRouting, ApplicationDataOut)>| {
+            sent.into_iter()
+                .filter(|(_, d)| {
+                    matches!(
+                        HoprStartProtocol::decode(d.data.application_tag, &d.data.plain_text),
+                        Ok(StartProtocol::KeepAlive(KeepAliveMessage { flags, .. })) if flags.contains(KeepAliveFlag::ManualPing)
+                    )
+                })
+                .map(|(routing, _)| {
+                    matches!(&routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &pseudonym)
+                })
+                .collect::<Vec<_>>()
+        };
+        assert!(
+            manual_pings(originated_during(&mut msg_rx, Duration::from_millis(200)).await).is_empty(),
+            "a stale ping must send nothing"
+        );
+        mgr.ping_session_instance(&pseudonym, new_id).await?;
+        assert_eq!(
+            vec![true],
+            manual_pings(originated_during(&mut msg_rx, Duration::from_millis(500)).await),
+            "a ping on the current instance must send one manual keep-alive, back over the reply route"
+        );
+        assert!(mgr.close_session_instance(&pseudonym, new_id));
+        Ok(())
+    }
+
+    /// On an Entry Session with a SURB balancer, a stale instance id neither reads nor changes the balancer
+    /// config, nor pings; the current instance does all three.
+    #[test_log::test(tokio::test)]
+    async fn stale_instance_cannot_read_update_or_ping_a_balanced_entry_session() -> anyhow::Result<()> {
+        let mgr = RecordingManager::new(Default::default());
+        let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let initial = SurbBalancerConfig::default();
+        let opening = tokio::spawn({
+            let mgr = mgr.clone();
+            async move {
+                mgr.new_session(
+                    (&ChainKeypair::random()).into(),
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    SessionClientConfig {
+                        capabilities: Capabilities::empty(),
+                        pseudonym: pseudonym.into(),
+                        surb_management: Some(initial),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(anyhow::Error::from)
+            }
+        });
+
+        let start = timeout(Duration::from_secs(2), msg_rx.next())
+            .await
+            .context("the Entry must send its StartSession")?
+            .context("the sender must stay open")?;
+        let Ok(StartProtocol::StartSession(initiation)) =
+            HoprStartProtocol::decode(start.1.data.application_tag, &start.1.data.plain_text)
+        else {
+            anyhow::bail!("the first message must be a StartSession");
+        };
+        mgr.dispatch_message(
+            pseudonym,
+            start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge: initiation.challenge,
+                session_id: pseudonym,
+            }))?,
+        )?;
+        let session = timeout(Duration::from_secs(5), opening)
+            .await
+            .context("the Entry must establish")???;
+        let current = session.slot_instance().context("the Session names its instance")?;
+        let stale = current + 1_000_000;
+
+        let before = mgr.get_surb_balancer_config(&pseudonym)?;
+        assert!(before.is_some(), "the Entry runs a balancer");
+        let changed = SurbBalancerConfig {
+            target_surb_buffer_size: initial.target_surb_buffer_size + 1_000,
+            ..initial
+        };
+
+        assert!(matches!(
+            mgr.get_surb_balancer_config_instance(&pseudonym, stale),
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        assert!(matches!(
+            mgr.update_surb_balancer_config_instance(&pseudonym, stale, changed),
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        assert_eq!(
+            mgr.get_surb_balancer_config(&pseudonym)?,
+            before,
+            "a stale update must leave the config unchanged"
+        );
+
+        mgr.update_surb_balancer_config_instance(&pseudonym, current, changed)?;
+        assert_eq!(
+            mgr.get_surb_balancer_config_instance(&pseudonym, current)?
+                .map(|c| c.target_surb_buffer_size),
+            Some(changed.target_surb_buffer_size)
+        );
+
+        while msg_rx.try_recv().is_ok() {}
+        assert!(matches!(
+            mgr.ping_session_instance(&pseudonym, stale).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+        let manual_pings = |sent: Vec<(DestinationRouting, ApplicationDataOut)>| {
+            sent.iter()
+                .filter(|(_, d)| {
+                    matches!(
+                        HoprStartProtocol::decode(d.data.application_tag, &d.data.plain_text),
+                        Ok(StartProtocol::KeepAlive(KeepAliveMessage { flags, .. })) if flags.contains(KeepAliveFlag::ManualPing)
+                    )
+                })
+                .count()
+        };
+        assert_eq!(
+            manual_pings(originated_during(&mut msg_rx, Duration::from_millis(200)).await),
+            0,
+            "a stale ping must send nothing"
+        );
+        mgr.ping_session_instance(&pseudonym, current).await?;
+        assert_eq!(
+            manual_pings(originated_during(&mut msg_rx, Duration::from_millis(500)).await),
+            1,
+            "a ping on the current instance must send a manual keep-alive"
+        );
+
+        assert!(mgr.close_session_instance(&pseudonym, current));
+        Ok(())
+    }
+
+    /// A `HoprSession` whose slot was torn down can no longer send, and nothing reaches the sender.
+    #[test_log::test(tokio::test)]
+    async fn writes_on_a_session_whose_slot_was_torn_down_fail_and_send_nothing() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, mut incoming, pseudonym) =
+            exit_session_originating_keep_alives(Default::default(), None).await?;
+        let mut held = timeout(Duration::from_secs(2), incoming.next())
+            .await
+            .context("the Exit must hand over its Session")?
+            .context("the incoming channel must stay open")?;
+
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+        // Whatever the teardown itself had in flight.
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+
+        let outcome = async {
+            held.session.write_all(&[7u8; 600]).await?;
+            held.session.flush().await
+        }
+        .await;
+        assert!(
+            outcome.is_err(),
+            "a write after the slot's teardown must fail, got {outcome:?}"
+        );
+
+        let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        assert!(
+            sent.iter()
+                .all(|(_, data)| data.data.application_tag != SESSION_APPLICATION_TAG),
+            "no Session data may reach the sender after the teardown, got {} packet(s)",
+            sent.len()
+        );
+        Ok(())
+    }
+
+    /// An Entry that only writes keeps its slot while it writes, and loses it once it stops.
+    #[test_log::test(tokio::test)]
+    async fn an_entry_session_that_keeps_writing_should_not_be_idle_evicted() -> anyhow::Result<()> {
+        let idle_timeout = Duration::from_millis(400);
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            idle_timeout,
+            ..Default::default()
+        });
+        let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let opening = tokio::spawn({
+            let mgr = mgr.clone();
+            async move {
+                mgr.new_session(
+                    (&ChainKeypair::random()).into(),
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    SessionClientConfig {
+                        capabilities: Capabilities::empty(),
+                        pseudonym: pseudonym.into(),
+                        surb_management: None,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(anyhow::Error::from)
+            }
+        });
+
+        let start = timeout(Duration::from_secs(2), msg_rx.next())
+            .await
+            .context("the Entry must send its StartSession")?
+            .context("the sender must stay open")?;
+        let Ok(StartProtocol::StartSession(initiation)) =
+            HoprStartProtocol::decode(start.1.data.application_tag, &start.1.data.plain_text)
+        else {
+            anyhow::bail!("the first message must be a StartSession");
+        };
+        mgr.dispatch_message(
+            pseudonym,
+            start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge: initiation.challenge,
+                session_id: pseudonym,
+            }))?,
+        )?;
+        let mut session = timeout(Duration::from_secs(5), opening)
+            .await
+            .context("the Entry must establish")???;
+
+        // Write for several idle timeouts; nothing is ever read back.
+        let until = tokio::time::Instant::now() + idle_timeout * 5;
+        while tokio::time::Instant::now() < until {
+            session.write_all(&[7u8; 600]).await?;
+            session.flush().await?;
+            // `contains_key` does not refresh the idle timer, so only the writes can keep the slot.
+            mgr.sessions.run_pending_tasks();
+            assert!(
+                mgr.sessions.contains_key(&pseudonym),
+                "a writing Entry must keep its slot"
+            );
+            tokio::time::sleep(idle_timeout / 20).await;
+        }
+
+        // Once it stops, the slot goes after the idle timeout.
+        let mut evicted = false;
+        for _ in 0..50 {
+            tokio::time::sleep(idle_timeout / 10).await;
+            mgr.sessions.run_pending_tasks();
+            if !mgr.sessions.contains_key(&pseudonym) {
+                evicted = true;
+                break;
+            }
+        }
+        assert!(
+            evicted,
+            "an Entry that stopped writing must be evicted after its idle timeout"
+        );
+        Ok(())
+    }
+
+    /// The Entry's own egress is cut with its slot, and the instance handle closes only what it names.
+    #[test_log::test(tokio::test)]
+    async fn an_entry_session_cannot_send_once_its_slot_is_torn_down() -> anyhow::Result<()> {
+        let mgr = RecordingManager::new(Default::default());
+        let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let opening = tokio::spawn({
+            let mgr = mgr.clone();
+            async move {
+                mgr.new_session(
+                    (&ChainKeypair::random()).into(),
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    SessionClientConfig {
+                        capabilities: Capabilities::empty(),
+                        pseudonym: pseudonym.into(),
+                        surb_management: None,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(anyhow::Error::from)
+            }
+        });
+
+        let start = timeout(Duration::from_secs(2), msg_rx.next())
+            .await
+            .context("the Entry must send its StartSession")?
+            .context("the sender must stay open")?;
+        let Ok(StartProtocol::StartSession(initiation)) =
+            HoprStartProtocol::decode(start.1.data.application_tag, &start.1.data.plain_text)
+        else {
+            anyhow::bail!("the first message must be a StartSession");
+        };
+        mgr.dispatch_message(
+            pseudonym,
+            start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge: initiation.challenge,
+                session_id: pseudonym,
+            }))?,
+        )?;
+        let mut session = timeout(Duration::from_secs(5), opening)
+            .await
+            .context("the Entry must establish")???;
+
+        let instance = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the Entry's slot must exist")?
+            .instance
+            .clone();
+        assert_eq!(session.slot_instance(), Some(instance.id()));
+        assert!(instance.is_established(), "the commit marks the instance established");
+
+        assert!(
+            !mgr.close_session_instance(&pseudonym, instance.id() + 1_000_000),
+            "an instance that is not the slot's must not close it"
+        );
+        assert!(mgr.sessions.get(&pseudonym).is_some());
+
+        assert!(mgr.close_session_instance(&pseudonym, instance.id()));
+        assert!(instance.is_superseded());
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+
+        // Write and flush twice: a sink that re-polls its failed `With` future panics on the second round.
+        for round in 0..2 {
+            let outcome = async {
+                session.write_all(&[7u8; 600]).await?;
+                session.flush().await
+            }
+            .await;
+            assert_eq!(
+                Some(std::io::ErrorKind::BrokenPipe),
+                outcome.as_ref().err().map(std::io::Error::kind),
+                "an Entry write after the teardown must fail with BrokenPipe (round {round}), got {outcome:?}"
+            );
+            assert_eq!(
+                Some(std::io::ErrorKind::BrokenPipe),
+                session.flush().await.err().map(|e| e.kind()),
+                "a flush after a failed write must keep failing with BrokenPipe (round {round})"
+            );
+        }
+        let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        assert!(
+            sent.iter()
+                .all(|(_, data)| data.data.application_tag != SESSION_APPLICATION_TAG),
+            "no Session data may reach the sender after the teardown"
+        );
+        Ok(())
+    }
+
+    /// The Exit's egress refuses a superseded instance before counting, and a writer parked on the gate
+    /// when the instance is superseded is refused once the gate admits it, giving its SURB back.
+    #[tokio::test]
+    async fn the_exit_egress_refuses_a_superseded_instance_before_and_after_the_gate() -> anyhow::Result<()> {
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.store(40, Ordering::Relaxed);
+
+        let instance = SlotInstance::new(MIN_CHALLENGE);
+        let gate = ServiceGate::new(0, 10);
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer_with_target(3_200),
+            Some(gate.clone()),
+            false,
+            instance.clone(),
+        ));
+
+        // Parked on the exhausted budget: the SURB is counted while the send waits.
+        let mut parked = Box::pin(sink.send(data_packet()?));
+        assert!(
+            futures::poll!(parked.as_mut()).is_pending(),
+            "the exhausted gate must park the write"
+        );
+        assert_eq!(39, estimator.saturating_diff(), "the parked packet's SURB is counted");
+
+        // Superseded while it waits; then funded.
+        instance.supersede();
+        gate.release_service();
+        let outcome = timeout(Duration::from_secs(5), parked)
+            .await
+            .context("the parked write must resolve")?;
+        assert_eq!(
+            Some(std::io::ErrorKind::BrokenPipe),
+            outcome.as_ref().err().map(std::io::Error::kind),
+            "a permit granted to a superseded instance must not let the packet through"
+        );
+        assert!(forwarded.try_recv().is_err(), "nothing may be forwarded");
+        assert_eq!(
+            40,
+            estimator.saturating_diff(),
+            "the cut packet's SURB is back in the held count"
+        );
+
+        // And a fresh write on the superseded instance is refused before anything is counted.
+        let counted = (estimator.estimate_surbs_consumed(), estimator.estimate_surbs_refunded());
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer_with_target(3_200),
+            None,
+            false,
+            instance,
+        ));
+        assert!(sink.send(data_packet()?).await.is_err());
+        assert!(forwarded.try_recv().is_err());
+        assert_eq!(
+            counted,
+            (estimator.estimate_surbs_consumed(), estimator.estimate_surbs_refunded()),
+            "the refused write neither books nor refunds a SURB"
+        );
+        Ok(())
+    }
+
+    /// A guard's rollback removes its own slot and nobody else's.
+    #[test_log::test(tokio::test)]
+    async fn a_guard_rollback_removes_only_its_own_slot() -> anyhow::Result<()> {
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let first = unregistered_slot(session_id);
+        let first_guard = mgr
+            .allocate_session_slot(session_id, first.clone())
+            .context("the first slot must be allocated")?;
+
+        // The first establishment is torn down by someone else, and a successor takes the pseudonym.
+        let removed = remove_slot_if(&mgr.sessions, &session_id, |slot| {
+            Arc::ptr_eq(&slot.admission_token, &first.admission_token)
+        });
+        assert!(removed.is_some());
+        mgr.active_sessions.fetch_sub(1, Ordering::Relaxed);
+        let successor = unregistered_slot(session_id);
+        let mut successor_guard = mgr
+            .allocate_session_slot(session_id, successor.clone())
+            .context("the successor must be allocated")?;
+        successor_guard.commit(None, None, 0);
+
+        // The first guard, never committed, rolls back now: the successor must stay.
+        drop(first_guard);
+        let kept = mgr.sessions.get(&session_id).context("the successor must survive")?;
+        assert!(Arc::ptr_eq(&kept.admission_token, &successor.admission_token));
+        assert_eq!(mgr.num_active_sessions(), 1);
+
+        // Control: a guard whose slot is current does remove it.
+        let other_id = HoprPseudonym::random();
+        let guard = mgr
+            .allocate_session_slot(other_id, unregistered_slot(other_id))
+            .context("allocation must succeed")?;
+        assert!(mgr.sessions.get(&other_id).is_some());
+        drop(guard);
+        assert!(
+            mgr.sessions.get(&other_id).is_none(),
+            "an uncommitted guard removes its own slot"
+        );
+        Ok(())
+    }
+
+    /// A PIX driver of a torn-down Session, which still holds that Session's control plane, can neither
+    /// silence the fill of a fresh Session under the same pseudonym nor close it.
+    #[test_log::test(tokio::test)]
+    async fn a_stale_pix_driver_cannot_touch_a_fresh_session_under_the_same_pseudonym() -> anyhow::Result<()> {
+        let params = fill_pix_params();
+        let (mgr, _msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            Some(Duration::from_secs(1)),
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 1,
+                drain_after_close: false,
+                ..Default::default()
+            },
+            None,
+        )
+        .await?;
+        let old = mgr.sessions.get(&pseudonym).context("the first slot must exist")?;
+        let stale_plane = old.pix_supervisor.clone();
+        let old_instance = old.instance.clone();
+        drop(old);
+
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+
+        // The fixture's incoming-session receiver is gone, so the successor's hand-over goes to a drain.
+        {
+            let (notifier, _) = mgr.session_notifiers.get().context("the manager is started")?;
+            *notifier.lock().await =
+                Box::pin(futures::sink::drain::<IncomingSession>().sink_map_err(SessionManagerError::other));
+        }
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE + 1,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capabilities::empty() | Capability::UsePIX),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO),
+            },
+        )
+        .await?;
+        let fresh = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the successor's slot must exist")?;
+        assert!(!Arc::ptr_eq(&fresh.pix_supervisor, &stale_plane));
+        let fill = fresh
+            .pix_fill
+            .get()
+            .context("an Exit PIX Session has a fill control")?
+            .clone();
+        fill.set_fill(FillRate::per_second(7));
+        let before = fill.effective_rate();
+
+        assert!(mgr.slot_of_control_plane(&pseudonym, &stale_plane).is_none());
+        mgr.stop_pix_fill(&pseudonym, &stale_plane);
+        assert_eq!(
+            before,
+            fill.effective_rate(),
+            "the stale driver must not silence the fresh fill"
+        );
+
+        for scope in [
+            CloseScope::ControlPlane(&stale_plane),
+            CloseScope::Instance(&old_instance),
+        ] {
+            assert!(
+                !mgr.close_session_scoped(&pseudonym, ClosureReason::MissingDepositData, scope),
+                "a stale scope must not close the fresh Session"
+            );
+        }
+        let still = mgr.sessions.get(&pseudonym).context("the fresh Session must survive")?;
+        assert!(Arc::ptr_eq(&still.instance, &fresh.instance));
+
+        // Control: the fresh Session's own control plane does act.
+        mgr.stop_pix_fill(&pseudonym, &fresh.pix_supervisor);
+        assert_ne!(before, fill.effective_rate(), "its own driver silences its own fill");
+        assert!(mgr.close_session_scoped(
+            &pseudonym,
+            ClosureReason::MissingDepositData,
+            CloseScope::ControlPlane(&fresh.pix_supervisor)
+        ));
+        Ok(())
+    }
+
+    /// A slot removed through `remove_slot_if` is superseded, and its control plane torn down, by the
+    /// time the removal returns.
+    #[test_log::test(tokio::test)]
+    async fn a_slot_removed_by_remove_slot_if_is_already_superseded() -> anyhow::Result<()> {
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+        let slot = unregistered_slot(session_id);
+        let _guard = mgr
+            .allocate_session_slot(session_id, slot.clone())
+            .context("the slot must be allocated")?;
+
+        // A refused predicate leaves everything as it was.
+        assert!(remove_slot_if(&mgr.sessions, &session_id, |_| false).is_none());
+        assert!(!slot.instance.is_superseded());
+        assert!(!slot.pix_supervisor.is_torn_down());
+
+        let removed = remove_slot_if(&mgr.sessions, &session_id, |_| true).context("the slot must be removed")?;
+        assert!(Arc::ptr_eq(&removed.instance, &slot.instance));
+        assert!(slot.instance.is_superseded(), "superseded inside the removal");
+        assert!(slot.pix_supervisor.is_torn_down(), "the control plane is flagged too");
+        Ok(())
+    }
+
+    /// A PIX driver of a torn-down Session reports nothing to, and re-sends nothing into, a successor
+    /// under the same pseudonym.
+    #[test_log::test(tokio::test)]
+    async fn a_stale_pix_driver_reports_and_resends_nothing_for_a_successor() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            None,
+            crate::supervision::PixFillConfig::default(),
+            None,
+        )
+        .await?;
+        // The fixture's own Session is replaced by a stand-in "old" one with its own control plane and a
+        // supervisor this test owns, so the driver's events do not reach the fixture's real supervisor.
+        let real = mgr.sessions.get(&pseudonym).context("the first slot must exist")?;
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+        let mut old = real.clone();
+        old.pix_supervisor = Default::default();
+        let (old_handle, old_commands) = SessionPixSupervisorHandle::observable();
+        let _ = old.pix_supervisor.set(old_handle);
+        old.abort_handles = Default::default();
+        old.admission_token = Default::default();
+        old.instance = SlotInstance::new(1);
+        let mut old_guard = mgr
+            .allocate_session_slot(pseudonym, old.clone())
+            .context("the old slot must be allocated")?;
+        old_guard.commit(None, None, 0);
+        let ssa_requests = |sent: &[(DestinationRouting, ApplicationDataOut)]| {
+            sent.iter()
+                .filter(|(_, data)| {
+                    matches!(
+                        HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text),
+                        Ok(StartProtocol::SsaRequest(_))
+                    )
+                })
+                .count()
+        };
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(200)).await;
+
+        // A driver on the old slot that is not among its handles, so the teardown leaves it lingering.
+        // While the Session is live its request goes out, giving the driver something to re-send.
+        let (action_tx, action_rx) = crossfire::mpsc::bounded_async::<SessionPixAction>(8);
+        let _driver = mgr.spawn_pix_action_driver(
+            pseudonym,
+            &old,
+            action_rx,
+            DestinationRouting::Return(SurbMatcher::Pseudonym(pseudonym)),
+        );
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::new(2).context("index two is non-zero")?);
+        action_tx
+            .send(SessionPixAction::RequestSsa {
+                ssa_ids: vec![ssa_id],
+                params: fill_pix_params(),
+            })
+            .await
+            .map_err(|_| anyhow!("the driver must accept the action"))?;
+        let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        assert_eq!(
+            1,
+            ssa_requests(&sent),
+            "the live driver sends its request, got {sent:?}"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        assert!(wait_for_no_active_sessions(&mgr).await);
+        assert!(
+            old.pix_supervisor.is_torn_down(),
+            "the teardown flags the control plane"
+        );
+
+        // The successor has a supervisor handle whose commands this test can see.
+        let mut successor = unregistered_slot(pseudonym);
+        let (handle, successor_commands) = SessionPixSupervisorHandle::observable();
+        let _ = successor.pix_supervisor.set(handle);
+        successor.instance = SlotInstance::new(2);
+        mgr.sessions.insert(pseudonym, successor);
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(100)).await;
+
+        // Its own slot gone, the driver's failure goes nowhere near the successor; nor does a re-send.
+        let ssa_id_3 = SsaId::new(pseudonym, SsaIndex::new(3).context("index three is non-zero")?);
+        action_tx
+            .send(SessionPixAction::RequestSsa {
+                ssa_ids: vec![ssa_id_3],
+                params: fill_pix_params(),
+            })
+            .await
+            .map_err(|_| anyhow!("the driver must accept the action"))?;
+        action_tx
+            .send(SessionPixAction::ResendSsaRequest { ssa_ids: vec![ssa_id] })
+            .await
+            .map_err(|_| anyhow!("the driver must accept the action"))?;
+        // The driver handles actions in order, so a failed `RequestSsa` queued after the re-send shows
+        // that the re-send was handled too.
+        let ssa_id_4 = SsaId::new(pseudonym, SsaIndex::new(4).context("index four is non-zero")?);
+        action_tx
+            .send(SessionPixAction::RequestSsa {
+                ssa_ids: vec![ssa_id_4],
+                params: fill_pix_params(),
+            })
+            .await
+            .map_err(|_| anyhow!("the driver must accept the action"))?;
+
+        // Wait for the stale driver's failed `RequestSsa` results for both `ssa_id_3` and `ssa_id_4`, which it
+        // reports to its own supervisor. Other commands, such as the `SsaRequestSent` left from the live
+        // phase, are skipped. The driver handles actions in order, so `ssa_id_4`'s failure proves the
+        // re-send before it was handled. The timeout only bounds a failure.
+        let (mut seen_3, mut seen_4) = (false, false);
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while !(seen_3 && seen_4) {
+                let command = old_commands
+                    .recv()
+                    .await
+                    .map_err(|_| anyhow!("the old supervisor's channel closed"))?;
+                if let Some(ids) = command.failed_request_ssa_ids() {
+                    seen_3 |= ids == [ssa_id_3];
+                    seen_4 |= ids == [ssa_id_4];
+                }
+            }
+            anyhow::Ok(())
+        })
+        .await
+        .context("the stale driver must report its failed requests to its own supervisor")??;
+
+        let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        assert!(
+            sent.is_empty(),
+            "no SSA request may be sent for the successor, got {sent:?}"
+        );
+        assert!(
+            successor_commands.try_recv().is_err(),
+            "the successor's supervisor must hear nothing from the stale driver"
+        );
+        assert!(mgr.sessions.get(&pseudonym).is_some(), "the successor must survive");
         Ok(())
     }
 }

@@ -9,36 +9,47 @@ use crate::{
     errors::SessionManagerError,
 };
 
-/// Carries finite Proportional, Integral and Derivative controller gains for a PID controller.
+/// Carries finite, non-negative Proportional, Integral and Derivative controller gains for a PID controller.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PidControllerGains(f64, f64, f64);
 
 impl PidControllerGains {
-    /// Creates PID controller gains, returns an error if the gains are not finite.
+    /// Creates PID controller gains, returns an error if a gain is negative or not finite.
+    ///
+    /// [`PidBalancerController`] floors its integral term at 0, which is only right with non-negative gains.
     pub fn new(p: f64, i: f64, d: f64) -> errors::Result<Self> {
-        if p.is_finite() && i.is_finite() && d.is_finite() {
+        if [p, i, d].into_iter().all(Self::is_valid_gain) {
             Ok(Self(p, i, d))
         } else {
-            Err(SessionManagerError::other(anyhow!("gains must be finite")).into())
+            Err(SessionManagerError::other(anyhow!("gains must be finite and non-negative")).into())
         }
     }
 
-    /// Uses PID controller gains from the env variables or uses the defaults if not set.
+    fn is_valid_gain(gain: f64) -> bool {
+        gain.is_finite() && gain >= 0.0
+    }
+
+    /// Uses PID controller gains from the env variables, or the default for each gain that is unset or invalid.
     pub fn from_env_or_default() -> Self {
+        Self::from_lookup(|var| std::env::var(var).ok())
+    }
+
+    fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Self {
+        let gain = |var: &str, default: f64| match lookup(var) {
+            None => default,
+            Some(value) => match f64::from_str(&value) {
+                Ok(gain) if Self::is_valid_gain(gain) => gain,
+                _ => {
+                    tracing::warn!(var, value, default, "ignoring invalid PID gain, using the default");
+                    default
+                }
+            },
+        };
         let default = Self::default();
         Self(
-            std::env::var("HOPR_BALANCER_PID_P_GAIN")
-                .ok()
-                .and_then(|v| f64::from_str(&v).ok())
-                .unwrap_or(default.0),
-            std::env::var("HOPR_BALANCER_PID_I_GAIN")
-                .ok()
-                .and_then(|v| f64::from_str(&v).ok())
-                .unwrap_or(default.1),
-            std::env::var("HOPR_BALANCER_PID_D_GAIN")
-                .ok()
-                .and_then(|v| f64::from_str(&v).ok())
-                .unwrap_or(default.2),
+            gain("HOPR_BALANCER_PID_P_GAIN", default.0),
+            gain("HOPR_BALANCER_PID_I_GAIN", default.1),
+            gain("HOPR_BALANCER_PID_D_GAIN", default.2),
         )
     }
 
@@ -128,7 +139,14 @@ impl SurbBalancerController for PidBalancerController {
     }
 
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
-        self.0.next_control_output(current_buffer_level as f64).output.max(0.0) as u64
+        let step = self.0.next_control_output(current_buffer_level as f64);
+        // A negative integral would ask the Entry to take SURBs back, which it can't, and would hold off the refill
+        // once the level drops below target.
+        if step.i < 0.0 {
+            self.0.reset_integral_term();
+            return (step.p + step.d).clamp(0.0, self.0.output_limit) as u64;
+        }
+        step.output.max(0.0) as u64
     }
 }
 
@@ -215,6 +233,24 @@ mod tests {
         assert!(out > 0, "an emptied buffer after a healthy period produced {out}");
     }
 
+    /// A long stretch above target must not leave the integral wound below zero. The first level below
+    /// target afterwards has to command a refill straight away, not after the integral unwinds.
+    #[test]
+    fn pid_should_refill_at_once_after_a_long_stretch_above_target() {
+        let mut c = PidBalancerController::from_gains(PidControllerGains::default());
+        c.set_target_and_limit(BalancerControllerBounds::new(11, 5_000));
+
+        for _ in 0..1000 {
+            c.next_control_output(23);
+        }
+
+        let out = c.next_control_output(5);
+        assert!(
+            out > 0,
+            "level below target after a long stretch above it produced {out}"
+        );
+    }
+
     // --- PidControllerGains tests ---
 
     #[test]
@@ -247,6 +283,36 @@ mod tests {
     #[test]
     fn gains_try_from_tuple_with_nan_fails() {
         assert!(PidControllerGains::try_from((f64::NAN, 0.0, 0.0)).is_err());
+    }
+
+    #[test]
+    fn gains_negative_values_are_rejected() {
+        assert!(PidControllerGains::new(-0.1, 0.0, 0.0).is_err());
+        assert!(PidControllerGains::new(0.0, -0.1, 0.0).is_err());
+        assert!(PidControllerGains::new(0.0, 0.0, -0.1).is_err());
+        assert!(PidControllerGains::try_from((0.0, -1.0, 0.0)).is_err());
+    }
+
+    #[test]
+    fn gains_zero_values_are_accepted() -> anyhow::Result<()> {
+        let gains = PidControllerGains::new(0.0, 0.0, 0.0)?;
+        assert_eq!((gains.p(), gains.i(), gains.d()), (0.0, 0.0, 0.0));
+        Ok(())
+    }
+
+    #[test]
+    fn gains_from_env_use_the_default_for_each_invalid_gain() {
+        let default = PidControllerGains::default();
+        let gains = PidControllerGains::from_lookup(|var| match var {
+            "HOPR_BALANCER_PID_P_GAIN" => Some("-1".into()),
+            "HOPR_BALANCER_PID_I_GAIN" => Some("inf".into()),
+            "HOPR_BALANCER_PID_D_GAIN" => Some("0.5".into()),
+            _ => None,
+        });
+        assert_eq!((gains.p(), gains.i(), gains.d()), (default.p(), default.i(), 0.5));
+
+        let gains = PidControllerGains::from_lookup(|var| (var == "HOPR_BALANCER_PID_I_GAIN").then(|| "abc".into()));
+        assert_eq!(gains, default);
     }
 
     #[test]
