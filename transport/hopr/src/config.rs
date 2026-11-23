@@ -1725,6 +1725,57 @@ mod tests {
         );
     }
 
+    /// The default resume window is longer than a short idle timeout, which must not stop a node from
+    /// starting: the session manager caps the window instead.
+    #[test]
+    fn a_short_session_idle_timeout_does_not_invalidate_the_default_resume_window() {
+        for idle_timeout in [
+            Duration::from_millis(2500),
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ] {
+            let cfg = HoprProtocolConfig {
+                session: SessionGlobalConfig {
+                    idle_timeout,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            assert!(
+                Duration::from_secs(60) >= idle_timeout / 2,
+                "the default window is above the cap at {idle_timeout:?}"
+            );
+            cfg.validate()
+                .unwrap_or_else(|error| panic!("an idle timeout of {idle_timeout:?} must validate: {error}"));
+        }
+    }
+
+    #[test]
+    fn the_pix_resume_window_defaults_to_a_minute() {
+        assert_eq!(
+            Duration::from_secs(60),
+            IncomingSessionPixConfig::default().resume_window
+        );
+    }
+
+    /// `resume_window` is settable from a configuration file, in humantime.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn the_pix_resume_window_is_configurable() -> anyhow::Result<()> {
+        let cfg: IncomingSessionPixConfig =
+            serde_saphyr::from_str("resume_window: 2m\n").context("config with a resume window must parse")?;
+        assert_eq!(Duration::from_secs(120), cfg.resume_window);
+
+        let disabled: IncomingSessionPixConfig =
+            serde_saphyr::from_str("resume_window: 0s\n").context("a zero window must parse")?;
+        assert_eq!(Duration::ZERO, disabled.resume_window);
+
+        let omitted: IncomingSessionPixConfig =
+            serde_saphyr::from_str("enforce_pix: true\n").context("config without the setting must parse")?;
+        assert_eq!(Duration::from_secs(60), omitted.resume_window);
+        Ok(())
+    }
+
     // The reversed range is the point of the test: `quota_range` is operator-settable, so an
     // inverted range is reachable from a config file and must be rejected by validation rather
     // than silently matching nothing.

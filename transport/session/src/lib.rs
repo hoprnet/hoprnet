@@ -53,6 +53,7 @@ pub mod testing;
 pub use hopr_api::types::internal::routing::DestinationRouting;
 pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 pub use hopr_protocol_pix::{InvalidPixParams, PixParams};
+pub use hopr_protocol_start::StartErrorReason;
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 #[cfg(any(test, feature = "testing"))]
@@ -125,6 +126,12 @@ flagset::flags! {
         /// (from this node's  [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator)) falls
         /// outside its acceptable range, or (with `enforce_pix`) if this flag is *absent*.
         UsePIX = 0b0010_0000,
+        /// Announces that the Entry can resume this Session later, i.e. it understands `SessionResumed`, stream
+        /// bases and errors addressed by challenge.
+        ///
+        /// The session manager sets it on every PIX Session. An Exit that predates it ignores it, because
+        /// unknown capability bits are ignored since hoprnet#8736.
+        Resumable = 0b0100_0000,
     }
 }
 
@@ -146,7 +153,22 @@ pub struct SessionClientConfig {
     /// Capabilities offered by the session.
     #[default(_code = "Capability::Segmentation.into()")]
     pub capabilities: Capabilities,
-    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    /// Optional pseudonym used for the session. Random when not given.
+    ///
+    /// Giving one is how a client reconnects under a pseudonym it used before in this process. A live local
+    /// Session under it is closed and the new one takes its place. For a PIX Session the reconnect either resumes
+    /// the Session the Exit holds, continuing its accounting and numbering the new socket's stream from the base
+    /// the Exit chose, or is refused with `NotResumable`. After a refusal the client must use a fresh pseudonym.
+    ///
+    /// Only stateless Sessions (frame-based, no retransmission) can be resumed; the reconnect of a stateful one is
+    /// refused with `NotResumable`. The Entry keeps a pseudonym's PIX accounting for 30 minutes after its Session
+    /// ends (a live Session never loses it), so a resume is possible only within that time. Its `StartSession`
+    /// challenges strictly increase, and an Exit takes a Session over only for a challenge greater than the one it
+    /// was established by, so a delayed attempt cannot take over a newer Session. Who may take a Session over is
+    /// decided by the pseudonym alone; see hoprnet#8723 for binding it to a secret.
+    ///
+    /// Reusing a pseudonym across process restarts is **not** supported: the share generator, the reply
+    /// openers and the SURB generation are all held in memory.
     #[default(None)]
     pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the Session.
@@ -230,7 +252,9 @@ mod tests {
         let offset = 4 + size_of::<StartChallenge>();
         assert_eq!(bytes[offset], known_byte);
 
-        bytes[offset] |= 0b1100_0000;
+        let unknown = !Capabilities::full().bits();
+        assert_ne!(unknown, 0, "all capability bits are now in use; revisit this test");
+        bytes[offset] |= unknown;
         let decoded = HoprStartProtocol::decode(tag, &bytes)?;
         assert_eq!(decoded, HoprStartProtocol::StartSession(init));
         Ok(())

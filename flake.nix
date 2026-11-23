@@ -231,7 +231,8 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump";
+                    # The session crates' telemetry unit tests only exist with their `telemetry` feature.
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump -F hopr-protocol-session/telemetry -F hopr-transport-session/telemetry";
                     runNextest = true;
                     testCargoProfile = "ci-test";
                     prependPackageName = false;
@@ -241,7 +242,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing -F hopr-lib/state-dump --lib
+                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing -F hopr-lib/state-dump -F hopr-protocol-session/telemetry -F hopr-transport-session/telemetry --lib
                     runHook postCheck
                   '';
                 });
@@ -273,7 +274,7 @@
                 libraryBuildArgs
                 // {
                   src = testSrc;
-                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing -F hopr-lib/state-dump";
+                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing -F hopr-lib/state-dump -F hopr-protocol-session/telemetry -F hopr-transport-session/telemetry";
                   cargoNextestExtraArgs = "--lib";
                   runNextest = true;
                   testCargoProfile = "ci-test";
@@ -289,7 +290,7 @@
                 // {
                   src = testSrc;
                   # Include the opt-in reporter's unit tests, matching the integration coverage features.
-                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump";
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump -F hopr-protocol-session/telemetry -F hopr-transport-session/telemetry";
                   cargoLlvmCovCommand = "nextest";
                   runCoverage = true;
                   testCargoProfile = "ci-test";

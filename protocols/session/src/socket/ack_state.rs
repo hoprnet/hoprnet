@@ -943,6 +943,32 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
+    #[tracing::instrument(name = "AcknowledgementState::frames_discarded", skip(self))]
+    fn frames_discarded(&mut self, first: FrameId, last: FrameId) -> Result<(), SessionError> {
+        tracing::trace!("frames discarded");
+
+        let ctx = self
+            .started
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then_some(self.context.as_mut())
+            .flatten()
+            .ok_or(SessionError::StateNotRunning)?;
+
+        if self.cfg.mode.is_partial_ack_enabled() {
+            // No more requesting of segment retransmissions from frames that were discarded. This
+            // cancels every pending retry of a frame in the run, as cancelling each id would, in one
+            // pass over the retry queue whatever the run's length.
+            if let Err(error) = ctx
+                .incoming_frame_retries_tx
+                .cancel_where(|retry| (first..=last).contains(&retry.frame_id))
+            {
+                tracing::error!(%error, "failed to cancel retry of discarded frames");
+            }
+        }
+
+        Ok(())
+    }
+
     #[tracing::instrument(name = "AcknowledgementState::segment_sent", skip(self, segment), fields(frame_id = segment.frame_id, seq_idx = segment.seq_idx))]
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError> {
         tracing::trace!("segment sent");
@@ -1585,6 +1611,96 @@ mod tests {
         );
 
         assert_eq!(ctl_msgs[2], SessionMessage::Acknowledge(vec![1].try_into()?));
+
+        Ok(())
+    }
+
+    /// A run of discarded frames ends the requests for their missing segments, and only theirs.
+    ///
+    /// Frames 1 and 2 are in the run and frame 4 is not, all three with a segment missing. Frame 3 is in
+    /// the run too, but nothing of it ever arrived, so there is no retry of it to cancel.
+    #[tokio::test]
+    async fn ack_state_receiver_must_stop_requesting_the_segments_of_a_discarded_run_only() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Partial,
+            // Long enough to discard the run before the first request is due.
+            expected_packet_latency: Duration::from_millis(50),
+            max_incoming_frame_retries: 3,
+            ..Default::default()
+        };
+
+        let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut incomplete = Vec::new();
+        for frame_id in [1, 2, 4] {
+            let segments = segment(hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, frame_id)?;
+            inspector
+                .0
+                .entry(frame_id)
+                .try_as_vacant()
+                .ok_or(anyhow::anyhow!("frame {frame_id} must be vacant"))?
+                .insert(FrameBuilder::from(segments[0].clone()));
+            incomplete.push(segments);
+        }
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        for segments in &incomplete {
+            state.incoming_segment(&segments[0].id(), (segments.len() as SeqNum).try_into()?)?;
+        }
+
+        state.frames_discarded(1, 3)?;
+        tokio::time::sleep(cfg.expected_packet_latency * 4).await;
+        state.stop()?;
+
+        let ctl_msgs = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
+            .await
+            .context("timeout receiving Control messages")?;
+
+        // Frame 4 is still requested, with only its segment 1 missing.
+        assert!(!ctl_msgs.is_empty(), "frame 4 must still be requested");
+        assert!(
+            ctl_msgs
+                .iter()
+                .all(|msg| *msg == SessionMessage::Request(SegmentRequest::from_iter([(4, [0b01000000].into())]))),
+            "only frame 4 is requested: {ctl_msgs:?}"
+        );
+
+        assert!(
+            matches!(state.frames_discarded(1, 3), Err(SessionError::StateNotRunning)),
+            "a state that is not running reports it, as for a single frame"
+        );
+
+        Ok(())
+    }
+
+    /// A run over nearly the whole frame id range is handled in one step. A walk over its ids would take
+    /// minutes, so it fails the deadline rather than hanging the test.
+    #[tokio::test]
+    async fn ack_state_receiver_must_handle_a_run_over_the_whole_frame_id_range_in_one_step() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Partial,
+            ..Default::default()
+        };
+        let (ctl_tx, _ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: FrameInspector(FrameDashMap::with_capacity(10)).into(),
+            ctl_tx,
+        })?;
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(state.frames_discarded(1, FrameId::MAX - 1));
+        });
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .context("the run must not be walked one frame id at a time")??;
 
         Ok(())
     }
