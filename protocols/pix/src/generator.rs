@@ -529,6 +529,40 @@ impl<S: PixSpec> Default for SsaShareGenerator<S> {
     }
 }
 
+/// A generator that never emits a share, for a node that never originates PIX (a relay).
+///
+/// [`next_share`](EntryShareGenerator::next_share) returns `None`, which is also what
+/// [`SsaShareGenerator`] returns for a pseudonym it holds no polynomials for; a packet built with it
+/// carries the empty share. It holds no polynomials and has no SSA to commit, so
+/// [`new_ssa_commitment`](EntryShareGenerator::new_ssa_commitment) is an error.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoShareGenerator;
+
+/// Error of [`NoShareGenerator::new_ssa_commitment`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("this node does not originate PIX and holds no SSA commitments")]
+pub struct NoShareGeneratorError;
+
+impl<S: PixSpec> EntryShareGenerator<S> for NoShareGenerator {
+    type Error = NoShareGeneratorError;
+
+    fn next_share(
+        &self,
+        _pseudonym: &S::Pseudonym,
+        _msg: &impl AsRef<[u8]>,
+    ) -> Result<Option<GeneratedShare<S>>, Self::Error> {
+        Ok(None)
+    }
+
+    fn new_ssa_commitment(
+        &self,
+        _pseudonym: &S::Pseudonym,
+        _ssa_index: SsaIndex,
+    ) -> Result<SsaCommitment<S>, Self::Error> {
+        Err(NoShareGeneratorError)
+    }
+}
+
 impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
     type Error = PixError<S::Pseudonym>;
 
@@ -822,6 +856,23 @@ mod tests {
 
     use super::*;
     use crate::{tests::TestSpec, traits::EntryShareGenerator};
+
+    /// A node that never originates PIX must produce packets with the empty share, which is what
+    /// `None` means to the packet builder, and must refuse to commit an SSA it has no polynomials for.
+    #[test]
+    fn the_no_share_generator_emits_nothing_and_commits_nothing() -> anyhow::Result<()> {
+        let pseudonym = SimplePseudonym::random();
+
+        assert!(
+            EntryShareGenerator::<TestSpec>::next_share(&NoShareGenerator, &pseudonym, &b"msg")?.is_none(),
+            "it must emit no share"
+        );
+        assert!(
+            EntryShareGenerator::<TestSpec>::new_ssa_commitment(&NoShareGenerator, &pseudonym, 1.try_into()?).is_err(),
+            "it must not commit an SSA"
+        );
+        Ok(())
+    }
 
     /// A retransmission answers only what was asked for, only for a cycle that was committed, and
     /// only a bounded number of times.

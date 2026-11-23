@@ -466,21 +466,10 @@ fn tag_allocator_config(cfg: &HoprProtocolConfig) -> hopr_transport_tag_allocato
     }
 }
 
-/// SSA dimensions `(polynomials, threshold, surplus)`: configured on a node with the session stack,
-/// the deployed defaults on a relay, which never originates PIX but whose encoder is generic over a
-/// share generator.
+/// SSA dimensions `(polynomials, threshold, surplus)` from the PIX configuration.
+#[cfg(feature = "session-entry")]
 fn pix_dimensions(cfg: &HoprProtocolConfig) -> (usize, usize, usize) {
-    #[cfg(feature = "session-entry")]
-    return (cfg.pix.num_ssa_parts, cfg.pix.ssa_part_size, cfg.pix.surplus_shares());
-    #[cfg(not(feature = "session-entry"))]
-    {
-        let _ = cfg;
-        (
-            hopr_protocol_pix::DEFAULT_POLYS_PER_SSA as usize,
-            hopr_protocol_pix::DEFAULT_POLY_THRESHOLD as usize,
-            hopr_protocol_pix::DEFAULT_SURPLUS_SHARES as usize,
-        )
-    }
+    (cfg.pix.num_ssa_parts, cfg.pix.ssa_part_size, cfg.pix.surplus_shares())
 }
 
 /// HOPR protocol specific instantiation of the SessionManager.
@@ -1250,25 +1239,30 @@ where
         // `#[validate(nested)]` — but nothing in this crate calls `validate()`, so the guarantee
         // rested entirely on every caller remembering to.
         #[cfg(feature = "session-entry")]
-        validator::Validate::validate(&self.cfg.pix)
-            .map_err(|error| HoprTransportError::Api(format!("invalid PIX configuration: {error}")))?;
-        let (num_ssa_parts, ssa_part_size, surplus_shares) = pix_dimensions(&self.cfg);
-        // Checked rather than `as`-cast: the validation above already bounds all three, but a
-        // truncating cast would turn a future widening of any of those ranges into a silently
-        // wrong-but-valid-looking dimension rather than a startup error.
-        fn narrow<T: TryFrom<usize>>(value: usize, field: &str) -> errors::Result<T> {
-            T::try_from(value).map_err(|_| HoprTransportError::Api(format!("PIX {field} out of range: {value}")))
-        }
-        // `try_new`, not `new`: the dimensions come from operator configuration, so a range
-        // violation is a startup error to report rather than a panic to take down the node.
-        let ssa_generator = Arc::new(
-            hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::try_new(hopr_protocol_pix::SsaGeneratorConfig {
-                polynomials_per_ssa: narrow(num_ssa_parts, "num_ssa_parts")?,
-                threshold: narrow(ssa_part_size, "ssa_part_size")?,
-                surplus_shares: narrow(surplus_shares, "additional_shares")?,
-            })
-            .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
-        );
+        let ssa_generator = {
+            validator::Validate::validate(&self.cfg.pix)
+                .map_err(|error| HoprTransportError::Api(format!("invalid PIX configuration: {error}")))?;
+            let (num_ssa_parts, ssa_part_size, surplus_shares) = pix_dimensions(&self.cfg);
+            // Checked rather than `as`-cast: the validation above already bounds all three, but a
+            // truncating cast would turn a future widening of any of those ranges into a silently
+            // wrong-but-valid-looking dimension rather than a startup error.
+            fn narrow<T: TryFrom<usize>>(value: usize, field: &str) -> errors::Result<T> {
+                T::try_from(value).map_err(|_| HoprTransportError::Api(format!("PIX {field} out of range: {value}")))
+            }
+            // `try_new`, not `new`: the dimensions come from operator configuration, so a range
+            // violation is a startup error to report rather than a panic to take down the node.
+            Arc::new(
+                hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::try_new(hopr_protocol_pix::SsaGeneratorConfig {
+                    polynomials_per_ssa: narrow(num_ssa_parts, "num_ssa_parts")?,
+                    threshold: narrow(ssa_part_size, "ssa_part_size")?,
+                    surplus_shares: narrow(surplus_shares, "additional_shares")?,
+                })
+                .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
+            )
+        };
+        // A node without the session stack never originates PIX, so it emits no shares at all.
+        #[cfg(not(feature = "session-entry"))]
+        let ssa_generator = Arc::new(hopr_protocol_pix::NoShareGenerator);
 
         let surb_round_trips = self.surb_round_trips.clone();
 

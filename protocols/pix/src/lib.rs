@@ -31,7 +31,8 @@ mod traits;
 mod types;
 
 pub use generator::{
-    EmissionProgress, SHARE_EMISSION_WINDOW, SsaGeneratorConfig, SsaShareGenerator, min_emission_for_early_recovery,
+    EmissionProgress, NoShareGenerator, NoShareGeneratorError, SHARE_EMISSION_WINDOW, SsaGeneratorConfig,
+    SsaShareGenerator, min_emission_for_early_recovery,
 };
 pub use params::{InvalidPixParams, PixParams, PixSuite};
 pub use reconstructor::{
