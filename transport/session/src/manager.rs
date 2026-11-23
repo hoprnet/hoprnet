@@ -31476,7 +31476,12 @@ mod tests {
             (
                 "a stateful socket",
                 StubReply::Resumed(TEST_STREAM_BASE),
-                Capabilities::from(Capability::RetransmissionAck),
+                Capability::Segmentation | Capability::RetransmissionAck,
+            ),
+            (
+                "a stateful socket with retransmission nacks",
+                StubReply::Resumed(TEST_STREAM_BASE),
+                Capability::Segmentation | Capability::RetransmissionNack,
             ),
         ] {
             let pseudonym = HoprPseudonym::random();
