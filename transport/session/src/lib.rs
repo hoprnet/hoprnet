@@ -189,13 +189,15 @@ pub struct SessionClientConfig {
     /// carry the maximum number of SURBs possible. Setting this to a higher number will put additional CPU
     /// pressure on the local node as it will generate the given number of SURBs for each data packet.
     ///
-    /// Every finite value follows the balancer's target: data packets carry no SURBs while the
-    /// counterparty is estimated to have a full buffer, and up to `min(max_surbs_per_data_packet,
-    /// remaining_deficit)` while it is below its target, counted down per packet within each
-    /// balancer tick so bursts cannot overflow the counterparty's store. Setting this to `0`
-    /// leaves all SURB production to the SURB balancer (if configured). `usize::MAX` is the one
-    /// value that is not gated: every packet carries as many SURBs as fit, whatever the balancer
-    /// estimates.
+    /// When SURB balancing is enabled (`surb_management` is `Some`), every finite value follows
+    /// the balancer's target: data packets carry no SURBs once the counterparty is estimated to
+    /// have a full buffer (except a 1-SURB/packet floor while the counterparty signals distress or
+    /// during silence sustain), and up to `min(max_surbs_per_data_packet, remaining_deficit)` while
+    /// it is below target, counted down per packet within each balancer tick so bursts cannot
+    /// overflow the counterparty's store. When SURB balancing is disabled (`surb_management` is
+    /// `None`), the explicit finite limit applies verbatim to each data packet. Setting this to `0`
+    /// leaves all SURB production to the SURB balancer (if configured). `usize::MAX` is never
+    /// gated: every packet carries as many SURBs as fit, whatever the balancer estimates.
     ///
     /// The maximum number is naturally limited by the remaining payload space of the HOPR packet
     /// beside the packet's own application data.

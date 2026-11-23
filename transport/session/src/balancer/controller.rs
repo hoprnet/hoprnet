@@ -168,16 +168,6 @@ pub struct BalancerStateValues {
     /// Consecutive reported levels that did not rise while below target -- the plateau hysteresis
     /// behind [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
     pub capacity_plateau_count: AtomicU64,
-    /// Set by [`on_counterparty_wiped`](Self::on_counterparty_wiped), consumed by the next balancer
-    /// update: the counterparty dropped its whole stock, so that update restarts the level estimate
-    /// from empty.
-    ///
-    /// A flag rather than a plain store of `0` into [`buffer_level`](Self::buffer_level) because the
-    /// level has another writer: the update in flight, which would write back the level it loaded
-    /// before the reset. (The counterparty's keep-alive is the other, which may still carry its
-    /// pre-wipe level; [`observe_reported_level`](Self::observe_reported_level) drops such a report
-    /// while the refill is paced.)
-    counterparty_wiped: AtomicBool,
     /// Paces the refill after a wipe: the rate in SURBs per second in the high 32 bits and the
     /// milliseconds it still holds for in the low 32 bits, so both are read together. Zero is
     /// inactive. See `REFILL_PACING_SECS`.
@@ -238,6 +228,10 @@ pub struct BalancerStateValues {
 struct OrganicBudgetCheckpoint {
     /// Estimator `produced` value already absorbed into [`BalancerStateValues::buffer_level`].
     absorbed_produced: u64,
+    /// Set by [`BalancerStateValues::on_counterparty_wiped`] to the estimator's `produced` count
+    /// at the instant of the wipe and consumed by the next [`SurbBalancer::update`], so pre-wipe
+    /// production is discarded while any post-wipe new-generation production is preserved.
+    wiped_at_produced: Option<u64>,
     /// Fallback monotonic counter when no external `AtomicSurbFlowEstimator::produced` is attached.
     local_produced: Arc<AtomicU64>,
     /// Attached `AtomicSurbFlowEstimator::produced` counter shared with keep-alive and balancer
@@ -436,11 +430,14 @@ impl BalancerStateValues {
     /// before the refill in flight reached it, thousands short at the pacing rate. The level believed
     /// here during the window is the production since the reset, which is the truth by construction.
     pub fn observe_reported_level(&self, new_level: u64) {
-        use std::sync::atomic::Ordering::Relaxed;
+        use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
         // Heard even when the report is dropped below: it is the Exit speaking.
         self.note_heard();
-        let prev = self.buffer_level.load(Relaxed);
+        // Serialize report adoption with `commit_buffer_level` and `claim_organic_surbs` so a
+        // concurrent tick commit cannot have its absorbed production overwritten by a stale report.
+        let _guard = self.organic_budget.lock();
+        let prev = self.buffer_level.load(Acquire);
         if self.refill_pacing_active() {
             tracing::debug!(
                 reported = new_level,
@@ -451,7 +448,7 @@ impl BalancerStateValues {
         }
         let in_flight = self
             .produced_at_update
-            .load(Relaxed)
+            .load(Acquire)
             .saturating_sub(self.produced_before_lag.load(Relaxed));
         let level = new_level.saturating_add(in_flight);
         let target = self.target_surb_buffer_size.load(Relaxed);
@@ -486,7 +483,7 @@ impl BalancerStateValues {
             );
             self.correction_cap.store(true, Relaxed);
         }
-        self.buffer_level.store(level, Relaxed);
+        self.buffer_level.store(level, Release);
     }
 
     /// Publishes this side's `produced` count as it was `REPORT_LAG` before this update and as it is at
@@ -846,9 +843,10 @@ impl BalancerStateValues {
     /// [`observe_reported_level`](Self::observe_reported_level)).
     pub fn on_counterparty_wiped(&self) {
         let mut guard = self.organic_budget.lock();
+        let wipe_produced = guard.produced_counter().load(Ordering::Acquire);
         self.buffer_level.store(0, Ordering::Release);
-        guard.absorbed_produced = guard.produced_counter().load(Ordering::Acquire);
-        self.counterparty_wiped.store(true, Ordering::Release);
+        guard.absorbed_produced = wipe_produced;
+        guard.wiped_at_produced = Some(wipe_produced);
         drop(guard);
         self.arm_refill_pacing();
     }
@@ -873,9 +871,9 @@ impl BalancerStateValues {
             .store((cap << 32) | (REFILL_PACING_SECS * 1000), Relaxed);
     }
 
-    /// Takes the one-shot request to restart the level estimate from empty, if there is one.
-    fn take_counterparty_wiped(&self) -> bool {
-        self.counterparty_wiped.swap(false, std::sync::atomic::Ordering::AcqRel)
+    /// Takes the one-shot wipe checkpoint (`produced` at the instant of the wipe), if any.
+    fn take_counterparty_wiped(&self) -> Option<u64> {
+        self.organic_budget.lock().wiped_at_produced.take()
     }
 
     /// Whether the refill after a wipe is still paced. Read-only: unlike [`pace_refill`](Self::pace_refill)
@@ -1112,19 +1110,30 @@ where
             self.state.note_reply_heard();
         }
 
-        self.last_estimator_state = snapshot;
-        if self.state.take_counterparty_wiped() {
-            // The counterparty dropped everything it held, so what this tick's production and
-            // consumption add to the level belongs to the stock that is gone: restart from empty.
+        let absorbed_produced = if let Some(wipe_produced) = self.state.take_counterparty_wiped() {
+            // The counterparty dropped everything it held at `wipe_produced`, so pre-wipe
+            // production belongs to the discarded generation, while any production after
+            // `wipe_produced` belongs to the new generation and must stay reflected in the level.
+            let post_wipe_produced = snapshot.produced.saturating_sub(wipe_produced);
             tracing::debug!(
                 believed = current,
                 delta = target_buffer_change,
-                "counterparty SURBs were wiped, restarting the level estimate from empty"
+                wipe_produced,
+                post_wipe_produced,
+                "counterparty SURBs were wiped, restarting the level estimate from the wipe checkpoint"
             );
-            current = 0;
+            current = post_wipe_produced;
+            let baseline = snapshot.produced.max(wipe_produced);
+            self.last_estimator_state = SimpleSurbFlowEstimator {
+                produced: baseline,
+                ..snapshot
+            };
+            baseline
         } else {
+            self.last_estimator_state = snapshot;
             current = current.saturating_add_signed(target_buffer_change);
-        }
+            snapshot.produced
+        };
 
         // If SURB decaying is enabled, check if the decay window has elapsed
         // and calculate the number of SURBs that will be discarded
@@ -1157,7 +1166,7 @@ where
             );
         }
 
-        self.state.commit_buffer_level(current, snapshot.produced);
+        self.state.commit_buffer_level(current, absorbed_produced);
 
         // Invalid SURBs are held but cannot bring a reply home, so the balancer replaces them.
         let usable = self.state.usable_level(current);
@@ -3294,6 +3303,37 @@ mod tests {
         std::thread::sleep(Duration::from_millis(20));
         balancer.update();
         assert_eq!(100, state.buffer_level());
+        assert_eq!(0, state.claim_organic_surbs(8));
+    }
+
+    /// Regression test for post-wipe production: SURBs claimed after `on_counterparty_wiped()`
+    /// belong to the new generation and must be reflected in the level committed by the next
+    /// balancer update rather than silently dropped into `0` while advancing `absorbed_produced`.
+    #[test]
+    fn post_wipe_organic_production_is_preserved_across_next_update() {
+        let (mut balancer, surb_estimator, state, _output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 16,
+            max_surbs_per_sec: 1_000,
+            surb_decay: None,
+        });
+
+        surb_estimator.produced.fetch_add(100, Ordering::Release);
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+
+        // Wipe occurs at `produced = 100`; two post-wipe packets claim 8 SURBs each (reaching target 16).
+        state.on_counterparty_wiped();
+        assert_eq!(0, state.buffer_level());
+        assert_eq!(8, state.claim_organic_surbs(8));
+        assert_eq!(8, state.claim_organic_surbs(8));
+        assert_eq!(0, state.claim_organic_surbs(8));
+        assert_eq!(116, surb_estimator.estimate_surbs_produced());
+
+        // Next update discards pre-wipe 100 while preserving the 16 new-generation SURBs.
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+        assert_eq!(16, state.buffer_level());
+        assert_eq!(Some(0), state.organic_surbs_deficit());
         assert_eq!(0, state.claim_organic_surbs(8));
     }
 }

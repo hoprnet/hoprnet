@@ -164,11 +164,13 @@ pub struct HoprSessionClientConfig {
     /// Higher values add CPU strain, but reduce the workload of the SURB balancer (if configured).
     /// The value is bounded by the remaining payload space of the packet beside the application
     /// data and will saturate there.
-    /// Every finite value follows the balancer's target: packets carry no SURBs once the
-    /// counterparty is estimated to be at or above its target, and up to
-    /// `min(max_surbs_per_data_packet, remaining_deficit)` while below target, counted down per
-    /// packet within each balancer tick so bursts cannot overflow the counterparty's store. Only
-    /// `usize::MAX` is not gated.
+    /// When SURB balancing is enabled (`surb_management` is `Some`), every finite value follows
+    /// the balancer's target: packets carry no SURBs once the counterparty is estimated to be at
+    /// or above its target (except a 1-SURB/packet floor during distress or silence sustain), and
+    /// up to `min(max_surbs_per_data_packet, remaining_deficit)` while below target, counted down
+    /// per packet within each balancer tick so bursts cannot overflow the counterparty's store.
+    /// When balancing is disabled (`surb_management` is `None`), the explicit limit applies
+    /// verbatim. Only `usize::MAX` is never gated.
     /// Setting to 0 leaves all SURB production to the SURB balancer. If in that case no SURB
     /// balancer is configured, no SURBs are produced, making traffic possible only in one direction.
     /// Default matches [`hopr_transport::DEFAULT_MAX_SURBS_PER_DATA_PACKET`] (up to packet SURB
@@ -213,7 +215,13 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the session.
     pub surb_management: Option<SurbBalancerConfig>,
-    /// Sets the maximum number of possible SURBs which will always be sent with Session data packets (if they fit).
+    /// Sets the maximum number of SURBs sent with session data packets.
+    ///
+    /// Bounded by the remaining packet space beside the application data. When SURB balancing is
+    /// enabled, finite values follow the balancer's target (carrying no SURBs once the counterparty
+    /// is estimated to be at or above its target, except a 1-SURB/packet floor during distress or
+    /// silence sustain); when balancing is disabled, the explicit limit applies verbatim.
+    /// `usize::MAX` is never gated.
     pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
