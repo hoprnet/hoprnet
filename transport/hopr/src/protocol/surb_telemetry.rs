@@ -208,6 +208,14 @@ impl SurbRoundTripCounters {
     }
 }
 
+/// A SURB written off through a dead relayer: when, which ages the write-off out, and when the SURB was minted,
+/// which tells the generation it belongs to.
+#[derive(Debug, Clone, Copy)]
+struct WriteOff {
+    at: Instant,
+    minted_at: Instant,
+}
+
 /// Round-trip counts keyed by the legs they were observed over.
 ///
 /// Batching is not an optimisation here but a requirement: recording an edge takes a write lock on
@@ -231,9 +239,9 @@ pub struct SurbRoundTripRegistry {
     /// known dead (a lapsed verdict only times out, the write-off outlives it), but dropped when the
     /// session's generation is advanced: the counterparty drops the stock the count stood for, and
     /// what is counted afterwards is only the SURBs through the relayer minted since, the probes.
-    /// Each entry is the instants its SURBs were written off, oldest first, aged out after
-    /// `WRITE_OFF_HORIZON`; the count is their number.
-    written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, VecDeque<Instant>>>>,
+    /// Each entry holds its SURBs' write-offs, oldest first, aged out after `WRITE_OFF_HORIZON`; the count is
+    /// their number.
+    written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, VecDeque<WriteOff>>>>,
     /// When a dead verdict last made [`write_off_dead`](Self::write_off_dead) report a session for a
     /// relayer, so that the same pair is not reported again. Kept for as long as the relayer is known
     /// dead, and for `REBUMP_COOLDOWN` after it is not, so a pair advanced in this death stays
@@ -478,7 +486,7 @@ impl SurbRoundTripRegistry {
                 // Spent by the counterparty since, and gone with it: see `WRITE_OFF_HORIZON`.
                 while written_off_at
                     .front()
-                    .is_some_and(|at| at.elapsed() > WRITE_OFF_HORIZON)
+                    .is_some_and(|write_off| write_off.at.elapsed() > WRITE_OFF_HORIZON)
                 {
                     written_off_at.pop_front();
                 }
@@ -626,7 +634,10 @@ impl SurbRoundTripRegistry {
             }
             let mut session = self.written_off.entry(pseudonym).or_default();
             let first_for_pair = !session.contains_key(&dead);
-            session.entry(dead).or_default().push_back(Instant::now());
+            session.entry(dead).or_default().push_back(WriteOff {
+                at: Instant::now(),
+                minted_at,
+            });
             drop(session);
             // A probe, not stock: see the docs above. Judged per SURB, and before the mark, so that a
             // probe written off first leaves the stock SURBs of the same pass free to report the pair.
@@ -692,11 +703,12 @@ impl SurbRoundTripRegistry {
     pub fn write_off_pending(&self, pseudonym: &HoprPseudonym, minted_before: Instant) {
         let _walk = self.write_off_walk.lock();
         self.write_off_pending_where(|candidate, minted_at| candidate == pseudonym && minted_at < minted_before);
-        // The counterparty drops the earlier write-offs with the rest of the old generation, so, as after a wipe
-        // in `write_off`, they no longer count as invalid stock.
+        // The counterparty drops the old generation's write-offs with the rest of its stock, so, as after a wipe in
+        // `write_off`, they no longer count as invalid. Judged by mint time: a walk that raced the advance can have
+        // written off an old SURB after the cutoff.
         if let Some(mut session) = self.written_off.get_mut(pseudonym) {
             session.retain(|_, written_off_at| {
-                written_off_at.retain(|at| *at >= minted_before);
+                written_off_at.retain(|write_off| write_off.minted_at >= minted_before);
                 !written_off_at.is_empty()
             });
         }
@@ -4362,41 +4374,35 @@ mod tests {
         Ok(())
     }
 
-    /// A new SURB generation also takes the session's earlier write-offs out of the invalid stock: the counterparty
-    /// dropped those SURBs with the rest. A write-off from after the cutoff still counts.
+    /// A new SURB generation takes the session's older SURBs out of the invalid stock, judged by when they were
+    /// minted: one a racing walk wrote off only after the cutoff goes too, while a SURB of the new generation counts.
     #[test]
-    fn writing_off_pending_surbs_drops_the_earlier_write_offs_from_the_invalid_stock() -> anyhow::Result<()> {
+    fn writing_off_pending_surbs_drops_the_older_generation_from_the_invalid_stock() -> anyhow::Result<()> {
         let registry = SurbRoundTripRegistry::default();
-        let (old, new) = (key(), key());
-        registry
-            .written_off
-            .entry(*SESSION)
-            .or_default()
-            .entry(old)
-            .or_default()
-            .push_back(ago(Duration::from_secs(1))?);
-        assert_eq!(Some(1), registry.invalid().get(&SESSION).map(|(count, _)| *count));
-
+        let (early, raced, fresh) = (key(), key(), key());
+        let minted_old = ago(Duration::from_secs(2))?;
+        let written_early = ago(Duration::from_secs(1))?;
         let cutoff = Instant::now();
-        registry.write_off_pending(&SESSION, cutoff);
-        assert!(
-            registry.invalid().is_empty(),
-            "the old generation's write-offs no longer count"
-        );
+        let after = cutoff + Duration::from_millis(1);
+        {
+            let mut session = registry.written_off.entry(*SESSION).or_default();
+            for (relayer, at, minted_at) in [
+                (early, written_early, minted_old),
+                // Written off after the cutoff, but minted before it: gone with the old generation.
+                (raced, after, minted_old),
+                (fresh, after, cutoff),
+            ] {
+                session
+                    .entry(relayer)
+                    .or_default()
+                    .push_back(WriteOff { at, minted_at });
+            }
+        }
+        let count = |registry: &SurbRoundTripRegistry| registry.invalid().get(&*SESSION).map(|(count, _)| *count);
+        assert_eq!(Some(3), count(&registry));
 
-        registry
-            .written_off
-            .entry(*SESSION)
-            .or_default()
-            .entry(new)
-            .or_default()
-            .push_back(cutoff);
         registry.write_off_pending(&SESSION, cutoff);
-        assert_eq!(
-            Some(1),
-            registry.invalid().get(&SESSION).map(|(count, _)| *count),
-            "a write-off at or after the cutoff stays"
-        );
+        assert_eq!(Some(1), count(&registry), "only the new generation's write-off counts");
         Ok(())
     }
 
@@ -6080,8 +6086,8 @@ mod tests {
 
         for mut session in registry.written_off.iter_mut() {
             for written_off_at in session.values_mut() {
-                for at in written_off_at.iter_mut() {
-                    *at = ago(WRITE_OFF_HORIZON + Duration::from_secs(1))?;
+                for write_off in written_off_at.iter_mut() {
+                    write_off.at = ago(WRITE_OFF_HORIZON + Duration::from_secs(1))?;
                 }
             }
         }
