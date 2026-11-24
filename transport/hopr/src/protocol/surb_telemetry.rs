@@ -372,7 +372,7 @@ impl SurbRoundTripRegistry {
     /// An eviction is no evidence about a relayer either way. Left open, the race would expire as a
     /// loss of the relayers on the record's leg, healthy or not, and under sustained eviction that is
     /// enough unanswered races to judge a healthy relayer dead and wipe its Sessions' stock (see
-    /// [`open_race`](Self::open_race) for the eviction that lands before the race opens).
+    /// [`open_race_to`](Self::open_race_to) for the eviction that lands before the race opens).
     fn remember(&self, surb_id: HoprSurbId, pending: PendingSurb) {
         if let Some((evicted_id, evicted)) = self.pending.insert(surb_id, pending) {
             self.pending_lost.fetch_add(1, Ordering::Relaxed);
@@ -1192,7 +1192,7 @@ impl<K: Copy + Eq + std::hash::Hash + std::fmt::Display> Suspect<K> {
 /// suspect.
 ///
 /// A suspect explains a reply by being on its leg, whether or not it holds a race on it itself. A
-/// relayer on both legs of a pair over the same hop holds none (see [`RelayerHealth::open_race`]), and
+/// relayer on both legs of a pair over the same hop holds none (see [`RelayerHealth::open_race_to`]), and
 /// one that stalls is exactly that: it passes one reply and holds the other. Measured on a cluster,
 /// counting only the races held: the relayer behind a stalling one had 20 replies unanswered, at least
 /// three of them on legs where the stalling one held no race, so the stalling one did not explain them
