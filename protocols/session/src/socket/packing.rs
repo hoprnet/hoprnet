@@ -110,11 +110,10 @@ struct FlushTimer {
 }
 
 impl FlushTimer {
-    fn arm(pack_delay: Duration) -> Self {
-        let deadline = Instant::now() + pack_delay;
+    fn arm_until(deadline: Instant, remaining: Duration) -> Self {
         Self {
             deadline,
-            sleep: Box::pin(futures_time::task::sleep(pack_delay.into()).fuse()),
+            sleep: Box::pin(futures_time::task::sleep(remaining.into()).fuse()),
         }
     }
 
@@ -373,8 +372,9 @@ async fn run_packer<const C: usize, W>(
                     }
                 }
 
+                let buffered_at = Instant::now();
                 let limit = budget.as_ref().map_or(C, PackPayloadBudget::current_limit);
-                let outcome = pack_buf.push(&msg, now, limit);
+                let outcome = pack_buf.push(&msg, buffered_at, limit);
 
                 if let Some(overflow) = outcome.overflow {
                     timer = None;
@@ -389,7 +389,21 @@ async fn run_packer<const C: usize, W>(
                         break Err(err);
                     }
                 } else if timer.is_none() {
-                    timer = Some(FlushTimer::arm(pack_delay));
+                    // `pack_buf` holds `msg`, which was buffered at `buffered_at`. If writing an
+                    // overflow packet already spent `>= pack_delay`, emit the buffered packet
+                    // right away rather than starting a fresh full window; otherwise arm for the
+                    // remaining time until `buffered_at + pack_delay`.
+                    let deadline = buffered_at + pack_delay;
+                    let after_write = Instant::now();
+                    if after_write >= deadline {
+                        if let Some(pkt) = pack_buf.take()
+                            && let Err(err) = flush_packet(&mut writer, &pkt).await
+                        {
+                            break Err(err);
+                        }
+                    } else {
+                        timer = Some(FlushTimer::arm_until(deadline, deadline - after_write));
+                    }
                 }
             }
         }
@@ -427,7 +441,12 @@ impl<const C: usize> Sink<SessionMessage<C>> for WholeMessagePackingSink<C> {
             return Err(broken_pipe("packer sink closed"));
         };
         tx.start_send(PackerCommand::Message(encoded))
-            .map_err(|e| this.stored_error().unwrap_or_else(|| broken_pipe(e)))
+            .map_err(|e| this.stored_error().unwrap_or_else(|| broken_pipe(e)))?;
+        // Any in-flight `PackerCommand::Flush` was queued before this message in the FIFO channel
+        // and therefore cannot acknowledge it. Drop the stale receiver so the next `poll_flush`
+        // enqueues a fresh flush after this message.
+        this.pending_flush = None;
+        Ok(())
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -1494,6 +1513,292 @@ mod tests {
             "budget=WIRE_MTU must pack 2 full-MTU datagrams per packet: {:?}",
             writes.lock().iter().map(|b| b.len()).collect::<Vec<_>>()
         );
+        Ok(())
+    }
+
+    fn test_segment_msg(frame_id: u32, payload: &[u8]) -> SessionMessage<WIRE_MTU> {
+        SessionMessage::<WIRE_MTU>::Segment(crate::Segment {
+            frame_id,
+            seq_idx: 0,
+            seq_flags: crate::protocol::SeqIndicator::new_with_flags(1, false),
+            data: payload.to_vec().into_boxed_slice(),
+        })
+    }
+
+    /// Regression test for cancelled `poll_flush` followed by `start_send`: dropping a pending
+    /// flush future, accepting a new message, and calling `flush()` again must wait for the new
+    /// message to reach the underlying writer instead of resolving on the stale flush ack.
+    #[tokio::test]
+    async fn cancelled_flush_followed_by_write_does_not_complete_before_new_write_reaches_writer() -> anyhow::Result<()>
+    {
+        struct GatedWriter {
+            waker: Arc<Mutex<Option<std::task::Waker>>>,
+            gate_open: Arc<std::sync::atomic::AtomicBool>,
+            gate_after_writes: usize,
+            writes: Arc<Mutex<Vec<Bytes>>>,
+        }
+
+        impl AsyncWrite for GatedWriter {
+            fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+                let this = self.get_mut();
+                if this.writes.lock().len() >= this.gate_after_writes
+                    && !this.gate_open.load(std::sync::atomic::Ordering::Acquire)
+                {
+                    *this.waker.lock() = Some(cx.waker().clone());
+                    return Poll::Pending;
+                }
+                this.writes.lock().push(Bytes::copy_from_slice(buf));
+                Poll::Ready(Ok(buf.len()))
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        let waker_slot: Arc<Mutex<Option<std::task::Waker>>> = Arc::new(Mutex::new(None));
+        let gate_open = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let writes = Arc::new(Mutex::new(Vec::new()));
+        let writer = GatedWriter {
+            waker: waker_slot.clone(),
+            gate_open: gate_open.clone(),
+            gate_after_writes: 1,
+            writes: writes.clone(),
+        };
+
+        let mut sink =
+            WholeMessagePackingSink::<WIRE_MTU>::new(writer, Duration::from_millis(20), None, tracing::Span::none());
+
+        // Send a first small message and poll `flush()` once so `PackerCommand::Flush(ack1)` is
+        // enqueued and `pending_flush` is populated, then cancel the flush future.
+        sink.feed(test_segment_msg(1, b"first")).await?;
+        {
+            let mut flush1 = sink.flush();
+            let waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&waker);
+            let _ = Pin::new(&mut flush1).poll(&mut cx);
+        }
+
+        // Wait for the first write to land while the second write is gated.
+        let deadline = Instant::now() + Duration::from_secs(1);
+        while writes.lock().is_empty() && Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        assert_eq!(1, writes.lock().len());
+
+        // Accept a second message while the writer is blocked on write #2.
+        sink.feed(test_segment_msg(2, &[0xAB; 128])).await?;
+
+        // A new `flush()` must remain pending until the writer unblocks and accepts msg2.
+        let mut flush2 = Box::pin(sink.flush());
+        assert!(
+            tokio::time::timeout(Duration::from_millis(40), &mut flush2)
+                .await
+                .is_err(),
+            "flush must not complete on a stale ack before msg2 reaches the writer"
+        );
+        assert_eq!(1, writes.lock().len());
+
+        // Unblock the writer; now flush2 must complete and msg2 must have been written.
+        gate_open.store(true, std::sync::atomic::Ordering::Release);
+        if let Some(waker) = waker_slot.lock().take() {
+            waker.wake();
+        }
+        tokio::time::timeout(Duration::from_secs(1), flush2).await??;
+        assert_eq!(2, writes.lock().len());
+        Ok(())
+    }
+
+    /// Regression test for overflow-write stalling past `pack_delay`: if flushing the overflow
+    /// packet stalls longer than `pack_delay`, the follow-up message already buffered in
+    /// `pack_buf` must be flushed immediately once the writer recovers instead of waiting another
+    /// full `pack_delay`.
+    #[tokio::test]
+    async fn stalled_overflow_write_past_pack_delay_flushes_buffered_message_immediately() -> anyhow::Result<()> {
+        struct DelayedNthWrite {
+            delay_on_write_index: usize,
+            delay: Duration,
+            write_times: Arc<Mutex<Vec<Instant>>>,
+            sleep: Option<Pin<Box<tokio::time::Sleep>>>,
+        }
+
+        impl AsyncWrite for DelayedNthWrite {
+            fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+                let this = self.as_mut().get_mut();
+                if this.write_times.lock().len() == this.delay_on_write_index {
+                    let sleep = this
+                        .sleep
+                        .get_or_insert_with(|| Box::pin(tokio::time::sleep(this.delay)));
+                    futures::ready!(sleep.as_mut().poll(cx));
+                    this.sleep = None;
+                }
+                this.write_times.lock().push(Instant::now());
+                Poll::Ready(Ok(buf.len()))
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        let pack_delay = Duration::from_millis(80);
+        let budget = PackPayloadBudget::new(|| 1_100);
+        assert!(format!("{budget:?}").contains("PackPayloadBudget"));
+
+        let write_times = Arc::new(Mutex::new(Vec::new()));
+        let writer = DelayedNthWrite {
+            // Write #0 = isolated msg0; Write #1 = overflow packet (msg1 + msg2), stalled 120 ms;
+            // Write #2 = buffered msg3, which must flush right after Write #1 finishes!
+            delay_on_write_index: 1,
+            delay: Duration::from_millis(120),
+            write_times: write_times.clone(),
+            sleep: None,
+        };
+        let mut sink =
+            WholeMessagePackingSink::<WIRE_MTU>::new(writer, pack_delay, Some(budget), tracing::Span::none());
+
+        let payload = vec![0x33; 450];
+        // msg0 exits idle (Write #0 immediately); msg1 + msg2 pack into 900+ B; msg3 overflows
+        // msg1+msg2 (Write #1 stalled 120 ms > 80 ms pack_delay) while msg3 waits in `pack_buf`.
+        for i in 1..=4u32 {
+            sink.feed(test_segment_msg(i, &payload)).await?;
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while write_times.lock().len() < 3 && Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        let times = write_times.lock().clone();
+        assert_eq!(
+            3,
+            times.len(),
+            "expected isolated, overflow, and immediate post-stall flush"
+        );
+        let gap_after_overflow = times[2].saturating_duration_since(times[1]);
+        assert!(
+            gap_after_overflow < pack_delay / 2,
+            "buffered msg3 should flush immediately after stalled overflow write, not wait another {pack_delay:?} \
+             (gap={gap_after_overflow:?})"
+        );
+        sink.close().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn sink_reports_closed_and_writer_errors_across_all_methods() -> anyhow::Result<()> {
+        struct FailingWriter {
+            fail_on_write: bool,
+            fail_on_flush: bool,
+            fail_on_close: bool,
+        }
+
+        impl AsyncWrite for FailingWriter {
+            fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+                if self.fail_on_write {
+                    Poll::Ready(Err(std::io::Error::new(
+                        std::io::ErrorKind::ConnectionReset,
+                        "write boom",
+                    )))
+                } else {
+                    Poll::Ready(Ok(buf.len()))
+                }
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                if self.fail_on_flush {
+                    Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::WriteZero, "flush boom")))
+                } else {
+                    Poll::Ready(Ok(()))
+                }
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                if self.fail_on_close {
+                    Poll::Ready(Err(std::io::Error::other("close boom")))
+                } else {
+                    Poll::Ready(Ok(()))
+                }
+            }
+        }
+
+        // 1. After clean `close()`, subsequent `poll_ready`, `start_send`, `poll_flush` return BrokenPipe and a second
+        //    `close()` succeeds idempotently.
+        let (a, _b, _writes) = RecordingPacketPipe::pair(vec![]);
+        let mut closed_sink =
+            WholeMessagePackingSink::<WIRE_MTU>::new(a, Duration::from_millis(10), None, tracing::Span::none());
+        closed_sink.close().await?;
+        closed_sink.close().await?;
+        assert!(matches!(
+            closed_sink.send(test_segment_msg(1, b"after-close")).await,
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::BrokenPipe
+        ));
+        assert!(matches!(
+            closed_sink.flush().await,
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::BrokenPipe
+        ));
+        assert!(matches!(
+            Pin::new(&mut closed_sink).start_send(test_segment_msg(2, b"start-send-after-close")),
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::BrokenPipe
+        ));
+
+        // 2. Writer flush error surfaces on `flush()`, then persists on `poll_ready`, `start_send`, and `close()`.
+        let mut flush_err_sink = WholeMessagePackingSink::<WIRE_MTU>::new(
+            FailingWriter {
+                fail_on_write: false,
+                fail_on_flush: true,
+                fail_on_close: false,
+            },
+            Duration::from_millis(50),
+            None,
+            tracing::Span::none(),
+        );
+        assert!(matches!(
+            flush_err_sink.flush().await,
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::WriteZero
+        ));
+        assert!(matches!(
+            Pin::new(&mut flush_err_sink).start_send(test_segment_msg(3, b"after-err")),
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::WriteZero
+        ));
+        assert!(matches!(
+            flush_err_sink.flush().await,
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::WriteZero
+        ));
+        assert!(matches!(
+            flush_err_sink.close().await,
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::WriteZero
+        ));
+        // Second close after error still surfaces stored error.
+        assert!(matches!(
+            flush_err_sink.close().await,
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::WriteZero
+        ));
+
+        // 3. Writer write error during timer-expired flush surfaces on subsequent operations.
+        let mut timer_err_sink = WholeMessagePackingSink::<WIRE_MTU>::new(
+            FailingWriter {
+                fail_on_write: true,
+                fail_on_flush: false,
+                fail_on_close: false,
+            },
+            Duration::from_millis(10),
+            None,
+            tracing::Span::none(),
+        );
+        timer_err_sink.feed(test_segment_msg(4, b"boom")).await?;
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(matches!(
+            timer_err_sink.flush().await,
+            Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::ConnectionReset
+        ));
         Ok(())
     }
 }
