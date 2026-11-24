@@ -7228,6 +7228,9 @@ where
                         Some(surb_mgmt.clone()),
                         cfg.flow_control,
                         None,
+                        // The Entry originates forward packets; its acks and resends go out on the
+                        // return path the Exit minted SURBs for, and pacing those is the Exit's.
+                        None,
                     )?
                     .with_slot_instance(instance.id());
 
@@ -10147,6 +10150,11 @@ where
         let egress_gate = slot.pix_egress_gate.get().cloned();
         let surb_estimator_tx = slot.surb_estimator.clone();
         let surb_estimator_rx = slot.surb_estimator.clone();
+        // The stock the socket paces its own control messages by. It is the same estimate the drains
+        // and the fill reserve read: `consumed` is counted for every return packet this plane hands
+        // on, `produced` for every SURB the Entry's packets brought, so what remains is what the
+        // Session actually holds.
+        let surb_stock: Arc<dyn hopr_protocol_session::SurbStock + Send + Sync> = Arc::new(slot.surb_estimator.clone());
         // Resolved per packet: `spawn_exit_keep_alive` publishes the control after this is built.
         let activity_tx = slot.pix_fill.clone();
         let activity_egress = slot.pix_fill.clone();
@@ -10210,6 +10218,7 @@ where
                 None,
                 None,
                 loss_signal,
+                Some(surb_stock.clone()),
             )?
         } else {
             let egress_instance = instance.clone();
@@ -10253,6 +10262,7 @@ where
                 None,
                 None,
                 loss_signal,
+                Some(surb_stock.clone()),
             )?
         };
 
@@ -16729,6 +16739,93 @@ mod tests {
             control.data_seen_since_report(),
             "data {} the Exit must be noted as activity",
             if inbound { "reaching" } else { "leaving" }
+        );
+        Ok(())
+    }
+
+    /// How long the Exit's socket is given to emit an acknowledgement: the default delay is 50 ms.
+    const ACKNOWLEDGEMENT_WINDOW: Duration = Duration::from_millis(200);
+
+    /// An Exit Session withholds its acknowledgements while it holds no SURB, and sends them once it does.
+    ///
+    /// An acknowledgement takes a return SURB. An Exit that owes more of them than it holds therefore
+    /// adds them to a debt it cannot pay: each packet waits in the resolve stage for a SURB that is not
+    /// coming, and on an Exit that stage used to withhold every other Session's traffic behind it. The
+    /// two Sessions below differ only in that stock, so the acknowledgement follows it.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_should_withhold_its_acknowledgements_while_it_holds_no_surb() -> anyhow::Result<()> {
+        use futures::AsyncReadExt;
+
+        // A Session established with nothing but the SURBs the Start-protocol replies spend.
+        let (mgr, mut msg_rx, mut new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            Capability::Segmentation | Capability::RetransmissionAck,
+            0,
+            SessionManagerConfig::default(),
+        )
+        .await?;
+        let mut incoming = new_session_rx.next().await.context("the Session was announced")?;
+        assert_eq!(
+            0,
+            mgr.sessions
+                .get(&pseudonym)
+                .context("the Session slot must exist")?
+                .surb_estimator
+                .saturating_diff(),
+            "fixture: the Session holds no SURB"
+        );
+
+        // A frame is acknowledged once the socket has reassembled it, so a withheld acknowledgement
+        // shows up as a missing packet rather than as a late one.
+        mgr.dispatch_message(pseudonym, stream_segment(1, false, b"first")?)?;
+        let mut buffer = [0u8; 16];
+        timeout(
+            Duration::from_secs(5),
+            AsyncReadExt::read(&mut incoming.session, &mut buffer),
+        )
+        .await
+        .context("the Session never read the packet")??;
+
+        let held = originated_during(&mut msg_rx, 2 * ACKNOWLEDGEMENT_WINDOW).await;
+
+        // The same Session, with the SURBs the Entry's packets brought.
+        let (mgr, mut msg_rx, mut new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            Capability::Segmentation | Capability::RetransmissionAck,
+            0,
+            SessionManagerConfig::default(),
+        )
+        .await?;
+        let mut incoming = new_session_rx.next().await.context("the Session was announced")?;
+        show_exit_its_entry(&mgr, pseudonym, SimulatedEntry::WithoutBalancer { surbs: 10 }).await?;
+        assert!(
+            mgr.sessions
+                .get(&pseudonym)
+                .context("the Session slot must exist")?
+                .surb_estimator
+                .saturating_diff()
+                > 0,
+            "fixture: the Session holds SURBs"
+        );
+
+        mgr.dispatch_message(pseudonym, stream_segment(1, false, b"first")?)?;
+        timeout(
+            Duration::from_secs(5),
+            AsyncReadExt::read(&mut incoming.session, &mut buffer),
+        )
+        .await
+        .context("the Session never read the packet")??;
+
+        let released = originated_during(&mut msg_rx, 2 * ACKNOWLEDGEMENT_WINDOW).await;
+
+        assert!(
+            held.iter()
+                .all(|(_, data)| data.data.application_tag != SESSION_APPLICATION_TAG),
+            "the Exit acknowledged a frame while holding no SURB: {held:?}"
+        );
+        assert!(
+            released
+                .iter()
+                .any(|(_, data)| data.data.application_tag == SESSION_APPLICATION_TAG),
+            "the Exit never acknowledged a frame it held a SURB for: {released:?}"
         );
         Ok(())
     }

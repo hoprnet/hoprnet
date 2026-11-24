@@ -187,6 +187,22 @@ impl StreamProgress {
     }
 }
 
+/// Reports how many SURBs a Session's return path is estimated to hold.
+///
+/// The reliable socket consults it before it emits a message of its own. Every such message leaves
+/// on the return path and so takes a SURB, and a Session that owes more return packets than it holds
+/// SURBs does not get them from anywhere: the packets are queued behind a return path that has
+/// nothing to spend, and every other Session on the node waits behind that queue. A message that is
+/// withheld here is one the peer sees as lost, which is what it would have seen anyway once the
+/// packet was dropped for want of a SURB.
+///
+/// Implemented above this crate, where the Session's SURB accounting lives. The socket holds its own
+/// control traffic to it; an implementation that always reports SURBs available removes the gate.
+pub trait SurbStock {
+    /// SURBs the Session's return path holds right now, saturating at zero.
+    fn available_surbs(&self) -> u64;
+}
+
 /// The highest allowed [`SessionSocketConfig::stream_base`], 2^31.
 ///
 /// It leaves half of the `u32` frame id space (2^31 frames) to the stream, which cannot be

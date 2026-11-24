@@ -26,7 +26,7 @@ use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, FrameLossSignal, ReliableSocket,
-    SegmentRequest, SeqIndicator, SessionSocketConfig, StreamProgress, UnreliableSocket,
+    SegmentRequest, SeqIndicator, SessionSocketConfig, StreamProgress, SurbStock, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
@@ -776,7 +776,7 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync + 'static,
     {
-        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None)
+        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None, None)
     }
 
     /// Like [`new`](Self::new) but threads the SURB balancer state and the opt-in client-side
@@ -788,6 +788,12 @@ impl HoprSession {
     /// stamps it at every loss, so the Exit can react within seconds. It reaches only the sockets of
     /// Sessions with [`Capability::Segmentation`] (a raw Session has no frames to lose); `None`
     /// records nothing.
+    ///
+    /// `surb_stock` is the Session's SURB estimate, when its own control messages must be paced by
+    /// it: the Exit passes the estimate its data plane keeps, so a Session that owes more return
+    /// packets than it holds SURBs stops adding acknowledgements and resends to that debt. `None`
+    /// lets the socket send them unconditionally, which is what the Entry, and every Session without
+    /// retransmission, does.
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_surb_state<Tx, Rx>(
         id: SessionId,
@@ -798,6 +804,7 @@ impl HoprSession {
         surb_mgmt: Option<Arc<BalancerStateValues>>,
         flow_control: Option<FlowControlConfig>,
         loss_signal: Option<Arc<FrameLossSignal>>,
+        surb_stock: Option<Arc<dyn SurbStock + Send + Sync>>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
@@ -921,12 +928,14 @@ impl HoprSession {
                     Some(fc_cfg) => {
                         let meter = DeliveryMeter::default();
                         let ack_state = AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg)
-                            .with_delivery_tap(DeliveryTap::new(meter.clone(), cfg.frame_mtu));
+                            .with_delivery_tap(DeliveryTap::new(meter.clone(), cfg.frame_mtu))
+                            .with_surb_stock(surb_stock.clone());
                         let clock = DeliveryClock::new(meter, Some(ack_cfg.expected_packet_latency));
                         (ack_state, Some((fc_cfg, clock)))
                     }
                     None => (
-                        AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
+                        AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg)
+                            .with_surb_stock(surb_stock.clone()),
                         None,
                     ),
                 };
@@ -1762,6 +1771,7 @@ mod tests {
                 ..Default::default()
             }),
             None,
+            None,
         )?;
         let frame = vec![7u8; SESSION_MTU];
         session.write_all(&frame).await?;
@@ -1887,6 +1897,7 @@ mod tests {
             None,
             None,
             Some(signal.clone()),
+            None,
         )?;
 
         assert_eq!(0, signal.lost_total(), "nothing lost before anything arrived");

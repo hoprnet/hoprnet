@@ -17,7 +17,7 @@ use crate::{
     flow_control::DeliveryTap,
     processing::types::FrameInspector,
     protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator, SessionMessage},
-    socket::{SocketState, state::SocketComponents},
+    socket::{SocketState, SurbStock, state::SocketComponents},
     utils::{
         RetriedFrameId, RingBufferProducer, RingBufferView, next_deadline_with_backoff, searchable_ringbuffer,
         skip_queue::{Skip, SkipDelaySender, skip_delay_channel},
@@ -463,6 +463,9 @@ pub struct AcknowledgementState<const C: usize> {
     /// and retransmission-exhausted frames bump the tap's atomic meter, but acknowledgement and
     /// retransmission behaviour is unchanged whether or not it is installed.
     delivery_tap: Option<DeliveryTap>,
+    /// The Session's SURB stock, when its control messages must be paced by it. `None` emits every
+    /// control message, which is what every side but the Exit does.
+    surb_stock: Option<Arc<dyn SurbStock + Send + Sync>>,
 }
 
 impl<const C: usize> AcknowledgementState<C> {
@@ -473,7 +476,20 @@ impl<const C: usize> AcknowledgementState<C> {
             context: Default::default(),
             started: std::sync::Arc::new(AtomicBool::new(false)),
             delivery_tap: None,
+            surb_stock: None,
         }
+    }
+
+    /// Gates every control message this state sends on the Session's SURB stock.
+    ///
+    /// Acknowledgements, retransmission requests and resent segments all leave on the return path and
+    /// so each one takes a SURB. A Session that holds none cannot send them anyway: the packet queues
+    /// behind a resolve stage that has nothing to spend, and on an Exit that queue used to withhold
+    /// every other Session's traffic for up to the resolution wait. Withholding here instead costs the
+    /// peer the same frame the packet would have lost, without the stall.
+    pub fn with_surb_stock(mut self, stock: Option<Arc<dyn SurbStock + Send + Sync>>) -> Self {
+        self.surb_stock = stock;
+        self
     }
 
     /// Installs a read-only honest-clock tap. Each acknowledged frame bumps the tap's acked-bytes
@@ -492,6 +508,20 @@ impl<const C: usize> AcknowledgementState<C> {
 /// [`AcknowledgementState::stop`], which closes their channels on purpose.
 fn is_running(started: &AtomicBool) -> bool {
     started.load(std::sync::atomic::Ordering::Acquire)
+}
+
+/// Whether the Session's return path holds a SURB for one more control message.
+///
+/// Every message this state sends takes one, so a Session holding none cannot pay for it. Reading the
+/// stock per message rather than caching it keeps the gate off the balancer's tick: the stock moves
+/// as SURBs arrive and as packets spend them, and a stale reading would either withhold a message the
+/// Session could afford or spend one it does not have.
+fn admits_control_message(stock: Option<&Arc<dyn SurbStock + Send + Sync>>) -> bool {
+    let admits = stock.is_none_or(|stock| stock.available_surbs() > 0);
+    if !admits {
+        tracing::trace!("withholding a Session control message: no SURB for its return path");
+    }
+    admits
 }
 
 impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
@@ -537,6 +567,14 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             retransmission_budget,
         });
 
+        // One clone for each task that emits control messages, so the gate is read per message and
+        // never held across the work between them.
+        let (requests_stock, acks_stock, resends_stock) = (
+            self.surb_stock.clone(),
+            self.surb_stock.clone(),
+            self.surb_stock.clone(),
+        );
+
         if self.cfg.mode.is_partial_ack_enabled() {
             // For partially received frames incomplete for too long,
             // missing segments will be asked for retransmission
@@ -574,6 +612,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     }
                 })
                 .ready_chunks(SegmentRequest::<C>::MAX_ENTRIES)
+                .filter(move |_| futures::future::ready(admits_control_message(requests_stock.as_ref())))
                 .inspect(|r| tracing::trace!(req = ?r, "requesting segments resend"))
                 .map(|a| Ok(SessionMessage::<C>::Request(a.into_iter().collect())))
                 .forward(ctl_tx_clone)
@@ -595,6 +634,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 .buffer(futures_time::time::Duration::from(ack_delay))
                 .flat_map(|acks| futures::stream::iter(FrameAcknowledgements::<C>::new_multiple(acks)))
                 .filter(|acks| futures::future::ready(!acks.is_empty()))
+                .filter(move |_| futures::future::ready(admits_control_message(acks_stock.as_ref())))
                 .inspect(|acks| tracing::trace!(?acks, "acknowledgements sent"))
                 .map(|acks| Ok(SessionMessage::<C>::Acknowledge(acks)))
                 .forward(ctl_tx_clone)
@@ -665,6 +705,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                             .map(|s| Ok(SessionMessage::<C>::Segment(s))),
                     )
                 })
+                .filter(move |_| futures::future::ready(admits_control_message(resends_stock.as_ref())))
                 .forward(ctl_tx_clone) // Retransmit all the segments
                 .map(move |res| match res {
                     Ok(_) => tracing::debug!("outgoing frame retries processing done"),
@@ -1064,6 +1105,129 @@ mod tests {
         assert_eq!(
             ctl_msgs[0],
             SessionMessage::Acknowledge(acked_frame_ids.to_vec().try_into()?)
+        );
+
+        Ok(())
+    }
+
+    /// A SURB stock the test drives, standing in for the Session's estimate.
+    #[derive(Clone, Default)]
+    struct TestStock(Arc<std::sync::atomic::AtomicU64>);
+
+    impl TestStock {
+        /// Makes `surbs` SURBs available to the socket.
+        fn provide(&self, surbs: u64) {
+            self.0.store(surbs, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    impl SurbStock for TestStock {
+        fn available_surbs(&self) -> u64 {
+            self.0.load(std::sync::atomic::Ordering::Relaxed)
+        }
+    }
+
+    /// A socket that holds no SURB withholds its acknowledgements, and sends them once it holds one.
+    ///
+    /// Every control message leaves on the return path and takes a SURB. A Session that holds none
+    /// cannot pay for one, and the packet it would ride on used to wait out the resolution stage -
+    /// withholding every other Session's traffic behind it, on an Exit.
+    #[test_log::test(tokio::test)]
+    async fn a_socket_should_withhold_its_acknowledgements_when_it_holds_no_surb() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(10),
+            acknowledgement_delay: Duration::from_millis(2),
+            ..Default::default()
+        };
+
+        let stock = TestStock::default();
+        let (ctl_tx, mut ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg).with_surb_stock(Some(Arc::new(stock.clone())));
+        state.run(SocketComponents {
+            inspector: FrameInspector(FrameDashMap::with_capacity(10)).into(),
+            ctl_tx,
+        })?;
+
+        // A frame the peer completed is what produces an acknowledgement.
+        state.frame_complete(1)?;
+        tokio::time::sleep(4 * cfg.acknowledgement_delay).await;
+        assert!(
+            tokio::time::timeout(cfg.acknowledgement_delay, ctl_rx.next())
+                .await
+                .is_err(),
+            "an acknowledgement left while the Session held no SURB"
+        );
+
+        // A SURB arrives, and the next completed frame is acknowledged.
+        stock.provide(1);
+        state.frame_complete(2)?;
+        let message = tokio::time::timeout(Duration::from_millis(200), ctl_rx.next())
+            .await
+            .context("the acknowledgement of the frame completed after the SURB arrived never came")?
+            .context("the control channel closed before the acknowledgement")?;
+        state.stop()?;
+
+        assert_eq!(
+            SessionMessage::Acknowledge(vec![2].try_into()?),
+            message,
+            "the frame completed while the Session held a SURB must be acknowledged, and only that one"
+        );
+
+        Ok(())
+    }
+
+    /// A socket that holds no SURB withholds its frame resends, and resumes them once it holds one.
+    #[test_log::test(tokio::test)]
+    async fn a_socket_should_withhold_its_frame_resends_when_it_holds_no_surb() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(50),
+            // Enough budget that the retry schedule outlives the window the test suppresses in.
+            max_outgoing_frame_retries: 10,
+            ..Default::default()
+        };
+
+        let stock = TestStock::default();
+        let (ctl_tx, mut ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg).with_surb_stock(Some(Arc::new(stock.clone())));
+        state.run(SocketComponents {
+            inspector: FrameInspector(FrameDashMap::with_capacity(10)).into(),
+            ctl_tx,
+        })?;
+
+        // A frame that is never acknowledged is resent; its first retry is due after
+        // `expected_packet_latency * (segments + 1)`.
+        let segments = segment(
+            hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(),
+            MTU,
+            1 as FrameId,
+        )?;
+        for segment in &segments {
+            state.segment_sent(segment)?;
+        }
+        let first_retry = cfg.expected_packet_latency * (segments.len() + 1) as u32;
+
+        tokio::time::sleep(2 * first_retry).await;
+        assert!(
+            tokio::time::timeout(cfg.expected_packet_latency, ctl_rx.next())
+                .await
+                .is_err(),
+            "a resend left while the Session held no SURB"
+        );
+
+        // A SURB arrives with the retry budget unspent, and the next retry goes out.
+        stock.provide(1);
+        let message = tokio::time::timeout(4 * first_retry, ctl_rx.next())
+            .await
+            .context("the resend after the SURB arrived never came")?
+            .context("the control channel closed before the resend")?;
+        state.stop()?;
+
+        assert!(
+            matches!(&message, SessionMessage::Segment(segment) if segment.frame_id == 1),
+            "the resend of the unacknowledged frame must go out: {message:?}"
         );
 
         Ok(())

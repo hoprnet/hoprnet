@@ -218,6 +218,17 @@ impl SurbFlowEstimator for AtomicSurbFlowEstimator {
     }
 }
 
+/// The estimate a Session's socket paces its own control messages by.
+///
+/// The Socket protocol asks this question about the return path the Session's replies will take, which
+/// is the same stock the fill reserve and the balancer read: `saturating_diff` is what the store
+/// actually holds, since evicted and spent SURBs have both left it and a refunded one never did.
+impl hopr_protocol_session::SurbStock for AtomicSurbFlowEstimator {
+    fn available_surbs(&self) -> u64 {
+        self.saturating_diff()
+    }
+}
+
 /// Wraps a [`RateController`] as [`SurbFlowController`] with the given correction
 /// factor on time unit.
 ///
