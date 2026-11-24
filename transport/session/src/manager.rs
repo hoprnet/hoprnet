@@ -7228,6 +7228,8 @@ where
                         Some(surb_mgmt.clone()),
                         cfg.flow_control,
                         None,
+                        // Not an Exit: this side's traffic creates SURBs rather than spending them.
+                        None,
                     )?
                     .with_slot_instance(instance.id());
 
@@ -10147,6 +10149,10 @@ where
         let egress_gate = slot.pix_egress_gate.get().cloned();
         let surb_estimator_tx = slot.surb_estimator.clone();
         let surb_estimator_rx = slot.surb_estimator.clone();
+        // Both rate-controlled and `NoRateControl` planes answer on the return path, so both hold
+        // their acknowledgements and resends back while the Session estimates no SURB.
+        let exit_surb_gate: Option<Arc<dyn hopr_protocol_session::SurbAvailability>> =
+            Some(Arc::new(slot.surb_estimator.clone()));
         // Resolved per packet: `spawn_exit_keep_alive` publishes the control after this is built.
         let activity_tx = slot.pix_fill.clone();
         let activity_egress = slot.pix_fill.clone();
@@ -10210,6 +10216,7 @@ where
                 None,
                 None,
                 loss_signal,
+                exit_surb_gate.clone(),
             )?
         } else {
             let egress_instance = instance.clone();
@@ -10253,6 +10260,7 @@ where
                 None,
                 None,
                 loss_signal,
+                exit_surb_gate,
             )?
         };
 

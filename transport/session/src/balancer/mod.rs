@@ -218,6 +218,16 @@ impl SurbFlowEstimator for AtomicSurbFlowEstimator {
     }
 }
 
+/// The Session's own return-path traffic is withheld while the estimate holds no SURB.
+///
+/// The same reading the balance report and the PIX fill reserve use: an estimate of zero means the
+/// counterparty holds nothing this side can answer with.
+impl hopr_protocol_session::SurbAvailability for AtomicSurbFlowEstimator {
+    fn has_surb(&self) -> bool {
+        self.saturating_diff() > 0
+    }
+}
+
 /// Wraps a [`RateController`] as [`SurbFlowController`] with the given correction
 /// factor on time unit.
 ///

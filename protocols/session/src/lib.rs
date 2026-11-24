@@ -47,7 +47,7 @@ pub use protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRe
 pub use socket::telemetry::{NoopTracker, SessionMessageDiscriminants, SessionTelemetryTracker};
 pub use socket::{
     MAX_STREAM_BASE, SessionSocket, SessionSocketConfig, StreamProgress,
-    ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
+    ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, SurbAvailability},
     loss_signal::FrameLossSignal,
     state::{SocketComponents, SocketState, Stateless},
 };

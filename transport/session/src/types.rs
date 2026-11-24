@@ -26,7 +26,7 @@ use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, FrameLossSignal, ReliableSocket,
-    SegmentRequest, SeqIndicator, SessionSocketConfig, StreamProgress, UnreliableSocket,
+    SegmentRequest, SeqIndicator, SessionSocketConfig, StreamProgress, SurbAvailability, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
@@ -776,7 +776,7 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync + 'static,
     {
-        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None)
+        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None, None)
     }
 
     /// Like [`new`](Self::new) but threads the SURB balancer state and the opt-in client-side
@@ -788,6 +788,11 @@ impl HoprSession {
     /// stamps it at every loss, so the Exit can react within seconds. It reaches only the sockets of
     /// Sessions with [`Capability::Segmentation`] (a raw Session has no frames to lose); `None`
     /// records nothing.
+    ///
+    /// `surb_gate` is the Exit's SURB estimate for this Session. While it reports none, the socket
+    /// withholds the acknowledgements, retransmission requests and resends it would otherwise send on
+    /// the return path; see [`hopr_protocol_session::SurbAvailability`]. Entry Sessions pass `None`:
+    /// their traffic consumes no SURB.
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_surb_state<Tx, Rx>(
         id: SessionId,
@@ -798,6 +803,7 @@ impl HoprSession {
         surb_mgmt: Option<Arc<BalancerStateValues>>,
         flow_control: Option<FlowControlConfig>,
         loss_signal: Option<Arc<FrameLossSignal>>,
+        surb_gate: Option<Arc<dyn SurbAvailability>>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
@@ -929,6 +935,14 @@ impl HoprSession {
                         AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                         None,
                     ),
+                };
+
+                // Exit side only: the socket answers on the return path, where every packet costs a
+                // SURB. With none left the answer cannot be delivered, so it is withheld instead of
+                // waiting in the resolve stage.
+                let ack_state = match surb_gate {
+                    Some(gate) => ack_state.with_surb_gate(gate),
+                    None => ack_state,
                 };
 
                 let socket = ReliableSocket::new(
@@ -1762,6 +1776,7 @@ mod tests {
                 ..Default::default()
             }),
             None,
+            None,
         )?;
         let frame = vec![7u8; SESSION_MTU];
         session.write_all(&frame).await?;
@@ -1887,6 +1902,7 @@ mod tests {
             None,
             None,
             Some(signal.clone()),
+            None,
         )?;
 
         assert_eq!(0, signal.lost_total(), "nothing lost before anything arrived");

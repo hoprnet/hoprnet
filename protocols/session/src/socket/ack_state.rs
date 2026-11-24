@@ -364,6 +364,31 @@ struct AcknowledgementStateContext<const C: usize> {
     retransmission_budget: Arc<parking_lot::Mutex<RetransmissionBudget>>,
 }
 
+/// Tells a reliable socket whether its Session holds a SURB for a return packet.
+///
+/// An Exit answers and retransmits on the Session's own return path, and every such packet consumes
+/// one SURB. With none left, those packets fill the routing resolve stage with work that waits out
+/// `surb_resolution_wait` and then drops, so the socket withholds them until the estimate is above
+/// zero again.
+///
+/// Installed per state, see [`AcknowledgementState::with_surb_gate`]. A state without one sends
+/// unconditionally, which is what an Entry does: its traffic has no SURB to consume.
+pub trait SurbAvailability: Send + Sync {
+    /// Whether a SURB is available for a return packet.
+    fn has_surb(&self) -> bool;
+}
+
+/// The [`SurbAvailability`] a state's background senders share, cloned into each of them.
+#[derive(Clone)]
+struct SurbGate(Option<Arc<dyn SurbAvailability>>);
+
+impl SurbGate {
+    /// Whether packets may go out now.
+    fn is_open(&self) -> bool {
+        self.0.as_ref().is_none_or(|gate| gate.has_surb())
+    }
+}
+
 #[cfg_attr(doc, aquamarine::aquamarine)]
 /// Represents a Session socket state is able to process acknowledgements.
 ///
@@ -463,6 +488,8 @@ pub struct AcknowledgementState<const C: usize> {
     /// and retransmission-exhausted frames bump the tap's atomic meter, but acknowledgement and
     /// retransmission behaviour is unchanged whether or not it is installed.
     delivery_tap: Option<DeliveryTap>,
+    /// Optional SURB gate for the Session's own return-path traffic, see [`SurbAvailability`].
+    surb_gate: Option<Arc<dyn SurbAvailability>>,
 }
 
 impl<const C: usize> AcknowledgementState<C> {
@@ -473,7 +500,18 @@ impl<const C: usize> AcknowledgementState<C> {
             context: Default::default(),
             started: std::sync::Arc::new(AtomicBool::new(false)),
             delivery_tap: None,
+            surb_gate: None,
         }
+    }
+
+    /// Withholds acknowledgements, retransmission requests and resends while `gate` reports no SURB.
+    ///
+    /// A withheld packet is dropped, not queued: the point is to keep work the Session cannot pay
+    /// for out of the egress, and a packet held until a SURB arrives would be as stale as the frame
+    /// it belongs to. Without a gate installed everything is sent, which is what an Entry wants.
+    pub fn with_surb_gate(mut self, gate: Arc<dyn SurbAvailability>) -> Self {
+        self.surb_gate = Some(gate);
+        self
     }
 
     /// Installs a read-only honest-clock tap. Each acknowledged frame bumps the tap's acked-bytes
@@ -544,6 +582,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             let ctl_tx_clone = context.ctl_tx.clone();
             let frame_inspector_clone = context.inspector.clone();
             let cfg = self.cfg;
+            let surb_gate = SurbGate(self.surb_gate.clone());
             let (started_1, started_2) = (self.started.clone(), self.started.clone());
             hopr_utils::runtime::prelude::spawn(incoming_frame_retries_rx
                 .filter_map(move |rf| {
@@ -575,6 +614,9 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 })
                 .ready_chunks(SegmentRequest::<C>::MAX_ENTRIES)
                 .inspect(|r| tracing::trace!(req = ?r, "requesting segments resend"))
+                // The request needs a SURB to reach the peer; without one it would only wait in the
+                // resolve stage. The next retry is already registered above, so it resumes by itself.
+                .filter(move |_| futures::future::ready(surb_gate.is_open()))
                 .map(|a| Ok(SessionMessage::<C>::Request(a.into_iter().collect())))
                 .forward(ctl_tx_clone)
                 .map(move |res| match res {
@@ -590,11 +632,17 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         // Send out Frame Acknowledgements chunked as Control messages
         let ctl_tx_clone = context.ctl_tx.clone();
         let ack_delay = self.cfg.acknowledgement_delay;
+        let ack_surb_gate = SurbGate(self.surb_gate.clone());
         hopr_utils::runtime::prelude::spawn(
             ack_rx
                 .buffer(futures_time::time::Duration::from(ack_delay))
                 .flat_map(|acks| futures::stream::iter(FrameAcknowledgements::<C>::new_multiple(acks)))
                 .filter(|acks| futures::future::ready(!acks.is_empty()))
+                // An acknowledgement is a return-path packet and needs a SURB. Withheld ones are
+                // dropped rather than queued: the peer retransmits or gives up on the frame either
+                // way, and a bundled ack for a frame that old is worth nothing by the time a SURB
+                // returns.
+                .filter(move |_| futures::future::ready(ack_surb_gate.is_open()))
                 .inspect(|acks| tracing::trace!(?acks, "acknowledgements sent"))
                 .map(|acks| Ok(SessionMessage::<C>::Acknowledge(acks)))
                 .forward(ctl_tx_clone)
@@ -612,6 +660,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let rb_rx_clone = context.rb_rx.clone();
         let cfg = self.cfg;
         let delivery_tap = self.delivery_tap.clone();
+        let resend_surb_gate = SurbGate(self.surb_gate.clone());
         let (started_1, started_2) = (self.started.clone(), self.started.clone());
         hopr_utils::runtime::prelude::spawn(
             outgoing_frame_retries_rx
@@ -655,6 +704,10 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     tracing::trace!(frame_id, "going to re-send entire frame");
                     futures::future::ready(Some(frame_id))
                 })
+                // A resend is a return-path packet as well. Its retry chain and loss accounting above
+                // already ran, so withholding it here costs the same frame outcome as letting the
+                // resolver drop it, without the stall.
+                .filter(move |_| futures::future::ready(resend_surb_gate.is_open()))
                 .flat_map(move |frame_id| {
                     // Find out all the segments of that frame to be retransmitted
                     futures::stream::iter(
@@ -1066,6 +1119,72 @@ mod tests {
             SessionMessage::Acknowledge(acked_frame_ids.to_vec().try_into()?)
         );
 
+        Ok(())
+    }
+
+    /// A [`SurbAvailability`] the test drives by hand.
+    struct StubSurbGate(AtomicBool);
+
+    impl StubSurbGate {
+        fn new(has_surb: bool) -> Self {
+            Self(AtomicBool::new(has_surb))
+        }
+
+        fn set(&self, has_surb: bool) {
+            self.0.store(has_surb, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    impl SurbAvailability for StubSurbGate {
+        fn has_surb(&self) -> bool {
+            self.0.load(std::sync::atomic::Ordering::Relaxed)
+        }
+    }
+
+    /// The acknowledgements this state sends are return packets and consume a SURB, so none may go
+    /// out while the Session holds none — and they resume once it holds one again.
+    ///
+    /// This is the Exit-side defect of issue #8753 at its smallest: an Exit that acknowledges what
+    /// it cannot answer puts a packet into the resolve stage that waits out `surb_resolution_wait`
+    /// and then drops, once per frame.
+    #[test_log::test(tokio::test)]
+    async fn ack_state_should_withhold_acknowledgements_while_the_session_holds_no_surb() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(10),
+            acknowledgement_delay: Duration::from_millis(2),
+            ..Default::default()
+        };
+        let gate = Arc::new(StubSurbGate::new(false));
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, mut ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg).with_surb_gate(gate.clone());
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        state.frame_complete(1)?;
+        assert!(
+            tokio::time::timeout(cfg.acknowledgement_delay * 8, ctl_rx.next())
+                .await
+                .is_err(),
+            "an acknowledgement went out while the session held no SURB"
+        );
+
+        gate.set(true);
+        state.frame_complete(2)?;
+        let message = tokio::time::timeout(Duration::from_millis(500), ctl_rx.next())
+            .await
+            .context("no acknowledgement after the SURB estimate rose above zero")?
+            .context("control channel closed")?;
+        assert_eq!(
+            message,
+            SessionMessage::Acknowledge(vec![2].try_into()?),
+            "the acknowledgement resumes once the session holds a SURB"
+        );
+
+        state.stop()?;
         Ok(())
     }
 
