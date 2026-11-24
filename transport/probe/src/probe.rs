@@ -1147,6 +1147,9 @@ mod tests {
             ..Default::default()
         };
         let control = ProbeControl::default();
+        // The default dial is 3.0, while the gaps below are named after the dial they assert, so
+        // the test starts from the base rate explicitly.
+        control.set_dial(Some(crate::Dial::HIGH));
 
         test_with_probing_control(cfg, control.clone(), paced_store(), move |iface: TestInterface| {
             let control = control.clone();

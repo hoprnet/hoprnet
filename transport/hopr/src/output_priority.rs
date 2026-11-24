@@ -68,13 +68,13 @@ pub struct OutputPriorityConfig {
     /// Share of the emission slots the probe lane keeps while session data is queued.
     ///
     /// The value is a fraction of all slots, so the longest run of session slots follows as
-    /// `max_session_run`: `0.1` allows 9 session slots between two probe slots, and the maximum
-    /// accepted value of `0.5` allows 1.
+    /// `max_session_run`: the default of `0.4` allows 1 session slot between two probe slots, a
+    /// low share such as `0.1` allows 9, and the maximum accepted value of `0.5` allows 1.
     ///
     /// `0.0` gives probes a slot only while the session lane is empty. Valid values are finite and in
     /// `0.0..=0.5`: a larger share leaves no session slot in the derived run, which would serve
     /// session data only while the probe lane is empty.
-    #[default = 0.1]
+    #[default = 0.4]
     #[validate(custom(function = "validate_probe_share"))]
     pub probe_share: f64,
 
@@ -748,11 +748,11 @@ mod tests {
         );
     }
 
-    /// A7: the default is a tenth, and the range is capped at one probe slot for every session slot.
+    /// A7: the default is two fifths, and the range is capped at one probe slot for every session slot.
     #[test]
-    fn probe_share_defaults_to_a_tenth_and_accepts_half_at_most() {
+    fn probe_share_defaults_to_two_fifths_and_accepts_half_at_most() {
         let default = OutputPriorityConfig::default();
-        assert_eq!(0.1, default.probe_share);
+        assert_eq!(0.4, default.probe_share);
         assert!(default.validate().is_ok(), "the default must be valid");
 
         for share in [0.0, 0.1, 0.5] {
