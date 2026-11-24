@@ -1376,14 +1376,15 @@ struct SessionSsaState {
     /// publishes every member still owed, not only the one named. A member with *no message of it out*
     /// has nothing to re-request, and only a repeat can reach it. The Exit repeats a successor batch,
     /// whole, for as long as any member of it has reported nothing, **but only while the batch is behind
-    /// the front**: a batch at the front is never re-sent (the opening batch is at the front from the
-    /// start, and a successor admitted just before the front moved joins it). So, per member, nothing
+    /// the front**: a batch at the front is never re-sent (a successor admitted just before the front
+    /// moved joins it). The opening batch is the exception, as it has no front to reach: it is repeated a
+    /// bounded number of times, whatever the front. So, per member, nothing
     /// prompts a resumption in two cases, and a third is given up on:
     ///
-    /// * a member with no message of it out whose batch holds the front: the opening batch always, or any member after
-    ///   a cut that lands exactly on a member boundary there, when no earlier member of the batch is itself still owed
-    ///   (its own burst cut part-way), whose re-request would resume it too. The member times out on its commitment
-    ///   deadline;
+    /// * a member with no message of it out that nothing will repeat for: any member of the opening batch once its
+    ///   re-sends are spent, or, in a successor batch at the front, a member after a cut that lands exactly on a
+    ///   member boundary there, when no earlier member of the batch is itself still owed (its own burst cut part-way),
+    ///   whose re-request would resume it too. The member times out on its commitment deadline;
     /// * a burst that went out whole whose `ReadyToDeposit` could not be queued because the PIX event channel was
     ///   full. The Exit then holds a complete commitment and never asks again. The member is kept owed, in case
     ///   something does;
@@ -1395,9 +1396,9 @@ struct SessionSsaState {
     /// lost. The Exit then has no part it could re-request, so only a repeat reaches the member. A
     /// repeat that arrives more than [`SSA_REPEAT_RESEND_GRACE`] after the batch last went out has the
     /// whole burst of every announced member sent again, and nothing announced (see
-    /// [`OwedPublications::announced`]). The limits are the same as for a resumption: a batch at the
-    /// front is never repeated, so a lost opening burst is not recovered, and each re-send spends one
-    /// of the cycle's retransmissions.
+    /// [`OwedPublications::announced`]). The limits are the same as for a resumption: a successor batch
+    /// at the front is never repeated, an opening batch is repeated only as often as its cap allows, and each re-send
+    /// spends one of the cycle's retransmissions.
     ///
     /// None of these strands a deposit, because nothing was announced for the member concerned: the
     /// Exit's own deadline ends the cycle. The opposite hazard exists, though. A resumed burst answers a
@@ -2553,6 +2554,11 @@ impl SessionSlot {
 /// refund then counts the SURB as given back in this estimator (see [`SurbRefund`]). It points at the
 /// estimator itself, so it reaches the Session that counted the packet whatever has happened to the
 /// Session's slot since, and it never touches the slot.
+///
+/// Not only Session data and keep-alives: the Exit's own Start-protocol sends on a Session
+/// (`SessionEstablished`, the SSA requests and their re-sends, the commitment re-requests) are return
+/// packets that take a SURB too, and are counted through [`send_counted_via_msg_sender`]. Left
+/// uncounted they would leave the estimate showing SURBs the handshake has already spent.
 ///
 /// The refund restores the held count the fill reserve and the drain budget read, and nothing else:
 /// the balancer's level, which the egress rate and the level reports follow, saturates at zero and
@@ -4675,7 +4681,10 @@ impl PixToolbox {
 /// size, because a batch asks the Entry for that many commitment sets and that many deposits before
 /// any of them can fairly be called late.
 ///
-/// The opening request is sent once. A *successor* request is not: the Entry's successor gate drops
+/// The opening request is re-sent too, but on its own rule: it has no predecessor, and so a bounded number of
+/// times (`max_opening_ssa_request_resends`) with gaps that double and never at or after its deadline, which
+/// it leaves alone, since only a loss on the return path can keep it unanswered. A *successor* request is
+/// re-sent without a count: the Entry's successor gate drops
 /// one that comes before its predecessor's returned packets have earned it, and says nothing, and a
 /// request can equally be lost on the return path. So while a successor batch is unanswered — none
 /// of its commitment has arrived — and an earlier generation is still being served, the supervisor
@@ -5235,6 +5244,87 @@ where
             error!("timeout sending {error_context}");
             TransportSessionError::Timeout
         })?
+        .map_err(|error| {
+            error!(%error, "failed to send {error_context}");
+            SessionManagerError::other(error)
+        })?;
+    Ok(())
+}
+
+/// Refreshes the pending registration of every member of a batch, and says whether all of them still exist.
+///
+/// A read of a registration postpones its expiry (see `SsaReconstructor::missing_commitment_runs`), which
+/// is what keeps one alive while the Entry is silent. Every member is read, not only up to the first one
+/// that is gone.
+fn refresh_registrations(reconstructor: &SsaReconstructor<HoprPixSpec>, ssa_ids: &[SsaId<HoprPseudonym>]) -> bool {
+    // Collected first, so that no short-circuit leaves a later member unread.
+    let present: Vec<bool> = ssa_ids
+        .iter()
+        .map(|ssa_id| reconstructor.missing_commitment_runs(ssa_id, 1).is_some())
+        .collect();
+    present.into_iter().all(|present| present)
+}
+
+/// As [`send_via_msg_sender`], for an Exit's Start-protocol send over a Session's return path: the packet
+/// takes a SURB, so it is counted in the Session's `estimator` (see [`count_return_packet_surb`]) and
+/// the resolver gives the count back if it drops the packet for want of a SURB.
+///
+/// `routing` must be the Session's return routing; a forward-routed send takes no SURB and must go
+/// through [`send_via_msg_sender`].
+async fn send_counted_via_msg_sender<S, D>(
+    msg_sender: &mut S,
+    routing: DestinationRouting,
+    data: D,
+    estimator: &AtomicSurbFlowEstimator,
+    session_id: &SessionId,
+    error_context: &'static str,
+) -> errors::Result<()>
+where
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    D: TryInto<ApplicationData>,
+    D::Error: std::error::Error + Send + Sync + 'static,
+{
+    let app_data: ApplicationData = data.try_into().map_err(SessionManagerError::other)?;
+    let data = count_return_packet_surb(estimator, ApplicationDataOut::with_no_packet_info(app_data));
+    let refund = data.surb_refund.clone();
+    let started = std::time::Instant::now();
+    let timed_out = |_| {
+        error!("timeout sending {error_context}");
+        TransportSessionError::Timeout
+    };
+
+    // The SURB is given back only while the sink has not taken the packet: once it has, the packet may
+    // already be on its way and the debit stands. The one timeout covers readiness and the flush, so a
+    // sink that stays pending drops a packet it never accepted, and must not leave the estimate down.
+    futures::future::poll_fn(|cx| msg_sender.poll_ready_unpin(cx))
+        .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+        .await
+        .map_err(|error| {
+            refund.give_back();
+            timed_out(error)
+        })?
+        .map_err(|error| {
+            refund.give_back();
+            error!(%error, "failed to send {error_context}");
+            SessionManagerError::other(error)
+        })?;
+    msg_sender.start_send_unpin((routing, data)).map_err(|error| {
+        refund.give_back();
+        error!(%error, "failed to send {error_context}");
+        SessionManagerError::other(error)
+    })?;
+    #[cfg(feature = "telemetry")]
+    telemetry::record_session_surb_consumed(session_id, 1);
+    #[cfg(not(feature = "telemetry"))]
+    let _ = session_id;
+
+    futures::future::poll_fn(|cx| msg_sender.poll_flush_unpin(cx))
+        .timeout(futures_time::time::Duration::from(
+            EXTERNAL_SEND_TIMEOUT.saturating_sub(started.elapsed()),
+        ))
+        .await
+        .map_err(timed_out)?
         .map_err(|error| {
             error!(%error, "failed to send {error_context}");
             SessionManagerError::other(error)
@@ -7319,6 +7409,9 @@ where
         // it carries it, so a driver outliving its Session cannot touch a fresh one under the same
         // pseudonym.
         let control_plane = slot.pix_supervisor.clone();
+        // Shares its counters with the slot's, so reading it needs no lookup either. The re-send arm
+        // asks it whether the Session holds a SURB to send over at all.
+        let surb_estimator = slot.surb_estimator.clone();
 
         hopr_utils::spawn_as_abortable!(async move {
             let _retirement_scope = retirement_scope;
@@ -7361,6 +7454,9 @@ where
                             Ok((guards, request)) => {
                                 owned_ssas.extend(guards);
                                 last_request = Some((ssa_ids.clone(), request));
+                                // The deadline starts when the supervisor sees the event below, and the
+                                // send took time: refresh again so the answer has the whole lifetime.
+                                refresh_registrations(&share_processor, &ssa_ids);
                                 // One confirmation per index: the supervisor arms each cycle's
                                 // commitment deadline on its own `SsaRequestSent`, and they were all
                                 // put on the wire by the one send that just succeeded.
@@ -7394,6 +7490,28 @@ where
                                 // cannot be supplied later, and the pool will not answer a retry it
                                 // did not answer the first time.
                                 //
+                                // A pool that answered after the registrations lapsed is just as local: the
+                                // Entry is told the Exit is busy, and nothing blames the supervisor.
+                                if matches!(
+                                    error,
+                                    TransportSessionError::Manager(SessionManagerError::DepositPoolTooSlow(_))
+                                ) {
+                                    myself.stop_pix_fill(&session_id, &control_plane);
+                                    gate.poison();
+                                    owned_ssas.clear();
+                                    myself
+                                        .close_session_scoped_and_notify(
+                                            &session_id,
+                                            ClosureReason::DepositPoolTooSlow,
+                                            &control_plane,
+                                            reply_routing.clone(),
+                                            StartErrorReason::Busy,
+                                            "session error due to a deposit pool too slow for the registrations",
+                                        )
+                                        .await;
+                                    return;
+                                }
+
                                 // Named rather than folded into the supervisor's `PixFailure`,
                                 // because it points at this node's own pool while every reason the
                                 // supervisor has points at the peer — and the Entry is told with a
@@ -7488,6 +7606,26 @@ where
                             }
                         };
 
+                        // A re-send is best-effort, and a return packet that finds no SURB is retried
+                        // for up to `surb_resolution_wait` while everything else this node originates
+                        // queues behind it, so one is not sent while the Session holds none. The
+                        // estimate is trustworthy for this because the Exit counts its control sends
+                        // (`SessionEstablished`, the SSA requests) as consumed, like its data. The
+                        // registration was refreshed above all the same. Nothing is reported back: the
+                        // attempt counts against the supervisor's cap and the next one tries again.
+                        if surb_estimator.saturating_diff() == 0 {
+                            tracing::debug!(
+                                %session_id, batch_size = ssa_ids.len(),
+                                "skipping the SSA request re-send — the Session holds no SURB to send it over"
+                            );
+                            record_exit_control(
+                                ExitControlKind::SsaRequestResend,
+                                ExitSessionKind::Pix,
+                                ExitControlOutcome::SkippedNoSurb,
+                            );
+                            continue;
+                        }
+
                         // Failure is logged and dropped, as for the re-request above, and nothing is
                         // reported back: the supervisor pushed the batch's deadline when it emitted
                         // this and will emit another on its next tick. `SsaRequestSent` is not sent
@@ -7497,10 +7635,12 @@ where
                                 if let Err(error) = count_exit_control_send(
                                     ExitControlKind::SsaRequestResend,
                                     ExitSessionKind::Pix,
-                                    send_via_msg_sender(
+                                    send_counted_via_msg_sender(
                                         &mut msg_sender,
                                         reply_routing.clone(),
                                         message.clone(),
+                                        &surb_estimator,
+                                        &session_id,
                                         "re-sent session SSA commitment request message",
                                     )
                                     .await,
@@ -8204,6 +8344,17 @@ where
         }
 
         let deposit_data = deposit_data_for_batch(&session_id, &ssa_indices, deposit_data)?;
+
+        // The pool may have taken a good part of the registrations' lifetime, and the commitment
+        // deadline only starts at `SsaRequestSent`, after this send. Reading each registration
+        // refreshes it, so the answer to this request gets the whole lifetime after the send. One that
+        // lapsed while the pool answered is not sent for: the Entry would answer a request the Exit can
+        // no longer match, after it has been told to deposit.
+        if !refresh_registrations(&pix_toolbox_local.share_processor, ssa_ids) {
+            return Err(SessionManagerError::DepositPoolTooSlow(format!("session {session_id}")).into());
+        }
+
+        // Only a request that is going out has its deposit data kept for the `DepositNeeded` to come.
         if let Some(ssa_state) = slot.current_ssa_state.get() {
             ssa_state.remember_sent_deposit_data(&deposit_data);
         }
@@ -8221,10 +8372,12 @@ where
         count_exit_control_send(
             ExitControlKind::SsaRequest,
             ExitSessionKind::Pix,
-            send_via_msg_sender(
+            send_counted_via_msg_sender(
                 &mut msg_sender,
                 slot.routing_opts.clone(),
                 data.clone(),
+                &slot.surb_estimator,
+                &session_id,
                 "session SSA commitment request message",
             )
             .await,
@@ -8289,7 +8442,7 @@ where
         count_exit_control_send(
             ExitControlKind::CommitmentRetransmissionRequest,
             ExitSessionKind::Pix,
-            send_via_msg_sender(
+            send_counted_via_msg_sender(
                 &mut msg_sender,
                 slot.routing_opts.clone(),
                 HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::recommit(
@@ -8297,6 +8450,8 @@ where
                     params,
                     [(ssa_id.ssa_index(), runs)],
                 )),
+                &slot.surb_estimator,
+                &session_id,
                 "ssa commitment retransmission request",
             )
             .await,
@@ -8423,7 +8578,10 @@ where
             return Answered(answer_while_draining(reason));
         }
 
-        if matches!(reason, ClosureReason::PixFailure | ClosureReason::MissingDepositData) {
+        if matches!(
+            reason,
+            ClosureReason::PixFailure | ClosureReason::MissingDepositData | ClosureReason::DepositPoolTooSlow
+        ) {
             return Answered(None);
         }
 
@@ -10008,10 +10166,12 @@ where
         if let Err(error) = count_exit_control_send(
             ExitControlKind::SessionEstablished,
             ExitSessionKind::of(session_req.capabilities.0),
-            send_via_msg_sender(
+            send_counted_via_msg_sender(
                 &mut msg_sender,
                 reply_routing.clone(),
                 established,
+                &held.surb_estimator,
+                &session_id,
                 "session resumption message of a taken over session",
             )
             .await,
@@ -10707,10 +10867,12 @@ where
         count_exit_control_send(
             ExitControlKind::SessionEstablished,
             ExitSessionKind::of(session_req.capabilities.0),
-            send_via_msg_sender(
+            send_counted_via_msg_sender(
                 &mut msg_sender,
                 reply_routing.clone(),
                 data,
+                &slot.surb_estimator,
+                &session_id,
                 "session establishment message",
             )
             .await,
@@ -12472,6 +12634,142 @@ mod tests {
             .buffer_level
             .store(buffer_level, std::sync::atomic::Ordering::Relaxed);
         state
+    }
+
+    /// How a stand-in sink treats the one packet a control send hands it.
+    #[derive(Clone, Copy)]
+    enum SinkMode {
+        NeverReady,
+        StartSendFails,
+        FlushFails,
+        FlushNeverCompletes,
+        Accepts,
+    }
+
+    #[derive(Clone, Debug)]
+    struct StandInSinkError;
+
+    impl std::fmt::Display for StandInSinkError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("stand-in sink failure")
+        }
+    }
+
+    impl std::error::Error for StandInSinkError {}
+
+    struct StandInSink(SinkMode);
+
+    impl Sink<(DestinationRouting, ApplicationDataOut)> for StandInSink {
+        type Error = StandInSinkError;
+
+        fn poll_ready(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            match self.0 {
+                SinkMode::NeverReady => std::task::Poll::Pending,
+                _ => std::task::Poll::Ready(Ok(())),
+            }
+        }
+
+        fn start_send(
+            self: std::pin::Pin<&mut Self>,
+            _: (DestinationRouting, ApplicationDataOut),
+        ) -> Result<(), Self::Error> {
+            match self.0 {
+                SinkMode::StartSendFails => Err(StandInSinkError),
+                _ => Ok(()),
+            }
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            match self.0 {
+                SinkMode::FlushFails => std::task::Poll::Ready(Err(StandInSinkError)),
+                SinkMode::FlushNeverCompletes => std::task::Poll::Pending,
+                _ => std::task::Poll::Ready(Ok(())),
+            }
+        }
+
+        fn poll_close(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    /// Sends one counted control packet into a sink of `mode`, and returns the result with the estimator's
+    /// `(consumed, refunded)`.
+    async fn counted_control_send(mode: SinkMode) -> anyhow::Result<(errors::Result<()>, u64, u64)> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        let mut sink = StandInSink(mode);
+        let result = send_counted_via_msg_sender(
+            &mut sink,
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationData::new(SESSION_APPLICATION_TAG, b"short")?,
+            &estimator,
+            &HoprPseudonym::random(),
+            "test control message",
+        )
+        .await;
+        Ok((
+            result,
+            estimator.consumed.load(Relaxed),
+            estimator.refunded.load(Relaxed),
+        ))
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_control_send_into_a_sink_that_is_never_ready_gives_its_surb_back() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::NeverReady).await?;
+        assert!(matches!(result, Err(TransportSessionError::Timeout)), "got {result:?}");
+        assert_eq!(
+            (1, 1),
+            (consumed, refunded),
+            "the packet was never accepted, so the SURB is back"
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_control_send_the_sink_refuses_to_start_gives_its_surb_back() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::StartSendFails).await?;
+        assert!(result.is_err());
+        assert_eq!((1, 1), (consumed, refunded));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_control_send_whose_flush_fails_keeps_its_debit() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::FlushFails).await?;
+        assert!(result.is_err());
+        assert_eq!(
+            (1, 0),
+            (consumed, refunded),
+            "the sink took the packet, which may be on its way"
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_control_send_whose_flush_never_completes_keeps_its_debit() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::FlushNeverCompletes).await?;
+        assert!(matches!(result, Err(TransportSessionError::Timeout)), "got {result:?}");
+        assert_eq!((1, 0), (consumed, refunded));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_accepted_and_flushed_control_send_keeps_its_debit() -> anyhow::Result<()> {
+        let (result, consumed, refunded) = counted_control_send(SinkMode::Accepts).await?;
+        assert!(result.is_ok(), "got {result:?}");
+        assert_eq!((1, 0), (consumed, refunded));
+        Ok(())
     }
 
     /// A packet short enough to have room for a SURB. `max_surbs_with_message` is
@@ -24291,7 +24589,13 @@ mod tests {
             "clamped max_recovery_idle ({:?}) must stay under the reconstructor lifetime ({lifetime:?})",
             sup.max_recovery_idle
         );
-        crate::supervision::validate_pix_supervision(sup, &hopr_protocol_pix::SsaReconstructorConfig::default())
+        // The reconstructor's registration lifetime is raised past the clamped delivery window, which the
+        // validator requires to be shorter than it; everything else is the default's.
+        let long_lived = hopr_protocol_pix::SsaReconstructorConfig {
+            incomplete_commitment_lifetime: cap + Duration::from_secs(1),
+            ..Default::default()
+        };
+        crate::supervision::validate_pix_supervision(sup, &long_lived)
             .expect("a normalized config must satisfy every cross-component invariant, not only representability");
 
         // Which is exactly the condition that makes every deadline representable.
@@ -29172,24 +29476,21 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that a PIX Session whose Entry never answers the `SsaRequest` is closed when the
-    /// commitment deadline expires.
+    /// A PIX Session whose Entry never answers the `SsaRequest` has the request re-sent once, byte for
+    /// byte, and is then closed once the commitment deadline expires.
     ///
-    /// This used to be spelled as a deposit-timeout test, with `max_ssa_delivery_time: 0` and a
-    /// 50 ms `max_deposit_wait`. A zero delivery time makes the *commitment* deadline fire
-    /// immediately, so the assertion held whatever the deposit deadline did — it would have passed
-    /// with that deadline removed entirely. The deposit deadline cannot be reached from this
-    /// fixture at all: arming it needs a `CommitmentVerified`, and a mock transport has no Entry to
-    /// send one. That path is covered end-to-end by `hopr-lib`'s `deposit_timeout_closes_session`.
-    ///
-    /// So `max_deposit_wait` is set far out of reach here, leaving the commitment deadline as the
-    /// only thing that can close the Session.
+    /// The deposit pool answers and the Session holds SURBs, so the request goes out and its re-send is
+    /// not skipped. With a 500 ms deadline and a 200 ms interval the first re-send is due at about 200 ms
+    /// and the second, at 600 ms, would fall past the deadline, so it is not sent. `max_deposit_wait` is
+    /// far out of reach: arming it needs a `CommitmentVerified`, which a mock transport cannot send.
     #[test_log::test(tokio::test)]
     async fn session_is_closed_when_the_entry_never_commits() -> anyhow::Result<()> {
-        use std::time::Duration;
+        use std::time::{Duration, Instant};
 
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
+
+        const DELIVERY: Duration = Duration::from_millis(500);
 
         let ssa_gen_config = SsaGeneratorConfig {
             polynomials_per_ssa: 2,
@@ -29197,7 +29498,7 @@ mod tests {
             surplus_shares: 1,
         };
 
-        let (pix_toolbox, _) = PixToolbox::new(
+        let pix_toolbox = pix_toolbox_with_pool(
             SsaShareGenerator::new(ssa_gen_config).into(),
             SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
         );
@@ -29206,15 +29507,10 @@ mod tests {
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
                 supervision: SupervisorConfig {
-                    // Short, so the deadline under test fires quickly.
-                    max_ssa_delivery_time: Duration::from_millis(50),
-                    // Scaled with it, since it has to stay under the delivery deadline. Nothing arms
-                    // it here — the Entry sends no commitment at all, so there is no scope to
-                    // re-request and the deadline under test is the only one that can fire.
-                    commitment_recommit_interval: Duration::from_millis(10),
-                    // Under the delivery deadline for the same reason. It would not fire here in any
-                    // case — this is the opening batch, which is never re-sent.
-                    ssa_request_resend_interval: Duration::from_millis(20),
+                    max_ssa_delivery_time: DELIVERY,
+                    // Nothing arms it: the Entry sends no commitment, so there is nothing to re-request.
+                    commitment_recommit_interval: Duration::from_millis(100),
+                    ssa_request_resend_interval: Duration::from_millis(200),
                     // Far out of reach, so it cannot be what closes the Session.
                     max_deposit_wait: Duration::from_secs(3600),
                     ..Default::default()
@@ -29224,25 +29520,17 @@ mod tests {
             ..Default::default()
         });
 
-        let mut bob_transport = MockMsgSender::new();
-        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest (2 messages).
-        bob_transport
-            .expect_send_message()
-            .returning(|_, _| Box::pin(async { Ok(()) }));
-        bob_transport
-            .expect_send_message()
-            .returning(|_, _| Box::pin(async { Ok(()) }));
-
-        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (bob_sender, mut sent) = futures::channel::mpsc::unbounded();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()), None)?;
+        mgr.start(bob_sender, new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
-
+        // Taken before the deadline can be armed, so the lower bound below holds whatever the scheduling.
+        let started = Instant::now();
         mgr.handle_incoming_session_initiation(
             alice_pseudonym,
             StartInitiation {
@@ -29253,13 +29541,131 @@ mod tests {
             },
         )
         .await?;
-
-        // Session is active after establishment.
         assert_eq!(vec![alice_pseudonym], mgr.active_sessions());
 
-        // The supervisor arms the commitment deadline once the `SsaRequest` goes out and closes the
-        // Session 50 ms later; the teardown that follows is asynchronous.
-        tokio::time::timeout(Duration::from_secs(2), async {
+        // Stock the Session with SURBs, or the driver skips the re-send for lack of one to send it over.
+        {
+            let slot = mgr
+                .sessions
+                .get(&alice_pseudonym)
+                .context("the session slot must exist")?;
+            slot.surb_estimator
+                .produced
+                .fetch_add(1_000, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        let mut next_message = async || {
+            tokio::time::timeout(Duration::from_secs(10), sent.next())
+                .await
+                .context("timed out waiting for a message from Bob")?
+                .context("Bob's sender closed")
+                .map(|(_, data)| data)
+        };
+
+        let established = next_message().await?;
+        assert!(
+            msg_type(&established, StartProtocolDiscriminants::SessionEstablished),
+            "the first message is SessionEstablished"
+        );
+        let request = next_message().await?;
+        assert!(
+            msg_type(&request, StartProtocolDiscriminants::SsaRequest),
+            "the second message is the opening SsaRequest"
+        );
+        let resend = next_message().await?;
+        assert!(
+            msg_type(&resend, StartProtocolDiscriminants::SsaRequest),
+            "the third message is a re-send of the request"
+        );
+        assert_eq!(
+            (request.data.application_tag, &request.data.plain_text),
+            (resend.data.application_tag, &resend.data.plain_text),
+            "the re-send is the request byte for byte"
+        );
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while mgr.num_active_sessions() > 0 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("session should be closed once the commitment deadline expires")?;
+        assert!(
+            started.elapsed() >= DELIVERY,
+            "the Session closed after {:?}, earlier than the {DELIVERY:?} deadline counted from before the initiation",
+            started.elapsed()
+        );
+
+        // The Session is already closed, so nothing more is sent. The deadline guard itself is covered by the
+        // supervisor tests.
+        while let Ok((_, data)) = sent.try_recv() {
+            assert!(
+                !msg_type(&data, StartProtocolDiscriminants::SsaRequest),
+                "no second re-send may follow"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// A re-send skipped because the Session holds no SURB is counted as skipped, not sent.
+    ///
+    /// Nothing stocks the Session, and `SessionEstablished` has used its one SURB, so the re-send due at 200 ms
+    /// is skipped.
+    #[test_log::test(tokio::test)]
+    async fn a_resend_skipped_for_want_of_a_surb_is_counted_as_skipped() -> anyhow::Result<()> {
+        use std::time::Duration;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let pix_toolbox = pix_toolbox_with_pool(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                supervision: SupervisorConfig {
+                    max_ssa_delivery_time: Duration::from_millis(500),
+                    commitment_recommit_interval: Duration::from_millis(100),
+                    ssa_request_resend_interval: Duration::from_millis(200),
+                    max_deposit_wait: Duration::from_secs(3600),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let (bob_sender, mut sent) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender, new_session_tx, Some(pix_toolbox), None)?;
+
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: small_pix_additional_data(),
+            },
+        )
+        .await?;
+
+        tokio::time::timeout(Duration::from_secs(10), async {
             while mgr.num_active_sessions() > 0 {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
@@ -29267,11 +29673,13 @@ mod tests {
         .await
         .context("session should be closed once the commitment deadline expires")?;
 
-        assert!(mgr.active_sessions().is_empty());
-
-        bob_sender.close_channel();
-        bob_handle.await??;
-
+        let mut requests = 0;
+        while let Ok((_, data)) = sent.try_recv() {
+            requests += usize::from(msg_type(&data, StartProtocolDiscriminants::SsaRequest));
+        }
+        assert_eq!(1, requests, "only the opening request is sent");
+        assert_eq!(1, probe::get("exit_control/ssa_request_resend/pix/skipped_no_surb"));
+        assert_eq!(0, probe::get("exit_control/ssa_request_resend/pix/sent"));
         Ok(())
     }
 
@@ -34545,6 +34953,7 @@ mod tests {
     #[case::an_operator_eviction(Duration::from_secs(60), ClosureReason::Eviction, true, true)]
     #[case::a_pix_failure(Duration::from_secs(60), ClosureReason::PixFailure, true, true)]
     #[case::a_missing_deposit(Duration::from_secs(60), ClosureReason::MissingDepositData, true, true)]
+    #[case::a_slow_deposit_pool(Duration::from_secs(60), ClosureReason::DepositPoolTooSlow, true, true)]
     #[case::not_the_instance_scope(Duration::from_secs(60), ClosureReason::EmptyRead, false, true)]
     #[case::nothing_paid_for(Duration::from_secs(60), ClosureReason::EmptyRead, true, false)]
     #[test_log::test(tokio::test)]
