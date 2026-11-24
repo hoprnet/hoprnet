@@ -140,6 +140,14 @@ impl SurbBalancerController for PidBalancerController {
 
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
         let step = self.0.next_control_output(current_buffer_level as f64);
+        // Once the buffer reaches or exceeds the target, reset any accumulated integral term so a
+        // prior deficit's positive integral cannot keep scheduling empty 0-SURB keep-alives after
+        // organic traffic has already refilled the counterparty to target, and a negative integral
+        // from time above target cannot hold off the next refill.
+        if current_buffer_level >= self.0.setpoint as u64 {
+            self.0.reset_integral_term();
+            return 0;
+        }
         // A negative integral would ask the Entry to take SURBs back, which it can't, and would hold off the refill
         // once the level drops below target.
         if step.i < 0.0 {
@@ -400,5 +408,19 @@ mod tests {
         let gains = PidControllerGains::default();
         let ctrl = PidBalancerController::from_gains(gains);
         assert_eq!(ctrl.bounds().unzip(), (0, 0));
+    }
+
+    #[test]
+    fn pid_resets_positive_integral_when_level_reaches_setpoint() {
+        let gains = PidControllerGains::default();
+        let mut ctrl = PidBalancerController::new(100, 200, gains);
+
+        // Deficit builds a positive integral term.
+        assert!(ctrl.next_control_output(60) > 0);
+        // Reaching the setpoint clears the integral and commands zero production immediately and
+        // on subsequent ticks.
+        assert_eq!(ctrl.next_control_output(100), 0);
+        assert_eq!(ctrl.next_control_output(100), 0);
+        assert_eq!(ctrl.next_control_output(100), 0);
     }
 }
