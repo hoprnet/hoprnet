@@ -143,8 +143,8 @@ pub type Capabilities = flagset::FlagSet<Capability>;
 /// Default maximum number of SURBs piggybacked on outgoing Session data packets.
 ///
 /// Matches [`hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET`]; every finite value
-/// is bounded by the remaining payload space of the packet beside application data and (when SURB
-/// balancing is enabled) by the balancer's remaining SURB deficit.
+/// (`< usize::MAX`) is bounded by the remaining payload space of the packet beside application
+/// data and (when SURB balancing is enabled) by the balancer's remaining SURB deficit.
 pub const DEFAULT_MAX_SURBS_PER_DATA_PACKET: usize = hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET;
 
 /// Configuration for the session.

@@ -5091,6 +5091,29 @@ fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt:
     }
 }
 
+/// Caps SURBs on a balancer-driven KeepAlive packet against the shared remaining SURB deficit and
+/// records the granted count into the session's monotonic estimator and telemetry.
+///
+/// Shares the same `organic_budget` lock and monotonic `produced` counter as outgoing Session data
+/// packets so a KeepAlive firing right after data packets filled the target cannot push the
+/// counterparty above its target buffer size. The KeepAlive control packet still sends (carrying
+/// `0` refill SURBs when the deficit is already exhausted) so target notifications continue to
+/// reach the counterparty.
+fn cap_and_record_keep_alive_surbs(
+    data: &mut ApplicationDataOut,
+    surb_mgmt: &BalancerStateValues,
+    _session_id: &SessionId,
+) -> usize {
+    let fittable = data.estimate_surbs_with_msg();
+    let claimed = surb_mgmt.claim_organic_surbs(fittable);
+    if claimed < fittable {
+        data.packet_info.get_or_insert_default().max_surbs_in_packet = claimed;
+    }
+    #[cfg(feature = "telemetry")]
+    telemetry::record_session_surb_produced(_session_id, claimed as u64);
+    claimed
+}
+
 /// Caps organic SURBs on a balanced outgoing Session data packet and records the resulting
 /// production into the shared estimator and telemetry.
 fn cap_and_record_organic_surbs(
@@ -6764,24 +6787,24 @@ where
                     let surb_estimator = AtomicSurbFlowEstimator::default();
                     let surbs_per_keep_alive = KeepAliveMessage::from(session_id).max_surbs()? as u32;
 
-                    // Sender responsible for keep-alives counts produced SURBs into the same
-                    // monotonic counter that organic data-packet claims debit against.
-                    let surb_estimator_for_ka = surb_estimator.clone();
-                    let full_surb_scoring_sender =
-                        msg_sender
-                            .clone()
-                            .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                                let produced = data.estimate_surbs_with_msg() as u64;
-                                record_surb_produced(&surb_estimator_for_ka, &session_id, produced);
-                                futures::future::ok::<_, S::Error>((routing, data))
-                            });
-
                     let surb_mgmt = Arc::new(BalancerStateValues::from(balancer_config));
-                    surb_mgmt.attach_produced_counter(surb_estimator.produced.clone());
+                    surb_mgmt.attach_estimator(&surb_estimator);
                     // The counterparty's store is the same bounded ring buffer as ours, so its
                     // capacity bounds what our `produced - consumed` estimate can legitimately
                     // claim it is holding.
                     surb_mgmt.set_counterparty_buffer_capacity(self.cfg.maximum_surb_buffer_size as u64);
+
+                    // Sender responsible for keep-alives claims SURBs from the same shared deficit
+                    // and monotonic `produced` counter as outgoing data packets, capping the packet
+                    // when data traffic has already filled the target while still forwarding the
+                    // keep-alive control message.
+                    let surb_mgmt_for_ka = surb_mgmt.clone();
+                    let full_surb_scoring_sender = msg_sender.clone().with(
+                        move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                            cap_and_record_keep_alive_surbs(&mut data, &surb_mgmt_for_ka, &session_id);
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        },
+                    );
 
                     // For standard Session data, cap organic SURBs and record production atomically
                     // against the shared estimator counter after verifying this instance still owns
@@ -12554,7 +12577,7 @@ mod tests {
         // `SESSION_MTU`), so 10 SURBs of deficit span 4 + 4 + 2 + 0 across four full-MTU packets.
         let mtu_state = gate_state(100, 90);
         let mtu_estimator = AtomicSurbFlowEstimator::default();
-        mtu_state.attach_produced_counter(mtu_estimator.produced.clone());
+        mtu_state.attach_estimator(&mtu_estimator);
         let mut mtu_grants = Vec::new();
         for _ in 0..4 {
             let mut data = full_mtu_outgoing_packet()?;
@@ -12608,7 +12631,7 @@ mod tests {
     fn cap_and_record_organic_surbs_shares_budget_with_keep_alives() -> anyhow::Result<()> {
         let estimator = AtomicSurbFlowEstimator::default();
         let state = gate_state(100, 92);
-        state.attach_produced_counter(estimator.produced.clone());
+        state.attach_estimator(&estimator);
         let session_id = SessionId::random();
 
         // Keep-alive sends 8 SURBs within the same tick.
@@ -12620,6 +12643,56 @@ mod tests {
         cap_and_record_organic_surbs(&mut data, 8, &state, &estimator, &session_id);
         assert_eq!(Some(0), data.packet_info.map(|info| info.max_surbs_in_packet));
         assert_eq!(8, estimator.estimate_surbs_produced());
+
+        // Reverse order: data packet fills 92 -> 100/100, then a scheduled keep-alive fires in the
+        // same tick -> keep-alive is capped to 0 refill SURBs instead of overshooting to 107.
+        let estimator2 = AtomicSurbFlowEstimator::default();
+        let state2 = gate_state(100, 92);
+        state2.attach_estimator(&estimator2);
+
+        let mut data2 = small_outgoing_packet()?;
+        cap_and_record_organic_surbs(&mut data2, 8, &state2, &estimator2, &session_id);
+        assert_eq!(Some(8), data2.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(8, estimator2.estimate_surbs_produced());
+
+        let (tag, plain_text) = HoprStartProtocol::KeepAlive(KeepAliveMessage::from(session_id)).encode()?;
+        let mut ka_full = ApplicationDataOut::with_no_packet_info(ApplicationData::new(tag, plain_text.as_ref())?);
+        let ka_claimed = cap_and_record_keep_alive_surbs(&mut ka_full, &state2, &session_id);
+        assert_eq!(0, ka_claimed);
+        assert_eq!(Some(0), ka_full.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(8, estimator2.estimate_surbs_produced());
+
+        // Partial deficit (96/100): keep-alive claims only the 4 remaining SURBs, not its full
+        // capacity.
+        let estimator3 = AtomicSurbFlowEstimator::default();
+        let state3 = gate_state(100, 96);
+        state3.attach_estimator(&estimator3);
+
+        let (tag, plain_text) = HoprStartProtocol::KeepAlive(KeepAliveMessage::from(session_id)).encode()?;
+        let mut ka_partial = ApplicationDataOut::with_no_packet_info(ApplicationData::new(tag, plain_text.as_ref())?);
+        let ka_partial_claimed = cap_and_record_keep_alive_surbs(&mut ka_partial, &state3, &session_id);
+        assert_eq!(4, ka_partial_claimed);
+        assert_eq!(Some(4), ka_partial.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(4, estimator3.estimate_surbs_produced());
+        Ok(())
+    }
+
+    #[test]
+    fn cap_and_record_organic_surbs_counts_production_when_balancer_disabled() -> anyhow::Result<()> {
+        let estimator = AtomicSurbFlowEstimator::default();
+        let state = gate_state(0, 0);
+        assert!(state.is_disabled());
+        state.attach_estimator(&estimator);
+        let session_id = SessionId::random();
+
+        let mut data = small_outgoing_packet()?;
+        cap_and_record_organic_surbs(&mut data, 4, &state, &estimator, &session_id);
+        assert_eq!(Some(4), data.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(
+            4,
+            estimator.estimate_surbs_produced(),
+            "disabled balancer (`target == 0`) must still record organically produced SURBs"
+        );
         Ok(())
     }
 
