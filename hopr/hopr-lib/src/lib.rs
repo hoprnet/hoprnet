@@ -169,8 +169,9 @@ pub struct HoprSessionClientConfig {
     /// or above its target (except a 1-SURB/packet floor during distress or silence sustain), and
     /// up to `min(max_surbs_per_data_packet, remaining_deficit)` while below target, counted down
     /// per packet within each balancer tick so bursts cannot overflow the counterparty's store.
-    /// When balancing is disabled (`surb_management` is `None`), the explicit limit applies
-    /// verbatim. Only `usize::MAX` is never gated.
+    /// When balancing is disabled (`surb_management` is `None` or has `target_surb_buffer_size == 0`),
+    /// the explicit limit applies verbatim (bounded by remaining packet payload space). Only
+    /// `usize::MAX` bypasses both the balancer gate and per-packet cap.
     /// Setting to 0 leaves all SURB production to the SURB balancer. If in that case no SURB
     /// balancer is configured, no SURBs are produced, making traffic possible only in one direction.
     /// Default matches [`hopr_transport::DEFAULT_MAX_SURBS_PER_DATA_PACKET`] (up to packet SURB

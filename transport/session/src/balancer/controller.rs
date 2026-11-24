@@ -228,15 +228,19 @@ pub struct BalancerStateValues {
 struct OrganicBudgetCheckpoint {
     /// Estimator `produced` value already absorbed into [`BalancerStateValues::buffer_level`].
     absorbed_produced: u64,
-    /// Set by [`BalancerStateValues::on_counterparty_wiped`] to the estimator's `produced` count
-    /// at the instant of the wipe and consumed by the next [`SurbBalancer::update`], so pre-wipe
-    /// production is discarded while any post-wipe new-generation production is preserved.
-    wiped_at_produced: Option<u64>,
+    /// Set by [`BalancerStateValues::on_counterparty_wiped`] to `(produced, consumed)` at the
+    /// instant of the wipe and consumed by the next [`SurbBalancer::update`], so pre-wipe
+    /// production and consumption belong to the discarded generation while post-wipe production
+    /// and post-wipe consumption (replies using fresh new-generation SURBs) are both reflected.
+    wiped_at: Option<(u64, Option<u64>)>,
     /// Fallback monotonic counter when no external `AtomicSurbFlowEstimator::produced` is attached.
     local_produced: Arc<AtomicU64>,
     /// Attached `AtomicSurbFlowEstimator::produced` counter shared with keep-alive and balancer
     /// accounting.
     external_produced: Option<Arc<AtomicU64>>,
+    /// Attached `AtomicSurbFlowEstimator::consumed` counter so [`BalancerStateValues::on_counterparty_wiped`]
+    /// snapshots the consumption baseline at the exact wipe instant.
+    external_consumed: Option<Arc<AtomicU64>>,
 }
 
 impl OrganicBudgetCheckpoint {
@@ -487,13 +491,14 @@ impl BalancerStateValues {
     }
 
     /// Publishes this side's `produced` count as it was `REPORT_LAG` before this update and as it is at
-    /// this update, for [`observe_reported_level`](Self::observe_reported_level). Called by every
-    /// balancer update.
+    /// this update, for [`observe_reported_level`](Self::observe_reported_level).
+    #[cfg(test)]
     pub(crate) fn publish_production(&self, before_lag: u64, at_update: u64) {
+        let _guard = self.organic_budget.lock();
         self.produced_before_lag
             .store(before_lag, std::sync::atomic::Ordering::Relaxed);
         self.produced_at_update
-            .store(at_update, std::sync::atomic::Ordering::Relaxed);
+            .store(at_update, std::sync::atomic::Ordering::Release);
     }
 
     /// Takes the one-shot request to hold the next output to the pacing rate, if there is one.
@@ -553,12 +558,14 @@ impl BalancerStateValues {
         }
     }
 
-    /// Attaches the session's monotonic `AtomicSurbFlowEstimator::produced` counter so organic data
-    /// packet claims, keep-alives, and [`SurbBalancer::update`] share one source of truth.
-    pub(crate) fn attach_produced_counter(&self, produced: Arc<AtomicU64>) {
+    /// Attaches the session's monotonic [`AtomicSurbFlowEstimator`] counters so organic data
+    /// packet claims, keep-alives, wipe checkpoints, and [`SurbBalancer::update`] share one source
+    /// of truth.
+    pub(crate) fn attach_estimator(&self, estimator: &AtomicSurbFlowEstimator) {
         let mut guard = self.organic_budget.lock();
-        guard.absorbed_produced = produced.load(Ordering::Acquire);
-        guard.external_produced = Some(produced);
+        guard.absorbed_produced = estimator.produced.load(Ordering::Acquire);
+        guard.external_produced = Some(estimator.produced.clone());
+        guard.external_consumed = Some(estimator.consumed.clone());
     }
 
     /// Computes how many organic SURBs may still be piggybacked given `in_tick` SURBs already
@@ -605,23 +612,22 @@ impl BalancerStateValues {
         }
     }
 
-    /// Atomically claims up to `max_surbs` from the remaining SURB deficit for one outgoing data
-    /// packet and advances the shared monotonic `produced` counter inside the same critical section.
+    /// Atomically claims up to `max_surbs` from the remaining SURB deficit for one outgoing packet
+    /// and advances the shared monotonic `produced` counter inside the same critical section.
     ///
-    /// Because keep-alives advance the same counter and [`Self::commit_buffer_level`] updates
-    /// `(buffer_level, absorbed_produced)` under the same lock, bursts of data packets, concurrent
-    /// keep-alives, and balancer tick boundaries can never double-claim or overshoot the target.
+    /// Because keep-alives and data packets both debit the same counter and
+    /// [`Self::commit_tick_update`] updates `(buffer_level, absorbed_produced)` under the same
+    /// lock, bursts of data packets, concurrent keep-alives, and balancer tick boundaries can
+    /// never double-claim or overshoot the target.
     ///
     /// While the counterparty signals distress, claims up to `max_surbs` against any remaining
     /// deficit and floors at `1` once the estimate reaches target. When the balancer is disabled,
-    /// preserves the caller's explicit `max_surbs` limit.
+    /// preserves the caller's explicit `max_surbs` limit and still increments the monotonic
+    /// `produced` counter so estimator accounting stays accurate.
     #[must_use]
     pub(crate) fn claim_organic_surbs(&self, max_surbs: usize) -> usize {
         if max_surbs == 0 {
             return 0;
-        }
-        if self.is_disabled() {
-            return max_surbs;
         }
 
         let guard = self.organic_budget.lock();
@@ -640,6 +646,7 @@ impl BalancerStateValues {
     /// Atomically publishes `level` into [`buffer_level`](Self::buffer_level) together with the
     /// estimator's `absorbed_produced` count that `level` already reflects, so in-tick organic
     /// claims see a consistent `(buffer_level, absorbed_produced)` pair.
+    #[cfg(test)]
     pub(crate) fn commit_buffer_level(&self, level: u64, absorbed_produced: u64) {
         let mut guard = self.organic_budget.lock();
         self.buffer_level.store(level, Ordering::Release);
@@ -648,6 +655,93 @@ impl BalancerStateValues {
         } else {
             guard.absorbed_produced = guard.local_produced.load(Ordering::Acquire);
         }
+    }
+
+    /// Atomically commits one [`SurbBalancer::update`] tick under `organic_budget`.
+    ///
+    /// Reading `buffer_level`, consuming any pending wipe checkpoint, applying the estimator delta
+    /// (or post-wipe net production), decay, and capacity clamp, storing `buffer_level`, updating
+    /// `absorbed_produced`, and publishing `(produced_before_lag, snapshot.produced)` in one
+    /// critical section ensures a concurrent [`observe_reported_level`](Self::observe_reported_level)
+    /// either runs strictly before this commit (so its lowered level becomes the base for
+    /// `target_buffer_change`) or strictly after (seeing the updated `produced_at_update`).
+    fn commit_tick_update(
+        &self,
+        snapshot: SimpleSurbFlowEstimator,
+        target_buffer_change: i64,
+        produced_before_lag: u64,
+        num_decayed_surbs: u64,
+    ) -> (u64, SimpleSurbFlowEstimator) {
+        let mut guard = self.organic_budget.lock();
+
+        let (mut current, next_estimator_state, absorbed_produced) =
+            if let Some((wipe_produced, wipe_consumed)) = guard.wiped_at.take() {
+                // The counterparty dropped everything it held at the wipe instant: pre-wipe
+                // production and consumption belong to the discarded generation, while both
+                // post-wipe production and post-wipe consumption (replies using fresh
+                // new-generation SURBs) must stay reflected in the restarted level.
+                let post_wipe_produced = snapshot.produced.saturating_sub(wipe_produced);
+                let post_wipe_consumed = wipe_consumed.map_or(0, |wc| snapshot.consumed.saturating_sub(wc));
+                let net_post_wipe = post_wipe_produced.saturating_sub(post_wipe_consumed);
+                tracing::debug!(
+                    believed = self.buffer_level.load(Ordering::Acquire),
+                    delta = target_buffer_change,
+                    wipe_produced,
+                    ?wipe_consumed,
+                    post_wipe_produced,
+                    post_wipe_consumed,
+                    "counterparty SURBs were wiped, restarting the level estimate from the wipe checkpoint"
+                );
+                let produced_baseline = snapshot.produced.max(wipe_produced);
+                let consumed_baseline = wipe_consumed.map_or(snapshot.consumed, |wc| snapshot.consumed.max(wc));
+                (
+                    net_post_wipe,
+                    SimpleSurbFlowEstimator {
+                        produced: produced_baseline,
+                        consumed: consumed_baseline,
+                        ..snapshot
+                    },
+                    produced_baseline,
+                )
+            } else {
+                let base = self.buffer_level.load(Ordering::Acquire);
+                (
+                    base.saturating_add_signed(target_buffer_change),
+                    snapshot,
+                    snapshot.produced,
+                )
+            };
+
+        if num_decayed_surbs > 0 {
+            current = current.saturating_sub(num_decayed_surbs);
+            tracing::trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
+        }
+
+        // Believing a level the counterparty cannot hold keeps production throttled long after
+        // the surplus was evicted on arrival, so the estimate is bounded by the store it describes.
+        let believed = current;
+        current = self.clamp_to_counterparty_capacity(current);
+        if current != believed {
+            // Not the configured capacity: the bound applied is `max(capacity, target)`, so name
+            // the clamped level and the capacity separately rather than conflating them.
+            tracing::debug!(
+                believed,
+                clamped_to = current,
+                counterparty_capacity = self.counterparty_buffer_capacity.load(Ordering::Relaxed),
+                "counterparty SURB estimate exceeded its store; the surplus was never held"
+            );
+        }
+
+        self.buffer_level.store(current, Ordering::Release);
+        if guard.external_produced.is_some() {
+            guard.absorbed_produced = absorbed_produced;
+        } else {
+            guard.absorbed_produced = guard.local_produced.load(Ordering::Acquire);
+        }
+        self.produced_before_lag.store(produced_before_lag, Ordering::Relaxed);
+        self.produced_at_update.store(snapshot.produced, Ordering::Release);
+
+        (current, next_estimator_state)
     }
 
     /// Records that the counterparty was heard from now.
@@ -844,9 +938,10 @@ impl BalancerStateValues {
     pub fn on_counterparty_wiped(&self) {
         let mut guard = self.organic_budget.lock();
         let wipe_produced = guard.produced_counter().load(Ordering::Acquire);
+        let wipe_consumed = guard.external_consumed.as_ref().map(|c| c.load(Ordering::Acquire));
         self.buffer_level.store(0, Ordering::Release);
         guard.absorbed_produced = wipe_produced;
-        guard.wiped_at_produced = Some(wipe_produced);
+        guard.wiped_at = Some((wipe_produced, wipe_consumed));
         drop(guard);
         self.arm_refill_pacing();
     }
@@ -869,11 +964,6 @@ impl BalancerStateValues {
         let cap = self.pacing_cap();
         self.refill_pacing
             .store((cap << 32) | (REFILL_PACING_SECS * 1000), Relaxed);
-    }
-
-    /// Takes the one-shot wipe checkpoint (`produced` at the instant of the wipe), if any.
-    fn take_counterparty_wiped(&self) -> Option<u64> {
-        self.organic_budget.lock().wiped_at_produced.take()
     }
 
     /// Whether the refill after a wipe is still paced. Read-only: unlike [`pace_refill`](Self::pace_refill)
@@ -1073,12 +1163,9 @@ where
     fn update(&mut self) -> u64 {
         let dt = self.last_update.elapsed();
 
-        // Load the updated current buffer level
-        let mut current = self.state.buffer_level.load(std::sync::atomic::Ordering::Acquire);
-
         if dt < Duration::from_millis(10) {
             tracing::debug!("time elapsed since last update is too short, skipping update");
-            return current;
+            return self.state.buffer_level.load(std::sync::atomic::Ordering::Acquire);
         }
 
         self.last_update = std::time::Instant::now();
@@ -1087,13 +1174,12 @@ where
         let snapshot = SimpleSurbFlowEstimator::from(&self.surb_estimator);
         let Some(target_buffer_change) = snapshot.estimated_surb_buffer_change(&self.last_estimator_state) else {
             tracing::error!("non-monotonic change in SURB estimators");
-            return current;
+            return self.state.buffer_level.load(std::sync::atomic::Ordering::Acquire);
         };
 
         // What a counterparty report arriving before the next update cannot have seen yet: the production
         // from REPORT_LAG before this update up to it. What comes after it, the next update adds.
         let produced_before_lag = self.produced_history.record(self.last_update, snapshot.produced);
-        self.state.publish_production(produced_before_lag, snapshot.produced);
 
         // The estimator counted a consumed SURB since the last tick, so the counterparty was heard, by a
         // reply or a keep-alive, whether or not any of its packets reached the hooks that record it.
@@ -1110,63 +1196,22 @@ where
             self.state.note_reply_heard();
         }
 
-        let absorbed_produced = if let Some(wipe_produced) = self.state.take_counterparty_wiped() {
-            // The counterparty dropped everything it held at `wipe_produced`, so pre-wipe
-            // production belongs to the discarded generation, while any production after
-            // `wipe_produced` belongs to the new generation and must stay reflected in the level.
-            let post_wipe_produced = snapshot.produced.saturating_sub(wipe_produced);
-            tracing::debug!(
-                believed = current,
-                delta = target_buffer_change,
-                wipe_produced,
-                post_wipe_produced,
-                "counterparty SURBs were wiped, restarting the level estimate from the wipe checkpoint"
-            );
-            current = post_wipe_produced;
-            let baseline = snapshot.produced.max(wipe_produced);
-            self.last_estimator_state = SimpleSurbFlowEstimator {
-                produced: baseline,
-                ..snapshot
-            };
-            baseline
-        } else {
-            self.last_estimator_state = snapshot;
-            current = current.saturating_add_signed(target_buffer_change);
-            snapshot.produced
-        };
-
         // If SURB decaying is enabled, check if the decay window has elapsed
-        // and calculate the number of SURBs that will be discarded
-        if let Some(num_decayed_surbs) = self
+        // and calculate the number of SURBs that will be discarded.
+        let num_decayed_surbs = self
             .state
             .surb_decay()
             .filter(|(decay_window, _)| &self.last_decay.elapsed() >= decay_window)
-            .map(|(_, decay_coeff)| (self.controller.bounds().target() as f64 * decay_coeff).round() as u64)
-        {
-            current = current.saturating_sub(num_decayed_surbs);
-            self.last_decay = std::time::Instant::now();
-            tracing::trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
-        }
+            .map(|(_, decay_coeff)| {
+                self.last_decay = std::time::Instant::now();
+                (self.controller.bounds().target() as f64 * decay_coeff).round() as u64
+            })
+            .unwrap_or(0);
 
-        // Believing a level the counterparty cannot hold keeps production throttled long after
-        // the surplus was evicted on arrival, so the estimate is bounded by the store it describes.
-        let believed = current;
-        current = self.state.clamp_to_counterparty_capacity(current);
-        if current != believed {
-            // Not the configured capacity: the bound applied is `max(capacity, target)`, so name
-            // the clamped level and the capacity separately rather than conflating them.
-            tracing::debug!(
-                believed,
-                clamped_to = current,
-                counterparty_capacity = self
-                    .state
-                    .counterparty_buffer_capacity
-                    .load(std::sync::atomic::Ordering::Relaxed),
-                "counterparty SURB estimate exceeded its store; the surplus was never held"
-            );
-        }
-
-        self.state.commit_buffer_level(current, absorbed_produced);
+        let (current, next_estimator_state) =
+            self.state
+                .commit_tick_update(snapshot, target_buffer_change, produced_before_lag, num_decayed_surbs);
+        self.last_estimator_state = next_estimator_state;
 
         // Invalid SURBs are held but cannot bring a reply home, so the balancer replaces them.
         let usable = self.state.usable_level(current);
@@ -1686,7 +1731,7 @@ mod tests {
 
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let state: Arc<BalancerStateValues> = Arc::new(cfg.into());
-        state.attach_produced_counter(surb_estimator.produced.clone());
+        state.attach_estimator(&surb_estimator);
         let balancer = SurbBalancer::new(
             HoprPseudonym::random(),
             PidBalancerController::default(),
@@ -3335,5 +3380,75 @@ mod tests {
         assert_eq!(16, state.buffer_level());
         assert_eq!(Some(0), state.organic_surbs_deficit());
         assert_eq!(0, state.claim_organic_surbs(8));
+    }
+
+    /// Regression test for post-wipe consumption: replies consuming fresh post-wipe SURBs before
+    /// the first post-wipe balancer tick must be subtracted from the restarted level rather than
+    /// absorbed into `last_estimator_state.consumed` and forgotten.
+    #[test]
+    fn post_wipe_consumption_is_subtracted_from_restarted_level() {
+        let (mut balancer, surb_estimator, state, _output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 16,
+            max_surbs_per_sec: 1_000,
+            surb_decay: None,
+        });
+
+        surb_estimator.produced.fetch_add(100, Ordering::Release);
+        surb_estimator.consumed.fetch_add(20, Ordering::Release);
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+
+        // Wipe occurs at `produced = 100, consumed = 20`.
+        state.on_counterparty_wiped();
+        assert_eq!(0, state.buffer_level());
+
+        // Post-wipe packets mint 16 fresh SURBs, and 6 replies arrive consuming 6 of them before
+        // the next balancer update runs.
+        assert_eq!(8, state.claim_organic_surbs(8));
+        assert_eq!(8, state.claim_organic_surbs(8));
+        surb_estimator.consumed.fetch_add(6, Ordering::Release);
+
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+        assert_eq!(10, state.buffer_level());
+        assert_eq!(Some(6), state.organic_surbs_deficit());
+        assert_eq!(6, state.claim_organic_surbs(8));
+    }
+
+    /// Regression test for `commit_tick_update` vs `observe_reported_level`: a peer level report
+    /// that arrives after `update()` takes its estimator snapshot but before the tick commits must
+    /// not be overwritten by the stale pre-tick `buffer_level`.
+    #[test]
+    fn commit_tick_update_preserves_mid_tick_reported_level_lowering() {
+        let surb_estimator = AtomicSurbFlowEstimator::default();
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 100,
+            max_surbs_per_sec: 1_000,
+            surb_decay: None,
+        });
+        state.attach_estimator(&surb_estimator);
+
+        // Previous tick left level at 100 with `produced = 100` and no in-flight production.
+        state.commit_buffer_level(100, 100);
+        state.publish_production(100, 100);
+
+        // Next tick snapshots `produced = 100, consumed = 0` (`target_buffer_change = 0`), then
+        // before it commits, a peer report lowers the believed level from 100 to 92.
+        let snapshot = SimpleSurbFlowEstimator {
+            produced: 100,
+            consumed: 0,
+            evicted: 0,
+            refunded: 0,
+        };
+        state.observe_reported_level(92);
+        assert_eq!(92, state.buffer_level());
+
+        // Committing the tick must build on the reported 92 (not overwrite it with stale 100) and
+        // preserve `correction_cap` for the controller output step.
+        let (committed, _) = state.commit_tick_update(snapshot, 0, 100, 0);
+        assert_eq!(92, committed);
+        assert_eq!(92, state.buffer_level());
+        assert_eq!(Some(8), state.organic_surbs_deficit());
+        assert!(state.take_correction_cap());
     }
 }
