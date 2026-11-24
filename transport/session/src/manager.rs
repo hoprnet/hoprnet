@@ -38032,6 +38032,7 @@ mod tests {
                 forward_receipts: None,
                 exit_resume: Default::default(),
                 instance: SlotInstance::new(0),
+                opening: None,
             },
         );
         Ok(mgr)
