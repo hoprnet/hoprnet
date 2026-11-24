@@ -109,6 +109,8 @@ pub enum SessionManagerError {
     NotAdmitted(String),
     #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]
     MissingDepositData(String),
+    #[error("the commitment registration lapsed while the deposit pool answered: {0}")]
+    DepositPoolTooSlow(String),
     #[error(transparent)]
     PixError(#[from] hopr_protocol_pix::errors::PixError<SimplePseudonym>),
     #[error(transparent)]

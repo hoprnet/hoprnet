@@ -920,6 +920,10 @@ fn default_session_max_frames_behind_gap() -> Option<usize> {
     Some(256)
 }
 
+fn default_session_forward_receipts() -> bool {
+    true
+}
+
 fn default_session_surb_target_notify() -> bool {
     true
 }
@@ -1166,6 +1170,14 @@ pub struct SessionGlobalConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_session_surb_target_notify"))]
     pub surb_target_notify: bool,
 
+    /// Whether Exits report the Session packets they received, and this node judges forward relayers
+    /// from those receipts. Off, no receipts are asked for, sent or recorded.
+    ///
+    /// Default is true.
+    #[default(default_session_forward_receipts())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_forward_receipts"))]
+    pub forward_receipts: bool,
+
     /// How many later frames may queue behind a missing one before the reassembler gives up on it
     /// and releases what it already has.
     ///
@@ -1270,6 +1282,23 @@ mod tests {
             ..Default::default()
         };
         assert!(accepted.validate().is_ok());
+    }
+
+    #[test]
+    fn forward_receipts_should_be_on_by_default() {
+        assert!(SessionGlobalConfig::default().forward_receipts);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn forward_receipts_should_be_optional_in_the_config() -> anyhow::Result<()> {
+        let omitted: SessionGlobalConfig =
+            serde_saphyr::from_str("idle_timeout: 3m\n").context("config without the setting must parse")?;
+        assert!(omitted.forward_receipts);
+        let off: SessionGlobalConfig =
+            serde_saphyr::from_str("forward_receipts: false\n").context("config turning it off must parse")?;
+        assert!(!off.forward_receipts);
+        Ok(())
     }
 
     #[test]
@@ -2137,6 +2166,9 @@ mod tests {
         // configuration whose declared memory cannot hold the batch it asks for. Leaving the default
         // 2 GiB here would make every case below fail on memory rather than on the batch range this
         // test is about.
+        //
+        // The delivery time is lowered for the same reason: the batch-scaled window has to stay shorter
+        // than the reconstructor's registration lifetime, and 20 s x the ceiling does not.
         let with_supervision = |supervision: SupervisorConfig| HoprProtocolConfig {
             incoming_session_pix_config: IncomingSessionPixConfig {
                 max_live_cycle_bytes: u64::MAX,
@@ -2150,6 +2182,7 @@ mod tests {
             assert!(
                 with_supervision(SupervisorConfig {
                     ssas_per_request,
+                    max_ssa_delivery_time: Duration::from_secs(4),
                     ..Default::default()
                 })
                 .validate()
@@ -2161,6 +2194,7 @@ mod tests {
         assert!(
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
+                max_ssa_delivery_time: Duration::from_secs(4),
                 ..Default::default()
             })
             .validate()
@@ -2181,6 +2215,7 @@ mod tests {
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
                 max_deposit_wait: per_cycle,
+                max_ssa_delivery_time: Duration::from_secs(4),
                 ..Default::default()
             })
             .validate()

@@ -443,6 +443,11 @@ pub enum ClosureReason {
     /// the Entry failing to pay. Kept apart from it for exactly that reason: the two look alike from
     /// the outside — a PIX Session that stopped — and point at opposite nodes.
     MissingDepositData,
+    /// The local deposit pool answered after the SSA batch's commitment registrations had lapsed, so the
+    /// request was not sent.
+    ///
+    /// Exit-side like [`MissingDepositData`](Self::MissingDepositData): the pool is too slow, the peer is not at fault.
+    DepositPoolTooSlow,
     /// The PIX supervisor ended the Session — a recovery deadline elapsed, too many shares failed
     /// verification, or the supervisor itself became unavailable.
     ///
@@ -573,6 +578,30 @@ pub trait SurbAdmissionControl: Send + Sync + 'static {
     ///
     /// Defaults to a no-op, for implementations that do not size a per-Session ring.
     fn raise_target(&self, _pseudonym: &SessionId, _token: AdmissionToken, _expected_surbs: usize) {}
+
+    /// Starts a new SURB generation for `pseudonym`, so the counterparty drops the SURBs it holds for it.
+    ///
+    /// Called by an Entry before it repeats a `StartSession`. Defaults to a no-op.
+    fn advance_generation(&self, _pseudonym: &SessionId) {}
+}
+
+/// Receives the forward receipts an Exit sent for an outgoing Session.
+///
+/// Implemented by `hopr-transport`, which matches the tags against the packets it sent. Called from the
+/// packet dispatch, so it must return quickly and may take only brief locks.
+pub trait ForwardReceiptSink: Send + Sync + 'static {
+    /// A receipt from the Exit of the Session `pseudonym`, with the `tags` it received in the intervals
+    /// `first_seq..=seq`.
+    fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32]);
+
+    /// A Session under `pseudonym` that asked its Exit for receipts is established, as the Session instance
+    /// `instance`: its packets are to be recorded, and whatever an earlier Session under the same pseudonym left is
+    /// to be forgotten.
+    fn session_started(&self, _pseudonym: HoprPseudonym, _instance: u64) {}
+
+    /// The Session instance `instance` under `pseudonym` has ended: its packets are no longer recorded, unless a
+    /// later instance has started under the pseudonym since.
+    fn session_ended(&self, _pseudonym: HoprPseudonym, _instance: u64) {}
 }
 
 /// Configures the Session protocol socket over HOPR.
@@ -1456,6 +1485,7 @@ mod tests {
             ClosureReason::Eviction,
             ClosureReason::UnrealizedDeposit,
             ClosureReason::MissingDepositData,
+            ClosureReason::DepositPoolTooSlow,
             ClosureReason::PixFailure,
         ];
 
@@ -1470,6 +1500,7 @@ mod tests {
                 | ClosureReason::Eviction
                 | ClosureReason::UnrealizedDeposit
                 | ClosureReason::MissingDepositData
+                | ClosureReason::DepositPoolTooSlow
                 | ClosureReason::PixFailure => {}
             }
         }

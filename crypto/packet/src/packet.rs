@@ -44,6 +44,7 @@ pub struct PartialHoprPacket {
     next_hop: OffchainPublicKey,
     ack_challenge: HalfKeyChallenge,
     encrypted_pix_share: Option<TaggedEncryptedPartialSsaShare<HoprPixSpec>>,
+    final_packet_tag: Option<PacketTag>,
 }
 
 /// Shared key data for a path.
@@ -151,6 +152,9 @@ impl PartialHoprPacket {
                     .next()
                     .ok_or_else(|| PacketConstructionError("empty path".into()))?;
 
+                // The tag the final hop will derive for this packet
+                let final_packet_tag = shared_keys.secrets.last().map(derive_packet_tag).transpose()?;
+
                 let receiver_data = HoprSenderId::new(pseudonym);
 
                 // Create SURBs if some return paths were specified
@@ -193,6 +197,7 @@ impl PartialHoprPacket {
                     next_hop: forward_path[0],
                     ack_challenge: por_values.acknowledgement_challenge(),
                     encrypted_pix_share: None,
+                    final_packet_tag,
                 })
             }
             PacketRouting::Surb(id, surb) => {
@@ -225,6 +230,7 @@ impl PartialHoprPacket {
                     )?,
                     surbs: vec![],
                     openers: vec![],
+                    final_packet_tag: None,
                 })
             }
             PacketRouting::NoAck(destination) => {
@@ -259,6 +265,7 @@ impl PartialHoprPacket {
                     surbs: vec![],
                     openers: vec![],
                     encrypted_pix_share: None,
+                    final_packet_tag: None,
                 })
             }
         }
@@ -286,6 +293,7 @@ impl PartialHoprPacket {
                     next_hop: self.next_hop,
                     ack_challenge: self.ack_challenge,
                     encrypted_pix_share: self.encrypted_pix_share,
+                    final_packet_tag: self.final_packet_tag,
                 }
                 .into(),
             ),
@@ -346,6 +354,8 @@ pub struct HoprOutgoingPacket {
     /// This is populated only if this is a return path packet and the associated SURB contained an encrypted partial
     /// SSA share.
     pub encrypted_pix_share: Option<TaggedEncryptedPartialSsaShare<HoprPixSpec>>,
+    /// Tag the final hop derives for this packet; set only on packets built from a forward path.
+    pub final_packet_tag: Option<PacketTag>,
 }
 
 impl HoprOutgoingPacket {
@@ -752,6 +762,7 @@ impl HoprPacket {
                             next_hop: next_node,
                             ack_challenge: verification_output.ack_challenge,
                             encrypted_pix_share: None,
+                            final_packet_tag: None,
                         },
                         packet_tag,
                         ack_key,
@@ -1534,6 +1545,64 @@ mod tests {
         };
 
         assert_ne!(first_tag, second_tag, "the shared secret must change at every hop");
+        Ok(())
+    }
+
+    fn outgoing_tag(packet: &HoprPacket) -> anyhow::Result<Option<PacketTag>> {
+        match packet {
+            HoprPacket::Outgoing(out) => Ok(out.final_packet_tag),
+            _ => bail!("not an outgoing packet"),
+        }
+    }
+
+    /// The sender knows the tag the recipient will derive, for any path length, and it differs per packet.
+    #[parameterized(hops = { 0, 1, 2, 3 })]
+    fn the_final_packet_tag_should_be_known_to_the_sender(hops: usize) -> anyhow::Result<()> {
+        let (packet, _) = create_packet(hops, SimplePseudonym::random(), vec![], b"tagged")?;
+        let (other, _) = create_packet(hops, SimplePseudonym::random(), vec![], b"tagged")?;
+        let sent = outgoing_tag(&packet)?.context("forward packet must carry the tag")?;
+        assert_ne!(Some(sent), outgoing_tag(&other)?, "tags must differ per packet");
+        let size = packet.to_bytes().len();
+
+        let mut packet = packet;
+        for hop in 1..=hops + 1 {
+            packet = process_packet_at_node(hops + 1, hop, false, packet, |_| None)?;
+        }
+        match packet {
+            HoprPacket::Final(incoming) => assert_eq!(sent, incoming.packet_tag),
+            _ => bail!("expected the final packet"),
+        }
+        assert_eq!(HoprPacket::SIZE, size, "the packet size must not change");
+        Ok(())
+    }
+
+    #[test]
+    fn surb_and_no_ack_packets_should_carry_no_final_packet_tag() -> anyhow::Result<()> {
+        let pseudonym = SimplePseudonym::random();
+        let (packet, _) = create_packet(0, pseudonym, vec![0], b"with a surb")?;
+        let received = process_packet_at_node(1, 1, false, packet, |_| None)?;
+        let HoprPacket::Final(incoming) = received else {
+            bail!("expected the final packet");
+        };
+        let (surb_id, surb) = incoming.surbs[0].clone();
+        let reply = create_packet_from_surb(1, surb_id, surb, &pseudonym, b"reply")?;
+        assert_eq!(None, outgoing_tag(&reply)?);
+
+        let ticket = mock_ticket(PEERS[1].0.public(), 1)?;
+        let ssa_gen = hopr_protocol_pix::SsaShareGenerator::new(SsaGeneratorConfig::default());
+        let (no_ack, _) = HoprPacket::into_outgoing(
+            b"probe",
+            &pseudonym,
+            PacketRouting::<TransportPath>::NoAck(*PEERS[1].1.public()),
+            &PEERS[0].0,
+            ticket,
+            &*MAPPER,
+            &DirectKeyExpander,
+            &Hash::default(),
+            &ssa_gen,
+            FLAGS,
+        )?;
+        assert_eq!(None, outgoing_tag(&no_ack)?);
         Ok(())
     }
 
