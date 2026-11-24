@@ -2944,4 +2944,93 @@ mod tests {
         assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
         Ok(())
     }
+
+    #[test_log::test(tokio::test)]
+    async fn stateless_packed_socket_cancelled_write_does_not_leak_length_into_next_write() -> anyhow::Result<()> {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        use futures::{AsyncRead, AsyncWrite, AsyncWriteExt};
+
+        struct GatedSink {
+            open: Arc<AtomicBool>,
+            waker: Arc<parking_lot::Mutex<Option<std::task::Waker>>>,
+            written: Arc<parking_lot::Mutex<Vec<Vec<u8>>>>,
+        }
+
+        impl AsyncRead for GatedSink {
+            fn poll_read(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+                Poll::Pending
+            }
+        }
+
+        impl AsyncWrite for GatedSink {
+            fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+                if !self.open.load(Ordering::Acquire) {
+                    *self.waker.lock() = Some(cx.waker().clone());
+                    return Poll::Pending;
+                }
+                self.written.lock().push(buf.to_vec());
+                Poll::Ready(Ok(buf.len()))
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        const WIRE_MTU: usize = 1500;
+        let open = Arc::new(AtomicBool::new(false));
+        let waker = Arc::new(parking_lot::Mutex::new(None::<std::task::Waker>));
+        let written = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+        let mut socket = SessionSocket::<WIRE_MTU, _>::stateless_builder(
+            "alice",
+            GatedSink {
+                open: open.clone(),
+                waker: waker.clone(),
+                written: written.clone(),
+            },
+            SessionSocketConfig {
+                flush_immediately: true,
+                datagram: true,
+                pack_delay: Some(Duration::from_millis(5)),
+                ..Default::default()
+            },
+        )
+        .build()?;
+
+        // Fill the packer's bounded queue with 64-byte single-segment writes until one parks in
+        // `Poll::Pending`, then cancel that pending 64-byte write.
+        let payload_64 = [0xAAu8; 64];
+        let mut parked = false;
+        for _ in 0..256 {
+            let poll =
+                futures::future::poll_fn(|cx| Poll::Ready(Pin::new(&mut socket).poll_write(cx, &payload_64))).await;
+            match poll {
+                Poll::Ready(Ok(n)) => assert_eq!(64, n),
+                Poll::Ready(Err(e)) => anyhow::bail!("unexpected write error: {e}"),
+                Poll::Pending => {
+                    parked = true;
+                    break;
+                }
+            }
+        }
+        assert!(parked, "bounded packer queue should backpressure 64-byte writes");
+
+        // Unblock the underlying writer so the packer drains, then issue a 1-byte write.
+        open.store(true, Ordering::Release);
+        if let Some(w) = waker.lock().take() {
+            w.wake();
+        }
+
+        let n = socket.write(&[0x42]).await?;
+        assert_eq!(1, n, "1-byte write after cancelled 64-byte write must return Ok(1)");
+        socket.flush().await?;
+        assert!(!written.lock().is_empty());
+        Ok(())
+    }
 }
