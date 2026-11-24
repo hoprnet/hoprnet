@@ -429,25 +429,18 @@ fn with_signals(
 /// refund returns the SURB its sender already counted for a packet that leaves without one.
 fn drop_at_deadline(
     routing: &DestinationRouting,
-    error: Option<&PathPlannerError>,
+    error: &PathPlannerError,
     surb_wait: Duration,
     data: &ApplicationDataOut,
 ) {
     hopr_transport_session::counters::ROUTING_RESOLUTION_SURB_TIMEOUTS
         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    match error {
-        Some(error) => warn!(
-            ?routing,
-            ?surb_wait,
-            %error,
-            "dropping an outgoing packet: no SURB for its return path within the wait"
-        ),
-        None => warn!(
-            ?routing,
-            ?surb_wait,
-            "dropping an outgoing packet: no SURB for its return path within the wait"
-        ),
-    }
+    warn!(
+        ?routing,
+        ?surb_wait,
+        %error,
+        "dropping an outgoing packet: no SURB for its return path within the wait"
+    );
     data.surb_refund.give_back();
 }
 
@@ -554,7 +547,7 @@ where
                             Some(crate::trace_context::WithContext::new((resolved, data), output_span))
                         }
                         Err(error) if error.is_surb() && Instant::now() >= deadline => {
-                            drop_at_deadline(&routing, Some(&error), surb_wait, &data);
+                            drop_at_deadline(&routing, &error, surb_wait, &data);
                             drop(claim);
                             None
                         }
@@ -576,7 +569,7 @@ where
                                     },
                                     surb_wait,
                                 ),
-                                None => drop_at_deadline(&routing, Some(&error), surb_wait, &data),
+                                None => drop_at_deadline(&routing, &error, surb_wait, &data),
                             }
                             drop(claim);
                             None
@@ -678,7 +671,7 @@ where
             Some(crate::trace_context::WithContext::new((resolved, data), output_span))
         }
         Err(error) if error.is_surb() && Instant::now() >= deadline => {
-            drop_at_deadline(&routing, Some(&error), surb_wait, &data);
+            drop_at_deadline(&routing, &error, surb_wait, &data);
             hold.release(pseudonym, None);
             None
         }
@@ -1152,6 +1145,43 @@ mod tests {
         Ok(())
     }
 
+    /// The hold lane is bounded per session, and a packet that arrives past the bound is dropped
+    /// with the same accounting as one that timed out.
+    ///
+    /// The bound is what keeps a long SURB outage from pinning memory: without it, every packet the
+    /// session submits while it starves would be kept for the whole wait.
+    #[test_log::test(tokio::test)]
+    async fn a_full_hold_lane_should_drop_further_packets_of_its_session() -> anyhow::Result<()> {
+        // Counted through the refunds rather than the process counter: the other tests of this
+        // module drop packets too, and they run at the same time.
+        let refunds = Arc::new(AtomicU64::new(0));
+        let pseudonym = HoprPseudonym::random();
+        // One more packet than the lane holds, all of the same session and all starved.
+        let input = futures::stream::iter((0..=MAX_PARKED_PER_PSEUDONYM).map(|marker| {
+            let mut counted = packet(marker as u8);
+            counted.surb_refund = SurbRefund::to(refunds.clone());
+            (return_routing(pseudonym), counted)
+        }));
+
+        let emitted = stage(
+            input,
+            |_size_hint, _max_surbs, routing: DestinationRouting| async move { Err(no_surb(&routing)) },
+        )
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+        .await
+        .map_err(|_| anyhow::anyhow!("the hold lane never drained its parked packets"))?;
+
+        assert!(emitted.is_empty(), "a starved packet must not be emitted");
+        assert_eq!(
+            (MAX_PARKED_PER_PSEUDONYM + 1) as u64,
+            refunds.load(Ordering::Relaxed),
+            "every packet past the bound, and every parked one at its deadline, must give its SURB back"
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn an_unset_wait_should_fall_back_to_the_default() {
         assert_eq!(DEFAULT_SURB_RESOLUTION_WAIT, surb_resolution_wait(None));
@@ -1348,6 +1378,55 @@ mod tests {
             emitted.iter().map(|(_, data)| marker_of(data)).collect::<Vec<_>>(),
             vec![1, 2],
             "only the unroutable packet is dropped; the rest keep their order"
+        );
+
+        Ok(())
+    }
+
+    /// A return packet's SURB signals follow the SURBs it has left: none clears nothing to send on,
+    /// a few warn the peer, and the rest are quiet.
+    ///
+    /// The signals are read by the peer's balance report gate, so getting them wrong either hides a
+    /// starving session or cries wolf on every packet.
+    #[rstest::rstest]
+    #[case(Some(0), true, true)]
+    #[case(Some(1), false, true)]
+    #[case(Some(2), false, false)]
+    #[test_log::test(tokio::test)]
+    async fn a_return_packet_should_carry_the_surb_signals_its_remaining_surbs_imply(
+        #[case] remaining: Option<usize>,
+        #[case] out_of_surbs: bool,
+        #[case] distress: bool,
+    ) -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let sender = hopr_api::types::internal::routing::HoprSenderId::new(&pseudonym);
+        let surb = HoprSurb::try_from(vec![0u8; HoprSurb::SIZE].as_slice())?;
+        let input = futures::stream::iter(vec![(return_routing(pseudonym), packet(0))]);
+
+        let emitted = stage(input, move |_size_hint, _max_surbs, _routing: DestinationRouting| {
+            let surb = surb.clone();
+            async move { Ok((ResolvedTransportRouting::Return(sender, surb), remaining, None)) }
+        })
+        .take(1)
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+        .await
+        .map_err(|_| anyhow::anyhow!("the return packet was not emitted within {TEST_TIMEOUT:?}"))?;
+
+        let signals = emitted
+            .first()
+            .and_then(|(_, data)| data.packet_info.as_ref())
+            .map(|info| info.signals_to_destination)
+            .ok_or_else(|| anyhow::anyhow!("the emitted packet carries no packet info"))?;
+        assert_eq!(
+            out_of_surbs,
+            signals.contains(PacketSignal::OutOfSurbs),
+            "OutOfSurbs with {remaining:?} SURBs left"
+        );
+        assert_eq!(
+            distress,
+            signals.contains(PacketSignal::SurbDistress),
+            "SurbDistress with {remaining:?} SURBs left"
         );
 
         Ok(())

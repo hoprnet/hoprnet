@@ -296,6 +296,22 @@ mod tests {
         assert_eq!(atomic.saturating_diff(), 30);
     }
 
+    /// The socket gate reads the same estimate the balance report does: a SURB to answer with
+    /// exists only while the held count is above zero.
+    #[test]
+    fn atomic_estimator_should_report_a_surb_only_above_zero() {
+        use hopr_protocol_session::SurbAvailability as _;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        assert!(!estimator.has_surb(), "an empty store holds no SURB to answer with");
+
+        estimator.produced.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(estimator.has_surb(), "a produced SURB is one to answer with");
+
+        estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(!estimator.has_surb(), "a spent SURB leaves nothing to answer with");
+    }
+
     /// Eviction can drive the held count to zero: after an overflow whose surplus is later drained,
     /// consumed + evicted can meet produced, and the buffer is empty rather than "still full".
     #[test]

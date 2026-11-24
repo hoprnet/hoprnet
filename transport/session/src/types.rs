@@ -1800,6 +1800,113 @@ mod tests {
         Ok(())
     }
 
+    /// An Exit Session withholds the acknowledgements it owes while its SURB estimate is zero, and
+    /// sends them once the estimate rises.
+    ///
+    /// The gate itself is covered in `hopr-protocol-session`; this pins what reaches it, from the
+    /// Exit data plane's estimate into the reliable socket. Without the wiring, an Exit that cannot
+    /// answer still puts the acknowledgement into the egress, where it waits out
+    /// `surb_resolution_wait` and drops.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_session_should_withhold_acks_until_its_surb_estimate_is_above_zero() -> anyhow::Result<()> {
+        use hopr_protocol_session::types::SessionMessage;
+
+        // One frame of one segment, so a single write is a single frame to acknowledge.
+        let frame = hopr_protocol_session::session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>();
+        let id: SessionId = HoprPseudonym::random();
+        let estimator = crate::balancer::AtomicSurbFlowEstimator::default();
+        let sent: Arc<std::sync::Mutex<Vec<Vec<u8>>>> = Default::default();
+
+        let (entry_tx, exit_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let (exit_tx, exit_wire) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        // Drain what the Exit puts on the wire, whether or not the Entry reads it: the point is
+        // what the Exit sends, not what the peer does with it.
+        {
+            let sent = sent.clone();
+            tokio::spawn(async move {
+                use futures::StreamExt as _;
+                let mut exit_wire = exit_wire;
+                while let Some((_, data)) = exit_wire.next().await {
+                    sent.lock().unwrap().push(data.data.plain_text.to_vec());
+                }
+            });
+        }
+
+        let capabilities = Capability::Segmentation | Capability::RetransmissionAck;
+        let mut exit = HoprSession::new_with_surb_state(
+            id,
+            DestinationRouting::Return(id.into()),
+            HoprSessionConfig {
+                capabilities,
+                frame_mtu: frame,
+                ..Default::default()
+            },
+            (
+                exit_tx,
+                exit_rx.map(|(_, data)| ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                }),
+            ),
+            None,
+            None,
+            None,
+            None,
+            Some(Arc::new(estimator.clone())),
+        )?;
+        let mut entry = HoprSession::new(
+            id,
+            DestinationRouting::forward_only(*OffchainKeypair::random().public(), RoutingOptions::Hops(1.try_into()?)),
+            HoprSessionConfig {
+                capabilities,
+                frame_mtu: frame,
+                ..Default::default()
+            },
+            (entry_tx, futures::stream::pending()),
+            None,
+        )?;
+
+        let mut received = vec![0u8; frame];
+        entry.write_all(&vec![7u8; frame]).await?;
+        entry.flush().await?;
+        exit.read_exact(&mut received).await?;
+
+        // Twice the 50 ms acknowledgement delay, so an acknowledgement that was going to be sent
+        // would have been by now.
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        assert!(
+            sent.lock().unwrap().is_empty(),
+            "an acknowledgement went out while the Exit estimated no SURB"
+        );
+
+        estimator.produced.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        entry.write_all(&vec![8u8; frame]).await?;
+        entry.flush().await?;
+        exit.read_exact(&mut received).await?;
+
+        let acknowledged = tokio::time::timeout(Duration::from_millis(500), async {
+            loop {
+                let acknowledged = sent.lock().unwrap().iter().any(|bytes| {
+                    matches!(
+                        SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(bytes.as_slice()),
+                        Ok(SessionMessage::Acknowledge(_))
+                    )
+                });
+                if acknowledged {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        assert!(
+            acknowledged.is_ok(),
+            "the acknowledgement never went out after the SURB estimate rose above zero"
+        );
+
+        Ok(())
+    }
+
     #[test_log::test(tokio::test)]
     async fn test_session_bidirectional_flow_without_segmentation() -> anyhow::Result<()> {
         let dst: Address = (&ChainKeypair::random()).into();
