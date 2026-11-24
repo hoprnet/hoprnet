@@ -19,10 +19,11 @@
 //! values as the draws even out. An operator can alert on a score that stays near 1.
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashSet, VecDeque},
     hash::Hash,
 };
 
+use ahash::HashMap;
 use hopr_api::OffchainPublicKey;
 
 /// Draws a session needs in a dimension before its score may raise a WARN.
@@ -111,6 +112,37 @@ fn count_log_count_delta(from: usize, to: usize) -> f64 {
     term(to) - term(from)
 }
 
+/// The same total, with nothing behind it, where no gauge reads it.
+#[cfg(not(any(test, feature = "telemetry")))]
+#[derive(Debug)]
+struct Pooled<K> {
+    _marker: std::marker::PhantomData<K>,
+}
+
+#[cfg(not(any(test, feature = "telemetry")))]
+impl<K: Copy + Eq + Hash> Default for Pooled<K> {
+    fn default() -> Self {
+        Self {
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+#[cfg(not(any(test, feature = "telemetry")))]
+impl<K: Copy + Eq + Hash> Pooled<K> {
+    fn add(&mut self, _value: K) {}
+
+    fn retract(&mut self, _value: K, _drawn: usize) {}
+
+    fn score(&self) -> Option<f64> {
+        None
+    }
+
+    fn draws(&self) -> usize {
+        0
+    }
+}
+
 /// The last `capacity` values a session drew, with their counts and `Σ c·ln c` alongside.
 #[derive(Debug)]
 struct DiversityWindow<K> {
@@ -129,7 +161,7 @@ impl<K: Copy + Eq + Hash> DiversityWindow<K> {
             // Grown by the draws themselves: reserving the configured window up front would commit
             // its whole length on the first draw, for a node that may never reach it.
             drawn: VecDeque::new(),
-            counts: HashMap::new(),
+            counts: HashMap::default(),
             sum_count_log_count: 0.0,
         }
     }
@@ -169,9 +201,12 @@ impl<K: Copy + Eq + Hash> DiversityWindow<K> {
     }
 }
 
-/// The node-wide total of one dimension's draws, kept as the windows change.
+/// The node-wide total of one dimension's draws.
 ///
-/// Maintained incrementally because it is read on each return-path draw, which is the packet path.
+/// Only the gauges read a pooled score, so a build without telemetry does no pooled work at all:
+/// the windows still feed the per-session WARN, but keeping a second set of counts in step would
+/// be a cost with no reader.
+#[cfg(any(test, feature = "telemetry"))]
 #[derive(Debug)]
 struct Pooled<K> {
     counts: HashMap<K, usize>,
@@ -179,16 +214,18 @@ struct Pooled<K> {
     sum_count_log_count: f64,
 }
 
+#[cfg(any(test, feature = "telemetry"))]
 impl<K: Copy + Eq + Hash> Default for Pooled<K> {
     fn default() -> Self {
         Self {
-            counts: HashMap::new(),
+            counts: HashMap::default(),
             drawn: 0,
             sum_count_log_count: 0.0,
         }
     }
 }
 
+#[cfg(any(test, feature = "telemetry"))]
 impl<K: Copy + Eq + Hash> Pooled<K> {
     fn add(&mut self, value: K) {
         let count = self.counts.get(&value).copied().unwrap_or(0);
@@ -236,12 +273,16 @@ struct SessionWindows {
 }
 
 /// Records `values` into one window, keeping `pooled` in step with what the window retains.
-fn record_batch<K: Copy + Eq + Hash>(window: &mut DiversityWindow<K>, pooled: &mut Pooled<K>, values: &[K]) {
+fn record_batch<K: Copy + Eq + Hash>(
+    window: &mut DiversityWindow<K>,
+    pooled: &mut Pooled<K>,
+    values: impl Iterator<Item = K>,
+) {
     for value in values {
-        if let Some(evicted) = window.record(*value) {
+        if let Some(evicted) = window.record(value) {
             pooled.retract(evicted, 1);
         }
-        pooled.add(*value);
+        pooled.add(value);
     }
 }
 
@@ -268,7 +309,7 @@ impl DiversityTracker {
             window: window.max(1),
             threshold,
             ticks: 0,
-            sessions: HashMap::new(),
+            sessions: HashMap::default(),
             pooled_forward_first_hop: Pooled::default(),
             pooled_return_first_hop: Pooled::default(),
             pooled_route: Pooled::default(),
@@ -291,7 +332,7 @@ impl DiversityTracker {
             record_batch(
                 &mut session.forward_first_hop,
                 &mut self.pooled_forward_first_hop,
-                &[first_hop],
+                std::iter::once(first_hop),
             );
             session.forward_first_hop_drawn += 1;
         }
@@ -299,9 +340,12 @@ impl DiversityTracker {
     }
 
     /// Records the routes one packet's SURBs took, under the key of the return leg that chose them.
+    ///
+    /// Takes the routes as an iterator, so the packet path does not build a vector per packet.
     #[cfg(any(test, feature = "telemetry"))]
-    pub(crate) fn record_routes(&mut self, key: DiversityKey, routes: &[u64]) {
-        if routes.is_empty() {
+    pub(crate) fn record_routes(&mut self, key: DiversityKey, routes: impl Iterator<Item = u64> + Clone) {
+        let drawn = routes.clone().count();
+        if drawn == 0 {
             return;
         }
         self.tick_and_evict(key);
@@ -311,14 +355,21 @@ impl DiversityTracker {
                 .get_mut(&key)
                 .expect("the session was created by tick_and_evict");
             record_batch(&mut session.route, &mut self.pooled_route, routes);
-            session.route_drawn += routes.len();
+            session.route_drawn += drawn;
         }
         self.apply_threshold(key, Dimension::Route);
     }
 
     /// Records the first relayers of every return path drawn for `key` in one batch.
-    pub(crate) fn record_returns(&mut self, key: DiversityKey, first_hops: &[OffchainPublicKey]) {
-        if first_hops.is_empty() {
+    ///
+    /// Takes the draws as an iterator, so the packet path does not build a vector per packet.
+    pub(crate) fn record_returns(
+        &mut self,
+        key: DiversityKey,
+        first_hops: impl Iterator<Item = OffchainPublicKey> + Clone,
+    ) {
+        let drawn = first_hops.clone().count();
+        if drawn == 0 {
             return;
         }
         self.tick_and_evict(key);
@@ -332,7 +383,7 @@ impl DiversityTracker {
                 &mut self.pooled_return_first_hop,
                 first_hops,
             );
-            session.return_first_hop_drawn += first_hops.len();
+            session.return_first_hop_drawn += drawn;
         }
         self.apply_threshold(key, Dimension::ReturnFirstHop);
     }
@@ -508,7 +559,7 @@ mod tests {
     /// Records `count` routes that alternate over `routes`, as one SURB each.
     fn draw_routes(tracker: &mut DiversityTracker, routes: &[u64], count: usize) {
         for i in 0..count {
-            tracker.record_routes(key(), &[routes[i % routes.len()]]);
+            tracker.record_routes(key(), [routes[i % routes.len()]].into_iter());
         }
     }
 
@@ -534,7 +585,7 @@ mod tests {
     fn collapsed_first_hop_scores_one() -> anyhow::Result<()> {
         let mut tracker = DiversityTracker::new(100, 0.0);
         draw_forward(&mut tracker, &[relayer(1)], 100);
-        tracker.record_returns(key(), &[relayer(2); 10]);
+        tracker.record_returns(key(), [relayer(2); 10].into_iter());
 
         assert_close(
             1.0,
@@ -558,7 +609,7 @@ mod tests {
         let mut tracker = DiversityTracker::new(100, 0.0);
         for i in 0..20 {
             tracker.record_forward_first_hop(key(), relayer(1 + (i % 2) as u8));
-            tracker.record_returns(key(), &[relayer(3)]);
+            tracker.record_returns(key(), [relayer(3)].into_iter());
         }
 
         assert_close(
@@ -681,7 +732,7 @@ mod tests {
     #[test]
     fn the_published_counts_follow_the_pooled_draws() -> anyhow::Result<()> {
         let mut tracker = DiversityTracker::new(10, 0.0);
-        tracker.record_returns(key(), &[relayer(1), relayer(2)]);
+        tracker.record_returns(key(), [relayer(1), relayer(2)].into_iter());
         let scores = tracker.scores();
         assert_eq!(2, scores.return_first_hop_draws);
         assert_eq!(0, scores.route_draws);
@@ -770,7 +821,7 @@ mod tests {
         let own: DiversityKey = (relayer(1), 1);
         for _ in 0..10 {
             tracker.record_forward_first_hop(own, relayer(1));
-            tracker.record_routes(own, &[1]);
+            tracker.record_routes(own, [1].into_iter());
         }
         let before = tracker.scores();
         assert_close(1.0, before.forward_first_hop.context("pooled forward score")?);
@@ -780,7 +831,7 @@ mod tests {
         for i in 0..(MAX_TRACKED_SESSIONS as u32) {
             let key: DiversityKey = (relayer((i % 200) as u8 + 2), 1 + i / 200);
             tracker.record_forward_first_hop(key, relayer(9));
-            tracker.record_routes(key, &[9]);
+            tracker.record_routes(key, [9].into_iter());
         }
 
         assert_eq!(
@@ -802,7 +853,7 @@ mod tests {
     fn a_batch_that_outgrows_the_window_leaves_no_trace_in_the_pooled_score() -> anyhow::Result<()> {
         let mut tracker = DiversityTracker::new(1, 0.0);
 
-        tracker.record_routes(key(), &[1, 2]);
+        tracker.record_routes(key(), [1, 2].into_iter());
         assert_close(
             1.0,
             tracker
@@ -818,7 +869,7 @@ mod tests {
         );
 
         // B is now replaced by C: still one route in the window.
-        tracker.record_routes(key(), &[3]);
+        tracker.record_routes(key(), [3].into_iter());
         assert_close(
             1.0,
             tracker
@@ -862,7 +913,7 @@ mod tests {
 
         // A return draw through a different single relayer breaches that dimension on its own,
         // once it has drawn enough for the score to mean anything.
-        tracker.record_returns(key(), &[relayer(2); 10]);
+        tracker.record_returns(key(), [relayer(2); 10].into_iter());
         let breach = logs.records("path relayer diversity at or below the configured minimum");
         assert_eq!(2, breach.len(), "the return dimension must warn on its own breach");
         assert_eq!("ReturnFirstHop", breach[1].fields["dimension"]);
@@ -896,7 +947,7 @@ mod tests {
         let mut tracker = DiversityTracker::new(100, 1.0);
 
         draw_forward(&mut tracker, &[relayer(1)], MIN_DRAWS_FOR_THRESHOLD - 1);
-        tracker.record_returns(key(), &[relayer(2); MIN_DRAWS_FOR_THRESHOLD - 1]);
+        tracker.record_returns(key(), [relayer(2); MIN_DRAWS_FOR_THRESHOLD - 1].into_iter());
 
         assert!(
             logs.records("path relayer diversity at or below the configured minimum")
@@ -915,7 +966,7 @@ mod tests {
         let mut tracker = DiversityTracker::new(100, 0.0);
 
         draw_forward(&mut tracker, &[relayer(1)], 10);
-        tracker.record_returns(key(), &[relayer(2)]);
+        tracker.record_returns(key(), [relayer(2)].into_iter());
 
         assert!(
             logs.records("path relayer diversity at or below the configured minimum")

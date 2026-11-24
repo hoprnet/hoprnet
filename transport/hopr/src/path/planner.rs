@@ -765,7 +765,9 @@ type PlannerCacheValue = Arc<CandidateSet>;
 fn route_hash(forward: &ValidatedPath, ret: &ValidatedPath) -> u64 {
     use std::hash::{Hash as _, Hasher as _};
 
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    // `ahash` rather than SipHash: this is hashed once per SURB on the packet path, and the value
+    // never leaves the process, so a keyed hash buys nothing here.
+    let mut hasher = ahash::AHasher::default();
     for key in forward.iter() {
         key.hash(&mut hasher);
     }
@@ -1452,43 +1454,16 @@ where
             "drew return paths"
         );
 
-        self.record_return_path_diversity(destination, u32::from(hops), &drawn)
-            .await;
-
+        // Recorded with the rest of the packet in `record_route_diversity`: one resolution and one
+        // lock for everything this packet draws, rather than one of each per leg.
         Ok(drawn)
     }
 
-    /// Records the first relayer of every drawn return path and publishes the pooled diversity.
+    /// Records everything one resolved packet draws: both first hops and each SURB's whole route.
     ///
-    /// A draw is where a session's relayer choice becomes real, so this is where the diversity
-    /// window is fed; the candidate pool would only say what was on offer. A destination this node
-    /// cannot resolve skips the observation instead of failing a draw that already succeeded.
-    async fn record_return_path_diversity(&self, destination: NodeId, hops: u32, drawn: &[ValidatedPath]) {
-        let relayers = drawn
-            .iter()
-            .filter_map(|path| path.first().copied())
-            .collect::<Vec<_>>();
-        if relayers.is_empty() {
-            return;
-        }
-        let Ok(destination) = self.resolve_node_id_to_offchain_key(&destination).await else {
-            tracing::trace!(%destination, "destination key unresolved, return-path diversity not observed");
-            return;
-        };
-
-        // Recorded only: the same packet goes on to `record_route_diversity`, which publishes the
-        // scores once for everything this packet drew. Publishing here too would set every gauge
-        // series twice per packet.
-        let mut tracker = self.paths.return_path_diversity.lock();
-        tracker.record_returns((destination, hops), &relayers);
-    }
-
-    /// Records the forward path and the whole routes of one packet: each SURB's forward path
-    /// together with the return path it was given.
-    ///
-    /// The route dimension is what catches a stable pair of relayers behind varied first hops, so
-    /// it is recorded where both legs are known. A destination this node cannot resolve skips the
-    /// observation instead of failing a packet that already resolved.
+    /// Both legs are known only here, and the tracker is taken once for the whole packet rather
+    /// than once per leg: this runs on the packet path. A destination this node cannot resolve
+    /// skips the observation instead of failing a packet that already resolved.
     async fn record_route_diversity(
         &self,
         destination: NodeId,
@@ -1510,10 +1485,7 @@ where
         // The route dimension has no threshold and only the gauge reads it, so a build without
         // telemetry does not hash a pair per SURB or keep its window at all.
         #[cfg(any(test, feature = "telemetry"))]
-        let routes = return_paths
-            .iter()
-            .map(|ret| route_hash(forward, ret))
-            .collect::<Vec<_>>();
+        let routes = return_paths.iter().map(|ret| route_hash(forward, ret));
         #[cfg(not(any(test, feature = "telemetry")))]
         let _ = (return_paths, return_hops);
 
@@ -1521,6 +1493,12 @@ where
         // so the packet path does not set eight series. A build without the tokio runtime never
         // starts that sweep, so there this is the only publisher and it runs per packet.
         let mut tracker = self.paths.return_path_diversity.lock();
+        if let Some(return_hops) = return_hops {
+            tracker.record_returns(
+                (destination, return_hops),
+                return_paths.iter().filter_map(|path| path.first().copied()),
+            );
+        }
         if let Some(first_relayer) = first_relayer {
             // Keyed by the forward leg's hops: a session's two legs are scored in the sessions
             // their own hop counts name, so a differing return leg cannot move the forward score.
@@ -1529,9 +1507,7 @@ where
         // Keyed by the return leg where the planner chose one, and by the forward leg otherwise:
         // a direct or explicit return still pairs with the forward path on every SURB it carries.
         #[cfg(any(test, feature = "telemetry"))]
-        if !routes.is_empty() {
-            tracker.record_routes((destination, return_hops.unwrap_or(forward_hops)), &routes);
-        }
+        tracker.record_routes((destination, return_hops.unwrap_or(forward_hops)), routes);
         #[cfg(all(feature = "telemetry", not(feature = "runtime-tokio"), not(test)))]
         publish_path_diversity(&tracker);
     }
@@ -2928,29 +2904,33 @@ mod tests {
     /// ends of its range rather than at either of them.
     #[tokio::test]
     async fn drawn_return_paths_feed_the_relayer_diversity_tracker() -> anyhow::Result<()> {
-        let (planner, _graph) = two_relayer_return_planner_with_floor(0);
+        let (planner, _graph) = two_relayer_bidirectional_planner();
         for _ in 0..20 {
             planner
-                .resolve_diverse_return_paths(
-                    NodeId::Offchain(pubkey(&SECRET_DEST)),
-                    RoutingOptions::Hops(1.try_into()?),
+                .resolve_routing(
+                    10,
                     2,
+                    DestinationRouting::Forward {
+                        destination: Box::new(NodeId::Offchain(pubkey(&SECRET_DEST))),
+                        pseudonym: None,
+                        forward_options: RoutingOptions::Hops(1.try_into()?),
+                        return_options: Some(RoutingOptions::Hops(1.try_into()?)),
+                    },
                 )
                 .await?;
         }
 
-        let score = planner
-            .path_diversity_scores()
+        let scores = planner.path_diversity_scores();
+        let score = scores
             .return_first_hop
             .context("a draw must have populated the window")?;
         assert!(
             score > 1.0 && score <= 2.0 + 1e-9,
             "a valuation spread over two relayers must score between 1 and 2, got {score}"
         );
-        assert_eq!(
-            None,
-            planner.path_diversity_scores().forward_first_hop,
-            "a return-path draw alone must not populate the forward dimension"
+        assert!(
+            scores.forward_first_hop.is_some(),
+            "and the same packet scored its forward leg"
         );
         anyhow::Ok(())
     }
@@ -2958,6 +2938,12 @@ mod tests {
     /// A `me <-> {a,b} <-> dest` topology: both legs exist, so one packet yields a forward path and
     /// the return paths its SURBs take.
     fn two_relayer_bidirectional_planner() -> (TestPlanner, ChannelGraph) {
+        two_relayer_bidirectional_planner_with(0, small_config().min_path_diversity)
+    }
+
+    /// The same both-legs topology with a floor and a diversity threshold, so a test can watch a
+    /// session held on one relayer.
+    fn two_relayer_bidirectional_planner_with(floor: usize, threshold: f64) -> (TestPlanner, ChannelGraph) {
         let me = pubkey(&SECRET_ME);
         let a = pubkey(&SECRET_A);
         let b = pubkey(&SECRET_B);
@@ -2982,7 +2968,8 @@ mod tests {
         }
 
         let cfg = PathPlannerConfig {
-            min_paths_anonymity_floor: 0,
+            min_paths_anonymity_floor: floor,
+            min_path_diversity: threshold,
             ..small_config()
         };
         let selector = HoprGraphPathSelector::new(
@@ -3132,7 +3119,7 @@ mod tests {
         use tracing::instrument::WithSubscriber;
 
         // Floor 1 caps the two relayers onto one, so every draw goes through the same relayer.
-        let (planner, _graph) = two_relayer_return_planner_with_diversity_threshold(1, 2.0);
+        let (planner, _graph) = two_relayer_bidirectional_planner_with(1, 2.0);
         // Keep callsite interest responsive to the scoped subscriber below: a lone registered
         // dispatch leaves callsites first reached on a worker thread cached as `never`.
         let _other_dispatch = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
@@ -3141,10 +3128,15 @@ mod tests {
             // Two return paths per packet, and the check waits for a window worth judging.
             for _ in 0..6 {
                 planner
-                    .resolve_diverse_return_paths(
-                        NodeId::Offchain(pubkey(&SECRET_DEST)),
-                        RoutingOptions::Hops(1.try_into()?),
+                    .resolve_routing(
+                        10,
                         2,
+                        DestinationRouting::Forward {
+                            destination: Box::new(NodeId::Offchain(pubkey(&SECRET_DEST))),
+                            pseudonym: None,
+                            forward_options: RoutingOptions::Hops(1.try_into()?),
+                            return_options: Some(RoutingOptions::Hops(1.try_into()?)),
+                        },
                     )
                     .await?;
             }
