@@ -14,7 +14,8 @@ use tokio::{sync::watch, time::Instant};
 /// A dial of `m` spaces generated probes `pace / m` apart, where `pace` is [`ProbeConfig::pace`](crate::ProbeConfig).
 /// It carries any positive multiplier, not only the presets. Probing off is [`ProbeControl::set_dial`] with `None`.
 ///
-/// The default is 3.0 times the base rate.
+/// The default is 3.0 times the base rate: with a probe share of `0.4` this pair kept the return
+/// path within its recovery bound in the integration runs.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Dial(f64);
 
@@ -43,10 +44,6 @@ impl Dial {
 }
 
 impl Default for Dial {
-    /// Three times the base rate.
-    ///
-    /// This dial with a probe share of `0.4` kept the return path within its recovery bound in the
-    /// integration runs, so a node probes at 3x unless an application sets another dial.
     fn default() -> Self {
         Self(3.0)
     }
