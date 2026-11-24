@@ -1476,11 +1476,11 @@ where
             return;
         };
 
+        // Recorded only: the same packet goes on to `record_route_diversity`, which publishes the
+        // scores once for everything this packet drew. Publishing here too would set every gauge
+        // series twice per packet.
         let mut tracker = self.paths.return_path_diversity.lock();
         tracker.record_returns((destination, hops), &relayers);
-        // Published under the recording lock: releasing it first lets a later record publish a
-        // newer score that this call then overwrites with its older snapshot.
-        publish_path_diversity(&tracker);
     }
 
     /// Records the forward path and the whole routes of one packet: each SURB's forward path
@@ -1517,6 +1517,8 @@ where
         #[cfg(not(any(test, feature = "telemetry")))]
         let _ = (return_paths, return_hops);
 
+        // Recorded only: the gauges are published from the background sweep, which keeps the
+        // packet path free of setting eight series.
         let mut tracker = self.paths.return_path_diversity.lock();
         if let Some(first_relayer) = first_relayer {
             // Keyed by the forward leg's hops: a session's two legs are scored in the sessions
@@ -1529,7 +1531,6 @@ where
         if !routes.is_empty() {
             tracker.record_routes((destination, return_hops.unwrap_or(forward_hops)), &routes);
         }
-        publish_path_diversity(&tracker);
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -1683,7 +1684,13 @@ where
         .for_each(move |_| {
             let cache = cache.clone();
             let paths = paths.clone();
-            async move { paths.sweep(&cache).await }
+            async move {
+                paths.sweep(&cache).await;
+                // The diversity gauges are published here, once per sweep, rather than on the
+                // packet path: setting eight series per packet measurably cost more than drawing
+                // the path, and a sweep's staleness in seconds is nothing on an alert's timescale.
+                publish_path_diversity(&paths.return_path_diversity.lock());
+            }
         })
         .instrument(tracing::debug_span!(parent: None, "planner.background_refresh"))
     }
