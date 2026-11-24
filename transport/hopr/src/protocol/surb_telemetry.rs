@@ -208,6 +208,14 @@ impl SurbRoundTripCounters {
     }
 }
 
+/// A SURB written off through a dead relayer: when, which ages the write-off out, and when the SURB was minted,
+/// which tells the generation it belongs to.
+#[derive(Debug, Clone, Copy)]
+struct WriteOff {
+    at: Instant,
+    minted_at: Instant,
+}
+
 /// Round-trip counts keyed by the legs they were observed over.
 ///
 /// Batching is not an optimisation here but a requirement: recording an edge takes a write lock on
@@ -231,9 +239,9 @@ pub struct SurbRoundTripRegistry {
     /// known dead (a lapsed verdict only times out, the write-off outlives it), but dropped when the
     /// session's generation is advanced: the counterparty drops the stock the count stood for, and
     /// what is counted afterwards is only the SURBs through the relayer minted since, the probes.
-    /// Each entry is the instants its SURBs were written off, oldest first, aged out after
-    /// `WRITE_OFF_HORIZON`; the count is their number.
-    written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, VecDeque<Instant>>>>,
+    /// Each entry holds its SURBs' write-offs, oldest first, aged out after `WRITE_OFF_HORIZON`; the count is
+    /// their number.
+    written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, VecDeque<WriteOff>>>>,
     /// When a dead verdict last made [`write_off_dead`](Self::write_off_dead) report a session for a
     /// relayer, so that the same pair is not reported again. Kept for as long as the relayer is known
     /// dead, and for `REBUMP_COOLDOWN` after it is not, so a pair advanced in this death stays
@@ -256,6 +264,8 @@ pub struct SurbRoundTripRegistry {
     /// here has already settled what the counterparty held, so such an eviction is not counted in
     /// [`take_pending_lost`](Self::take_pending_lost).
     written_off_legs: Arc<RandomEvictionMap<(ReturnRelayers, Instant)>>,
+    /// Held across each write-off's snapshot and walk, so two walks cannot both settle one SURB.
+    write_off_walk: Arc<parking_lot::Mutex<()>>,
     /// Records `pending` could not hold and evicted before their reply came home, since the last
     /// [`take_pending_lost`](Self::take_pending_lost). An evicted record settles no race and is never
     /// written off, so its Session's SURBs through a dead relayer may go unnoticed. Zero in a
@@ -337,6 +347,7 @@ impl SurbRoundTripRegistry {
             written_off: Default::default(),
             bumped: Default::default(),
             written_off_legs: Arc::new(written_off_legs),
+            write_off_walk: Default::default(),
             pending_lost: Default::default(),
             forward: Default::default(),
         }
@@ -475,7 +486,7 @@ impl SurbRoundTripRegistry {
                 // Spent by the counterparty since, and gone with it: see `WRITE_OFF_HORIZON`.
                 while written_off_at
                     .front()
-                    .is_some_and(|at| at.elapsed() > WRITE_OFF_HORIZON)
+                    .is_some_and(|write_off| write_off.at.elapsed() > WRITE_OFF_HORIZON)
                 {
                     written_off_at.pop_front();
                 }
@@ -556,6 +567,12 @@ impl SurbRoundTripRegistry {
     /// Returns the sessions a dead verdict reached for the first time, see `write_off`.
     pub fn write_off_dead(&self) -> Vec<HoprPseudonym> {
         self.age_write_offs();
+        self.write_off_dead_stock()
+    }
+
+    /// Snapshots the stock through dead relayers and writes it off, holding `write_off_walk` throughout.
+    fn write_off_dead_stock(&self) -> Vec<HoprPseudonym> {
+        let _walk = self.write_off_walk.lock();
         self.write_off(self.dead_stock())
     }
 
@@ -617,7 +634,10 @@ impl SurbRoundTripRegistry {
             }
             let mut session = self.written_off.entry(pseudonym).or_default();
             let first_for_pair = !session.contains_key(&dead);
-            session.entry(dead).or_default().push_back(Instant::now());
+            session.entry(dead).or_default().push_back(WriteOff {
+                at: Instant::now(),
+                minted_at,
+            });
             drop(session);
             // A probe, not stock: see the docs above. Judged per SURB, and before the mark, so that a
             // probe written off first leaves the stock SURBs of the same pass free to report the pair.
@@ -670,28 +690,48 @@ impl SurbRoundTripRegistry {
                 }
             }
 
-            // The counterparty drops its whole stock on the first batch of the new generation, but it
-            // goes on spending that stock until the batch arrives. Taken out of `pending`, these SURBs
-            // cannot make a second relayer confirmed at a later flush look as if it still had a stock
-            // to wipe. Their legs are kept as written-off legs are, before they leave `pending`, so
-            // that a reply spent in the meantime still proves its relayers alive: it can revive one
-            // judged dead in this same flush, whose verdict is not confirmed yet. A second walk, but
-            // only when a session was reached, which is once per verdict.
-            let mut wiped: Vec<(HoprSurbId, ReturnRelayers, Instant)> = Vec::new();
-            self.pending.for_each(|id, pending| {
-                if reached.contains(&pending.pseudonym) {
-                    wiped.push((*id, pending.return_relayers, pending.minted_at));
-                }
-            });
-            for (id, return_relayers, minted_at) in wiped {
-                self.remember_written_off(id, return_relayers, minted_at);
-                if self.pending.remove(&id).is_none() {
-                    // Spent in between, as in the loop above: the counterparty no longer holds it.
-                    self.written_off_legs.remove(&id);
-                }
-            }
+            // The counterparty drops its whole stock on the first batch of the new generation; taking these
+            // SURBs out of `pending` keeps a later verdict from counting that stock again.
+            self.write_off_pending_where(|pseudonym, _| reached.contains(pseudonym));
         }
         reached
+    }
+
+    /// Writes off `pseudonym`'s pending SURBs minted before `minted_before`, the ones a new SURB generation wipes.
+    ///
+    /// Walks the whole pending map (some 10 ms at the default budget), so call it off the runtime worker.
+    pub fn write_off_pending(&self, pseudonym: &HoprPseudonym, minted_before: Instant) {
+        let _walk = self.write_off_walk.lock();
+        self.write_off_pending_where(|candidate, minted_at| candidate == pseudonym && minted_at < minted_before);
+        // The counterparty drops the old generation's write-offs with the rest of its stock, so, as after a wipe in
+        // `write_off`, they no longer count as invalid. Judged by mint time: a walk that raced the advance can have
+        // written off an old SURB after the cutoff.
+        if let Some(mut session) = self.written_off.get_mut(pseudonym) {
+            session.retain(|_, written_off_at| {
+                written_off_at.retain(|write_off| write_off.minted_at >= minted_before);
+                !written_off_at.is_empty()
+            });
+        }
+        self.written_off.remove_if(pseudonym, |_, session| session.is_empty());
+    }
+
+    /// Writes off the pending SURBs of every pseudonym `wiped` accepts, in one walk.
+    ///
+    /// The legs are kept, so a reply spent in the meantime still proves its relayers alive.
+    fn write_off_pending_where(&self, wiped: impl Fn(&HoprPseudonym, Instant) -> bool) {
+        let mut doomed: Vec<(HoprSurbId, ReturnRelayers, Instant)> = Vec::new();
+        self.pending.for_each(|id, pending| {
+            if wiped(&pending.pseudonym, pending.minted_at) {
+                doomed.push((*id, pending.return_relayers, pending.minted_at));
+            }
+        });
+        for (id, return_relayers, minted_at) in doomed {
+            self.remember_written_off(id, return_relayers, minted_at);
+            if self.pending.remove(&id).is_none() {
+                // Spent in between: the counterparty no longer holds it.
+                self.written_off_legs.remove(&id);
+            }
+        }
     }
 
     /// Per session, how many SURBs held by the counterparty cannot bring a reply home, and their share
@@ -2089,15 +2129,12 @@ where
         return Vec::new();
     }
     let registry = registry.clone();
-    hopr_utils::parallelize::cpu::spawn_blocking(
-        move || registry.write_off(registry.dead_stock()),
-        "surb_write_off_dead",
-    )
-    .await
-    .unwrap_or_else(|error| {
-        tracing::warn!(%error, "SURB write-off deferred to the next flush");
-        Vec::new()
-    })
+    hopr_utils::parallelize::cpu::spawn_blocking(move || registry.write_off_dead_stock(), "surb_write_off_dead")
+        .await
+        .unwrap_or_else(|error| {
+            tracing::warn!(%error, "SURB write-off deferred to the next flush");
+            Vec::new()
+        })
 }
 
 /// The invalid SURBs to hand each session this tick: every current mark, re-applied so a session
@@ -4245,6 +4282,130 @@ mod tests {
         Ok(())
     }
 
+    /// Writing off one pseudonym's pending SURBs leaves the others', and keeps the legs of what it takes.
+    #[test]
+    fn writing_off_pending_surbs_takes_only_that_pseudonyms_and_keeps_their_legs() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let relayer = key();
+        let other = HoprPseudonym::random();
+        registry.pending.insert(surb_id(1), pending_to(&[relayer], None, 0));
+        let mut elsewhere = pending_to(&[relayer], None, 0);
+        elsewhere.pseudonym = other;
+        registry.pending.insert(surb_id(2), elsewhere);
+
+        registry.write_off_pending(&SESSION, Instant::now() + Duration::from_secs(1));
+
+        assert!(
+            !registry.pending.contains_key(&surb_id(1)),
+            "the pseudonym's SURB is taken"
+        );
+        assert!(
+            registry.written_off_legs.contains_key(&surb_id(1)),
+            "its leg is kept, so a reply on it still proves the relayers alive"
+        );
+        assert!(
+            registry.pending.contains_key(&surb_id(2)),
+            "another pseudonym's SURB is left"
+        );
+        assert!(!registry.written_off_legs.contains_key(&surb_id(2)));
+        Ok(())
+    }
+
+    /// A pending write-off waits for a walk already running, so two walks cannot both settle one SURB.
+    #[test]
+    fn writing_off_pending_surbs_waits_for_a_running_walk() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        registry.pending.insert(surb_id(1), pending_to(&[key()], None, 0));
+
+        let walk = registry.write_off_walk.lock();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let worker = {
+            let registry = registry.clone();
+            std::thread::spawn(move || {
+                let _ = started_tx.send(());
+                registry.write_off_pending(&SESSION, Instant::now() + Duration::from_secs(1));
+            })
+        };
+        started_rx.recv().context("the write-off thread never started")?;
+        // The thread is blocked on the lock, or about to be: either way it cannot have walked yet.
+        assert!(
+            registry.pending.contains_key(&surb_id(1)),
+            "nothing is written off while the walk runs"
+        );
+
+        drop(walk);
+        worker
+            .join()
+            .map_err(|_| anyhow::anyhow!("the write-off thread panicked"))?;
+        assert!(
+            !registry.pending.contains_key(&surb_id(1)),
+            "written off once the walk is done"
+        );
+        assert!(
+            registry.written_off_legs.contains_key(&surb_id(1)),
+            "and its leg is kept"
+        );
+        Ok(())
+    }
+
+    /// SURBs minted at or after the cutoff, the new generation's own, stay pending.
+    #[test]
+    fn writing_off_pending_surbs_leaves_those_minted_after_the_cutoff() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let relayer = key();
+        let cutoff = Instant::now();
+        let mut stale = pending_to(&[relayer], None, 0);
+        stale.minted_at = ago(Duration::from_secs(1))?;
+        registry.pending.insert(surb_id(1), stale);
+        let mut fresh = pending_to(&[relayer], None, 0);
+        fresh.minted_at = cutoff;
+        registry.pending.insert(surb_id(2), fresh);
+
+        registry.write_off_pending(&SESSION, cutoff);
+
+        assert!(
+            !registry.pending.contains_key(&surb_id(1)),
+            "the older SURB is written off"
+        );
+        assert!(
+            registry.pending.contains_key(&surb_id(2)),
+            "one minted at the cutoff stays"
+        );
+        Ok(())
+    }
+
+    /// A new SURB generation takes the session's older SURBs out of the invalid stock, judged by when they were
+    /// minted: one a racing walk wrote off only after the cutoff goes too, while a SURB of the new generation counts.
+    #[test]
+    fn writing_off_pending_surbs_drops_the_older_generation_from_the_invalid_stock() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let (early, raced, fresh) = (key(), key(), key());
+        let minted_old = ago(Duration::from_secs(2))?;
+        let written_early = ago(Duration::from_secs(1))?;
+        let cutoff = Instant::now();
+        let after = cutoff + Duration::from_millis(1);
+        {
+            let mut session = registry.written_off.entry(*SESSION).or_default();
+            for (relayer, at, minted_at) in [
+                (early, written_early, minted_old),
+                // Written off after the cutoff, but minted before it: gone with the old generation.
+                (raced, after, minted_old),
+                (fresh, after, cutoff),
+            ] {
+                session
+                    .entry(relayer)
+                    .or_default()
+                    .push_back(WriteOff { at, minted_at });
+            }
+        }
+        let count = |registry: &SurbRoundTripRegistry| registry.invalid().get(&*SESSION).map(|(count, _)| *count);
+        assert_eq!(Some(3), count(&registry));
+
+        registry.write_off_pending(&SESSION, cutoff);
+        assert_eq!(Some(1), count(&registry), "only the new generation's write-off counts");
+        Ok(())
+    }
+
     /// A reply home through the relayer revives it, and from then on the cooldown guards a quick
     /// re-death. Once it has run out, a relayer that dies again is a new verdict and bumps.
     #[test]
@@ -5925,8 +6086,8 @@ mod tests {
 
         for mut session in registry.written_off.iter_mut() {
             for written_off_at in session.values_mut() {
-                for at in written_off_at.iter_mut() {
-                    *at = ago(WRITE_OFF_HORIZON + Duration::from_secs(1))?;
+                for write_off in written_off_at.iter_mut() {
+                    write_off.at = ago(WRITE_OFF_HORIZON + Duration::from_secs(1))?;
                 }
             }
         }

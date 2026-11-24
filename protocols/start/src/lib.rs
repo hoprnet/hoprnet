@@ -183,6 +183,10 @@ pub struct StartResumed<I> {
 ///      else If Exit cannot accept a new session
 ///      Exit->>Entry: SessionError (Challenge, Reason)
 ///      end
+///      opt If Exit's answer does not arrive
+///      Entry->>Exit: SessionInitiation (same Challenge), repeated
+///      Exit->>Entry: SessionEstablished (Challenge, SessionID)
+///      end
 ///      opt If initiation attempt times out
 ///      Note left of Entry: Failure
 ///      end
