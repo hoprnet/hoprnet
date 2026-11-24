@@ -7452,11 +7452,15 @@ where
                     opening,
                 };
                 match self.sessions.get(&pseudonym) {
+                    // A detached or superseded instance has no data plane to confirm, so its repeat takes the
+                    // ordinary path (a resume attempt is refused there as a duplicate, which the Entry retries).
                     Some(slot)
                         if slot
                             .opening
                             .as_ref()
-                            .is_some_and(|opening| opening.challenge == challenge) =>
+                            .is_some_and(|opening| opening.challenge == challenge)
+                            && !slot.is_detached()
+                            && !slot.instance.is_superseded() =>
                     {
                         OpeningClaim::EstablishedRepeat(Box::new(slot), guard)
                     }
@@ -36897,6 +36901,34 @@ mod tests {
         );
         assert_eq!(1, probe::get("exit_control/session_established_replay/pix/sent"));
         assert_eq!(1, exit.mgr.num_active_sessions());
+        Ok(())
+    }
+
+    /// A repeat of a resume attempt whose takeover could not deliver its plane is not confirmed: the instance is
+    /// detached, so the repeat is refused as a duplicate, which the Entry retries with a new challenge.
+    #[test_log::test(tokio::test)]
+    async fn a_repeat_of_a_resume_attempt_whose_takeover_failed_is_not_confirmed() -> anyhow::Result<()> {
+        let (mut exit, _first) = paid_exit(PaidExitOptions::default()).await?;
+        let _ = exit.originated(Duration::from_millis(50)).await;
+
+        // Without a session server the taken-over plane cannot be delivered, and the new instance is detached.
+        exit.incoming.close();
+        let _ = exit.reconnect(MIN_CHALLENGE + 1).await;
+        let _ = exit.originated(Duration::from_millis(300)).await;
+        assert!(
+            exit.slot()?.is_detached(),
+            "the failed takeover detaches the new instance"
+        );
+
+        let repeat = HoprStartProtocol::StartSession(exit.request(MIN_CHALLENGE + 1)?);
+        exit.mgr.dispatch_message(exit.pseudonym, start_packet(repeat)?)?;
+        let seen = exit.originated(Duration::from_millis(300)).await;
+        assert!(
+            seen.resumed.is_empty(),
+            "a detached instance is not confirmed: {seen:?}"
+        );
+        assert_eq!(0, seen.established, "{seen:?}");
+        assert_eq!(vec![StartErrorReason::NoSlotsAvailable], seen.errors, "{seen:?}");
         Ok(())
     }
 

@@ -692,6 +692,15 @@ impl SurbRoundTripRegistry {
     pub fn write_off_pending(&self, pseudonym: &HoprPseudonym, minted_before: Instant) {
         let _walk = self.write_off_walk.lock();
         self.write_off_pending_where(|candidate, minted_at| candidate == pseudonym && minted_at < minted_before);
+        // The counterparty drops the earlier write-offs with the rest of the old generation, so, as after a wipe
+        // in `write_off`, they no longer count as invalid stock.
+        if let Some(mut session) = self.written_off.get_mut(pseudonym) {
+            session.retain(|_, written_off_at| {
+                written_off_at.retain(|at| *at >= minted_before);
+                !written_off_at.is_empty()
+            });
+        }
+        self.written_off.remove_if(pseudonym, |_, session| session.is_empty());
     }
 
     /// Writes off the pending SURBs of every pseudonym `wiped` accepts, in one walk.
@@ -4349,6 +4358,44 @@ mod tests {
         assert!(
             registry.pending.contains_key(&surb_id(2)),
             "one minted at the cutoff stays"
+        );
+        Ok(())
+    }
+
+    /// A new SURB generation also takes the session's earlier write-offs out of the invalid stock: the counterparty
+    /// dropped those SURBs with the rest. A write-off from after the cutoff still counts.
+    #[test]
+    fn writing_off_pending_surbs_drops_the_earlier_write_offs_from_the_invalid_stock() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let (old, new) = (key(), key());
+        registry
+            .written_off
+            .entry(*SESSION)
+            .or_default()
+            .entry(old)
+            .or_default()
+            .push_back(ago(Duration::from_secs(1))?);
+        assert_eq!(Some(1), registry.invalid().get(&SESSION).map(|(count, _)| *count));
+
+        let cutoff = Instant::now();
+        registry.write_off_pending(&SESSION, cutoff);
+        assert!(
+            registry.invalid().is_empty(),
+            "the old generation's write-offs no longer count"
+        );
+
+        registry
+            .written_off
+            .entry(*SESSION)
+            .or_default()
+            .entry(new)
+            .or_default()
+            .push_back(cutoff);
+        registry.write_off_pending(&SESSION, cutoff);
+        assert_eq!(
+            Some(1),
+            registry.invalid().get(&SESSION).map(|(count, _)| *count),
+            "a write-off at or after the cutoff stays"
         );
         Ok(())
     }
