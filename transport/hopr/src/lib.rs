@@ -19,6 +19,8 @@ pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
 pub mod observer;
+/// Priority scheduling of the outgoing traffic classes (session data, probes, noise).
+pub mod output_priority;
 /// Graph-based path planning for the HOPR transport layer.
 pub mod path;
 /// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
@@ -46,7 +48,7 @@ use std::{
 };
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender, stream::select_with_strategy};
+use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender};
 use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 pub use hopr_api::{
     Multiaddr, PeerId,
@@ -82,7 +84,9 @@ use hopr_protocol_pix::ShareResolution;
 /// Every engine feature is already enabled by this crate's dependency declaration, so `create`,
 /// `poisson_channel`, `channel` and `MixerSink` are reached through this module.
 pub use hopr_transport_mixer as mixer;
-pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
+pub use hopr_transport_probe::{
+    Dial, NeighborTelemetry, PathTelemetry, ProbeControl, errors::ProbeError, ping::PingQueryReplier,
+};
 use hopr_transport_probe::{
     Probe,
     ping::{PingConfig, Pinger},
@@ -95,7 +99,8 @@ use hopr_transport_session::{
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, InvalidPixParams, LOCAL_PIX_SUITE, PixParams, SESSION_MTU, SURB_SIZE, ServiceId,
-    SessionAdmissionReply, SessionAdmissionSink, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    SessionAdmissionReply, SessionAdmissionSink, SessionClientConfig, SessionId, SessionTarget, StartErrorReason,
+    SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 #[cfg(feature = "telemetry")]
@@ -122,7 +127,7 @@ pub use crate::{
 };
 use crate::{
     config::PixGlobalConfig,
-    constants::SESSION_INITIATION_TIMEOUT_BASE,
+    constants::{SESSION_INITIATION_MAX_RESENDS, SESSION_INITIATION_RESEND_INTERVAL, SESSION_INITIATION_TIMEOUT_BASE},
     errors::HoprTransportError,
     multiaddrs::strip_p2p_protocol,
     path::{HoprGraphPathSelector, PathPlanner},
@@ -192,6 +197,8 @@ const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
 /// adapter adds no policy of its own.
 struct StoreSurbAdmission {
     store: MemorySurbStore,
+    /// Its pending SURBs are written off when a new generation wipes the counterparty's stock.
+    round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
 }
 
 impl SurbAdmissionControl for StoreSurbAdmission {
@@ -206,6 +213,24 @@ impl SurbAdmissionControl for StoreSurbAdmission {
     fn raise_target(&self, pseudonym: &SessionId, token: AdmissionToken, expected_surbs: usize) {
         self.store
             .raise_admitted_capacity(pseudonym, token.into_raw(), expected_surbs);
+    }
+
+    fn advance_generation(&self, pseudonym: &SessionId) {
+        // Taken first: only SURBs minted before it are stale, the repeat's own are not.
+        let cutoff = std::time::Instant::now();
+        self.store.bump_generation(pseudonym);
+        // The registry walk is too long for a runtime worker.
+        let (registry, pseudonym) = (self.round_trips.clone(), *pseudonym);
+        hopr_utils::runtime::prelude::spawn(async move {
+            if let Err(error) = hopr_utils::parallelize::cpu::spawn_blocking(
+                move || registry.write_off_pending(&pseudonym, cutoff),
+                "surb_write_off_pending",
+            )
+            .await
+            {
+                tracing::warn!(%error, "pending SURBs were not written off after a new SURB generation");
+            }
+        });
     }
 }
 
@@ -313,8 +338,9 @@ async fn dispatch_incoming_messages<G, In, Out>(
             let _entered = span.enter();
             let _dispatch = tracing::debug_span!("session.dispatch").entered();
             hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
-            // try_send); it never blocks. However, the crossfire stream that feeds
+            // `dispatch_message` is synchronous (moka::sync + crossfire try_send) and
+            // never yields; the locks it takes, the forward receipts' among them, are
+            // held briefly. However, the crossfire stream that feeds
             // this loop does not participate in tokio's cooperative budget, so
             // `future::ready` — which is always Poll::Ready — would let this task
             // monopolize its worker thread under a saturated inbound queue (Processed
@@ -377,6 +403,10 @@ type HoprSessionManager = SessionManager<HoprMessageSender>;
 #[derive(Debug, Clone)]
 pub struct HoprSessionConfigurator {
     id: SessionId,
+    /// The slot instance of the Session this configurator was handed out with, so that none of its
+    /// operations can reach a successor that has since taken the same (reused) pseudonym: they fail
+    /// as for a non-existing Session, and [`close`](Self::close) returns `false`.
+    instance: Option<u64>,
     // Makes sure configurator does not extend lifetime of the SessionManager.
     smgr: std::sync::Weak<HoprSessionManager>,
 }
@@ -400,12 +430,15 @@ impl HoprSessionConfigurator {
     /// NOTE: This operation only sends the Session Keep-Alive packet and **DOES NOT** guarantee the other side
     /// has received it.
     pub async fn ping(&self) -> errors::Result<()> {
-        Ok(self
+        let smgr = self
             .smgr
             .upgrade()
-            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .ping_session(&self.id)
-            .await?)
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?;
+        match self.instance {
+            Some(instance) => smgr.ping_session_instance(&self.id, instance).await?,
+            None => smgr.ping_session(&self.id).await?,
+        }
+        Ok(())
     }
 
     /// Gets the configuration of the SURB balancer.
@@ -414,11 +447,14 @@ impl HoprSessionConfigurator {
     ///
     /// Returns `Ok(None)` if the Session has been created without a SURB balancer.
     pub fn get_surb_balancer_config(&self) -> errors::Result<Option<SurbBalancerConfig>> {
-        Ok(self
+        let smgr = self
             .smgr
             .upgrade()
-            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .get_surb_balancer_config(&self.id)?)
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?;
+        Ok(match self.instance {
+            Some(instance) => smgr.get_surb_balancer_config_instance(&self.id, instance)?,
+            None => smgr.get_surb_balancer_config(&self.id)?,
+        })
     }
 
     /// Updates the configuration of the SURB balancer.
@@ -426,11 +462,15 @@ impl HoprSessionConfigurator {
     /// Returns an error if the Session is closed, the Session manager is gone, or the
     /// Session has been created without a SURB balancer.
     pub fn update_surb_balancer_config(&self, config: SurbBalancerConfig) -> errors::Result<()> {
-        Ok(self
+        let smgr = self
             .smgr
             .upgrade()
-            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .update_surb_balancer_config(&self.id, config)?)
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?;
+        match self.instance {
+            Some(instance) => smgr.update_surb_balancer_config_instance(&self.id, instance, config)?,
+            None => smgr.update_surb_balancer_config(&self.id, config)?,
+        }
+        Ok(())
     }
 
     /// Explicitly closes the underlying Session in the [`SessionManager`].
@@ -439,10 +479,14 @@ impl HoprSessionConfigurator {
     /// already gone (or the manager is dropped). Frees the per-session state
     /// (frame reassembly buffers, control channels, …) immediately rather than
     /// waiting for the manager's idle-timeout eviction.
+    ///
+    /// Closes only the Session this configurator belongs to: if its pseudonym has meanwhile been
+    /// taken by a successor Session, that one is left alone and `false` is returned.
     pub fn close(&self) -> bool {
-        match self.smgr.upgrade() {
-            Some(smgr) => smgr.close_session(&self.id),
-            None => false,
+        match (self.smgr.upgrade(), self.instance) {
+            (Some(smgr), Some(instance)) => smgr.close_session_instance(&self.id, instance),
+            (Some(smgr), None) => smgr.close_session(&self.id),
+            (None, _) => false,
         }
     }
 }
@@ -463,6 +507,8 @@ pub struct HoprTransport<Chain, Graph, Net> {
     smgr: Arc<HoprSessionManager>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
+    /// Sets the rate of generated probes while the probe process runs.
+    probe_control: ProbeControl,
     counters: PeerProtocolCounterRegistry,
     cfg: HoprProtocolConfig,
 }
@@ -565,7 +611,9 @@ where
         // The pending maps are bounded by the byte budget the operator sets, per map, so the pair's
         // worst case is twice it; see `SurbRoundTripRegistry::with_budget`.
         let surb_round_trips =
-            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes);
+            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes)
+                .with_forward_receipts(cfg.session.forward_receipts);
+        let forward_receipts = surb_round_trips.forward().cloned();
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
@@ -573,6 +621,12 @@ where
             selector,
             planner_config,
         );
+        let path_planner = match forward_receipts {
+            Some(forward) => {
+                path_planner.with_forward_exclusions(Arc::new(move |exit| forward.excluded_relayers(exit)))
+            }
+            None => path_planner,
+        };
 
         // Bound before the struct literal rather than inside it so `set_surb_admission` below can
         // reach the manager: the seam depends on `path_planner`, which does not exist inside the
@@ -594,6 +648,8 @@ where
                 .and_then(|s| s.parse::<usize>().ok())
                 .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
             initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+            initiation_resend_interval: SESSION_INITIATION_RESEND_INTERVAL,
+            max_initiation_resends: SESSION_INITIATION_MAX_RESENDS,
             idle_timeout: cfg.session.idle_timeout,
             balancer_sampling_interval: cfg.session.balancer_sampling_interval,
             initial_return_session_egress_rate: 10,
@@ -620,6 +676,7 @@ where
             // Session's SURB admission has to wait out this window, and it is the operator's own
             // pipeline setting here that decides how long that is.
             surb_resolution_wait: crate::path::resolve::surb_resolution_wait(cfg.packet.pipeline.surb_resolution_wait),
+            forward_receipts: cfg.session.forward_receipts,
             ..Default::default()
         }));
 
@@ -629,7 +686,12 @@ where
         // manager is freshly constructed here, so nothing can have set it yet.
         let _ = smgr.set_surb_admission(Arc::new(StoreSurbAdmission {
             store: path_planner.surb_store.clone(),
+            round_trips: surb_round_trips.clone(),
         }));
+
+        if let Some(forward) = surb_round_trips.forward() {
+            let _ = smgr.set_forward_receipt_sink(forward.clone());
+        }
 
         // The store's admitted class cannot see the session config, so the invariant that it must
         // hold every Session that can be managed at once is checked here, where both figures are in
@@ -658,6 +720,7 @@ where
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
+            probe_control: ProbeControl::default(),
             counters: PeerProtocolCounterRegistry::default(),
             cfg,
         })
@@ -836,6 +899,19 @@ where
         >(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
         let unresolved_routing_msg_tx = trace_context::ContextSender::new(unresolved_routing_msg_tx);
 
+        // The probe lane. Session data and pongs keep the lane above; only outgoing probes enter
+        // this one, so a probe round cannot delay session packets. The depth is tracked on both
+        // endpoints, because the scheduler needs no accounting of its own for the gauge.
+        let (probe_msg_tx, probe_msg_rx) = bounded_sink_channel::<
+            trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>,
+        >(self.cfg.output_priority.probe_lane_capacity);
+        let probe_lane_depth = output_priority::LaneDepth::default();
+        let probe_msg_tx = output_priority::DepthSink::new(
+            trace_context::ContextSender::new(probe_msg_tx),
+            probe_lane_depth.clone(),
+        );
+        let probe_msg_rx = output_priority::DepthStream::new(probe_msg_rx, probe_lane_depth);
+
         // -- transport medium
 
         let transport_network = network;
@@ -1002,11 +1078,14 @@ where
             })
         });
 
-        // merge cover traffic with other outgoing data
-        let merged_unresolved_output_data =
-            select_with_strategy(unresolved_routing_msg_rx, cover_traffic_stream, |_: &mut ()| {
-                futures::stream::PollNext::Left
-            });
+        // merge cover traffic with the two prioritized lanes: session data first, then probes, then
+        // cover traffic as the last resort
+        let merged_unresolved_output_data = output_priority::merge_lanes(
+            unresolved_routing_msg_rx,
+            probe_msg_rx,
+            cover_traffic_stream,
+            self.cfg.output_priority.probe_share,
+        );
 
         // === END === cover traffic control
 
@@ -1369,15 +1448,11 @@ where
             crossfire::mpsc::bounded_async::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
         let manual_ping_rx = manual_ping_rx_raw.into_stream();
 
-        let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
+        let probe =
+            Probe::new(self.cfg.probe, self.probing_tag_allocator.clone()).with_control(self.probe_control.clone());
 
         let (probing_processes, probe_classifier) = probe
-            .continuously_scan(
-                unresolved_routing_msg_tx.clone(),
-                manual_ping_rx,
-                cover_traffic,
-                self.graph.clone(),
-            )
+            .continuously_scan(probe_msg_tx.clone(), manual_ping_rx, cover_traffic, self.graph.clone())
             .await;
 
         processes.flat_map_extend_from(probing_processes, HoprTransportProcess::Probing);
@@ -1470,10 +1545,12 @@ where
     ) -> errors::Result<(HoprSession, HoprSessionConfigurator)> {
         let session = self.smgr.new_session(destination, target, cfg).await?;
         let id = *session.id();
+        let instance = session.slot_instance();
         Ok((
             session,
             HoprSessionConfigurator {
                 id,
+                instance,
                 smgr: Arc::downgrade(&self.smgr),
             },
         ))
@@ -1520,6 +1597,13 @@ where
     /// Returns a reference to the network graph.
     pub fn graph(&self) -> &Graph {
         &self.graph
+    }
+
+    /// The handle that sets the rate of generated probes.
+    ///
+    /// A change reaches the running probe process on its next pull.
+    pub fn probe_control(&self) -> ProbeControl {
+        self.probe_control.clone()
     }
 
     /// Returns the per-relayer health, so connectivity events can report neighbours we lost or regained.
@@ -2269,6 +2353,28 @@ mod tests {
         assert_eq!(expected, surb_degraded_notify_period_override(raw, configured));
     }
 
+    /// `advance_generation` starts a new SURB generation in the store, once per call.
+    #[tokio::test]
+    async fn surb_admission_advance_generation_bumps_the_stores_generation() -> anyhow::Result<()> {
+        use hopr_api::types::{crypto::crypto_traits::Randomizable, internal::prelude::HoprPseudonym};
+        use hopr_protocol_hopr::SurbStoreConfig;
+
+        use super::{MemorySurbStore, StoreSurbAdmission, SurbAdmissionControl, SurbStore};
+
+        let admission = StoreSurbAdmission {
+            store: MemorySurbStore::new(SurbStoreConfig::default()),
+            round_trips: Default::default(),
+        };
+        let pseudonym: super::SessionId = HoprPseudonym::random();
+        let before = admission.store.current_generation(&pseudonym);
+
+        admission.advance_generation(&pseudonym);
+        assert_eq!(before.wrapping_add(1), admission.store.current_generation(&pseudonym));
+        admission.advance_generation(&pseudonym);
+        assert_eq!(before.wrapping_add(2), admission.store.current_generation(&pseudonym));
+        Ok(())
+    }
+
     /// The admission seam's `raise_target` must reach the store, and only for the admission it names.
     ///
     /// `StoreSurbAdmission` is pure delegation, so this pins the wiring the SessionManager relies on:
@@ -2284,6 +2390,7 @@ mod tests {
 
         let admission = StoreSurbAdmission {
             store: MemorySurbStore::new(SurbStoreConfig::default()),
+            round_trips: Default::default(),
         };
         let pseudonym: super::SessionId = HoprPseudonym::random();
 
@@ -2352,6 +2459,7 @@ mod tests {
                 rb_capacity,
                 ..Default::default()
             }),
+            round_trips: Default::default(),
         };
         let pseudonym: super::SessionId = HoprPseudonym::random();
 

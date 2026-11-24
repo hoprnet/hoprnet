@@ -168,6 +168,8 @@ pub struct IncomingPacketInfo {
     /// Declared by the SURB creator, not verified. `Some(0)` means a direct return path, which has no
     /// first relayer to acknowledge a reply and so cannot deliver PIX shares.
     pub min_return_path_hops: Option<u8>,
+    /// First 4 bytes of the packet tag, for a packet that was not a reply on a SURB.
+    pub forward_receipt_tag: Option<u32>,
 }
 
 /// Holds packet transient information when [`ApplicationData`] is passed to the HOPR protocol layer from the

@@ -111,15 +111,16 @@ impl FrameLossReport {
         self.report_if_due();
     }
 
-    pub fn frame_discarded(&self) {
-        self.discarded.fetch_add(1, Ordering::Relaxed);
-        self.record_loss();
+    /// `count` consecutive frames were skipped at once while putting received frames in order.
+    pub fn frames_discarded(&self, count: u64) {
+        self.discarded.fetch_add(count, Ordering::Relaxed);
+        self.record_loss(count);
         self.report_if_due();
     }
 
     pub fn frame_not_reassembled(&self) {
         self.not_reassembled.fetch_add(1, Ordering::Relaxed);
-        self.record_loss();
+        self.record_loss(1);
         self.report_if_due();
     }
 
@@ -138,12 +139,12 @@ impl FrameLossReport {
         }
     }
 
-    /// Records a loss into the live signal, if there is one.
+    /// Records the loss of `frames` frames into the live signal, if there is one.
     ///
     /// Only the two loss events call this: a duplicate segment is delivery, not loss.
-    fn record_loss(&self) {
+    fn record_loss(&self, frames: u64) {
         if let Some(signal) = &self.loss_signal {
-            signal.record();
+            signal.record_lost(frames);
         }
     }
 
@@ -289,7 +290,7 @@ mod tests {
         let signal = Arc::new(FrameLossSignal::new());
         let report = FrameLossReport::with_signal("test", INTERVAL, Some(signal.clone()));
 
-        report.frame_discarded();
+        report.frames_discarded(1);
         report.frame_not_reassembled();
         assert_eq!(2, signal.lost_total(), "both loss events are loss");
 
@@ -309,7 +310,7 @@ mod tests {
     #[test]
     fn a_report_without_a_signal_counts_as_before() {
         let report = FrameLossReport::new("test", INTERVAL);
-        report.frame_discarded();
+        report.frames_discarded(1);
         report.frame_not_reassembled();
         report.duplicate_segment();
 
@@ -324,8 +325,8 @@ mod tests {
     fn counting_methods_update_their_own_counter() {
         let report = FrameLossReport::new("test", INTERVAL);
         report.frame_emitted();
-        report.frame_discarded();
-        report.frame_discarded();
+        report.frames_discarded(1);
+        report.frames_discarded(1);
         report.frame_not_reassembled();
         report.duplicate_segment();
 
@@ -334,5 +335,17 @@ mod tests {
         assert_eq!(summary.discarded, 2);
         assert_eq!(summary.not_reassembled, 1);
         assert_eq!(summary.duplicates, 1);
+    }
+
+    #[test]
+    fn a_run_of_discarded_frames_counts_every_frame_of_it() {
+        let signal = Arc::new(FrameLossSignal::new());
+        let report = FrameLossReport::with_signal("test", INTERVAL, Some(signal.clone()));
+
+        report.frames_discarded(5);
+
+        assert_eq!(5, report.take_counts(Duration::ZERO).discarded);
+        assert_eq!(5, signal.lost_total(), "the live signal counts the frames, not the run");
+        assert!(signal.lost_within(Duration::from_secs(1)));
     }
 }

@@ -31,6 +31,7 @@
 //! | `hopr_pix_cycle_bytes_released_total` | SimpleCounter | bytes | reservation release | — |
 //! | `hopr_pix_cycles_total` | MultiCounter | cycles | supervisor transition (event-counted) | `event` = `requested\|committed\|funded\|recovered\|failed` |
 //! | `hopr_pix_ssa_requests_resent_total` | SimpleCounter | requests | supervisor re-send of an unanswered successor `SsaRequest` | — |
+//! | `hopr_pix_opening_ssa_requests_resent_total` | SimpleCounter | requests | supervisor re-send of an unanswered opening `SsaRequest` | — |
 //! | `hopr_pix_admission_rejections_total` | MultiCounter | refusals | incoming Start path | `reason` — see [`PixAdmissionRejection`] |
 //! | `hopr_pix_egress_packets_total` | MultiCounter | packets | supervisor turn (delta-counted from the gate) | `mode` = `predeposit\|funded` |
 //! | `hopr_pix_gate_blocks_total` | MultiCounter | episodes | first refusal of an episode | `reason` = `predeposit_exhausted\|share_lag\|closed` |
@@ -45,8 +46,14 @@
 //! | `hopr_pix_deposits_recovered_uhopr_total` | SimpleCounter | µHOPR | cycle finalization (recovered) | — |
 //! | `hopr_pix_closures_total` | MultiCounter | Sessions | supervisor close | `reason` — see [`SessionPixCloseReason`] |
 //! | `hopr_pix_fill_backoff_total` | MultiCounter | occasions | fill withheld / stall onset | `reason` = `surb_reserve\|stalled` |
+//! | `hopr_pix_resumptions_total` | MultiCounter | occasions | data plane ends and the Session is detached / an Entry takes a held Session over / the resume window runs out / a takeover is refused | `event` = `detached\|taken_over\|window_expired\|refused` |
 //!
-//! The last two are per-Session events rather than node aggregates, but they belong on this prefix
+//! A *detached* Session (see `hopr_pix_resumptions_total`) is still a live PIX Session: its supervisor
+//! and cycles carry on, so `hopr_pix_sessions_active` and `hopr_pix_cycles_active` count it for the
+//! whole resume window, and its per-Session lifecycle state stays `Active` rather than `Closing`
+//! until the window ends.
+//!
+//! The last three are per-Session events rather than node aggregates, but they belong on this prefix
 //! because neither is labelled by a Session. Their per-Session siblings
 //! (`hopr_session_pix_gate_mode`, `_recovery_progress`, `_fill_rate`) stay on the OTLP route.
 //!
@@ -232,6 +239,26 @@ use crate::supervision::{
     },
 };
 
+/// What became of a funded PIX Session whose data plane ended, as `hopr_pix_resumptions_total`
+/// labels it.
+///
+/// A Session that ends its data plane while its cycle is paid for is *detached* rather than torn
+/// down, and then is either taken over by the Entry reconnecting under the same pseudonym, or runs
+/// out its resume window and takes today's drain-or-close path. A takeover the Exit declines is
+/// counted too, because it is the one a reconnecting client sees as a refusal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub(crate) enum PixResumption {
+    /// The data plane ended and the control plane was kept for the resume window.
+    Detached,
+    /// A request under the same pseudonym took the Session's control plane over.
+    TakenOver,
+    /// The resume window ran out with no takeover; the Session was drained or closed.
+    WindowExpired,
+    /// A request found a held Session and was refused: it was not eligible, or lost a race.
+    Refused,
+}
+
 /// Why PIX fill sent less than its planned rate, as `hopr_pix_fill_backoff_total` labels it.
 ///
 /// Lives here rather than with the label enums in `supervision::telemetry` because neither producer
@@ -286,6 +313,10 @@ lazy_static::lazy_static! {
     static ref METRIC_PIX_SSA_REQUESTS_RESENT: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_pix_ssa_requests_resent_total",
         "Successor SsaRequests the PIX supervisor asked to have sent again because the Entry had not answered them"
+    ).unwrap();
+    static ref METRIC_PIX_OPENING_SSA_REQUESTS_RESENT: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_pix_opening_ssa_requests_resent_total",
+        "Opening SsaRequests the PIX supervisor asked to have sent again because the Entry had not answered them"
     ).unwrap();
     static ref METRIC_PIX_ADMISSION_REJECTIONS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_pix_admission_rejections_total",
@@ -360,6 +391,16 @@ lazy_static::lazy_static! {
         "Times PIX fill held back, by reason",
         &["reason"]
     ).unwrap();
+    static ref METRIC_PIX_RESUMPTIONS_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_pix_resumptions_total",
+        "PIX Sessions detached when their data plane ended, taken over by a reconnecting Entry, expired from the resume window, or refused a takeover, by event",
+        &["event"]
+    ).unwrap();
+}
+
+/// Counts one event of the detach and takeover lifecycle.
+pub(crate) fn record_resumption(event: PixResumption) {
+    METRIC_PIX_RESUMPTIONS_TOTAL.increment(&[event.to_string().as_str()]);
 }
 
 /// Moves `hopr_pix_sessions_active` for one gate mode by a signed delta.
@@ -388,6 +429,14 @@ pub(crate) fn add_cycles_total(event: PixCycleEvent, count: u64) {
 /// re-send moves no cycle through any of them.
 pub(crate) fn add_ssa_requests_resent(count: u64) {
     METRIC_PIX_SSA_REQUESTS_RESENT.increment_by(count);
+}
+
+/// Counts `count` re-sends of an unanswered opening `SsaRequest`.
+///
+/// Apart from [`add_ssa_requests_resent`]: a lost first request is a different fault from a successor
+/// the Entry has not yet admitted.
+pub(crate) fn add_opening_ssa_requests_resent(count: u64) {
+    METRIC_PIX_OPENING_SSA_REQUESTS_RESENT.increment_by(count);
 }
 
 /// Counts one incoming PIX Session refused before establishment.
@@ -596,6 +645,10 @@ mod tests {
             ),
             (METRIC_PIX_CLOSURES_TOTAL.name(), METRIC_PIX_CLOSURES_TOTAL.labels()),
             (
+                METRIC_PIX_RESUMPTIONS_TOTAL.name(),
+                METRIC_PIX_RESUMPTIONS_TOTAL.labels(),
+            ),
+            (
                 METRIC_PIX_FILL_BACKOFF_TOTAL.name(),
                 METRIC_PIX_FILL_BACKOFF_TOTAL.labels(),
             ),
@@ -619,6 +672,7 @@ mod tests {
         add_cycles_active(PixCyclePhase::Recovering, 2);
         add_cycles_total(PixCycleEvent::Requested, 5);
         add_ssa_requests_resent(2);
+        add_opening_ssa_requests_resent(1);
         set_held_shares(3);
         record_admission_rejection(PixAdmissionRejection::LiveCycleCapacity);
         record_cycle_bytes_reserved(1024);
@@ -629,6 +683,7 @@ mod tests {
         record_cycle_summary(PixCycleOutcome::Failed, 4096, Some(0.5), Some(0.75));
         record_pix_closure(SessionPixCloseReason::RecoveryIdle);
         record_pix_fill_backoff(PixFillBackoff::SurbReserve);
+        record_resumption(PixResumption::TakenOver);
         add_deposits_confirmed(1_500_000);
         add_deposits_recovered(1_000_000);
         record_cycle_phase_duration(PixCyclePhase::AwaitingDeposit, 12.5);
@@ -644,6 +699,7 @@ mod tests {
             "hopr_pix_cycles_active{phase=\"recovering\"}",
             "hopr_pix_cycles_total{event=\"requested\"}",
             "hopr_pix_ssa_requests_resent_total",
+            "hopr_pix_opening_ssa_requests_resent_total",
             "hopr_pix_held_shares",
             "hopr_pix_admission_rejections_total{reason=\"live_cycle_capacity\"}",
             "hopr_pix_live_cycle_bytes",
@@ -661,6 +717,7 @@ mod tests {
             "hopr_pix_deposits_recovered_uhopr_total",
             "hopr_pix_closures_total{reason=\"recovery_idle\"}",
             "hopr_pix_fill_backoff_total{reason=\"surb_reserve\"}",
+            "hopr_pix_resumptions_total{event=\"taken_over\"}",
         ] {
             assert!(text.contains(expected), "{expected} was not exported:\n{text}");
         }

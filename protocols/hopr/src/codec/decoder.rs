@@ -281,6 +281,14 @@ where
                                 .saturating_sub(1)
                         })
                         .min(),
+                    forward_receipt_tag: replied_on_surb.get().is_none().then(|| {
+                        u32::from_be_bytes([
+                            incoming.packet_tag[0],
+                            incoming.packet_tag[1],
+                            incoming.packet_tag[2],
+                            incoming.packet_tag[3],
+                        ])
+                    }),
                 };
 
                 // Store all incoming SURBs if any
@@ -356,8 +364,10 @@ where
                                 previous_hop: incoming.previous_hop,
                                 received_acks: incoming.plain_text
                                     [size_of::<u16>()..size_of::<u16>() + num_acks as usize * Acknowledgement::SIZE]
-                                    .chunks_exact(Acknowledgement::SIZE)
-                                    .map(Acknowledgement::try_from)
+                                    .as_chunks::<{ Acknowledgement::SIZE }>()
+                                    .0
+                                    .iter()
+                                    .map(|c| Acknowledgement::try_from(c.as_slice()))
                                     .collect::<Result<Vec<_>, _>>()
                                     .map_err(|e: GeneralError| IncomingPacketError::Undecodable(e.into()))?,
                             }

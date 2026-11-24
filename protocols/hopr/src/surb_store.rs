@@ -4550,6 +4550,34 @@ mod tests {
         Ok(())
     }
 
+    /// A newer generation wipes the quarantined stock of an older one, so admission promotes only the newer SURBs.
+    #[test]
+    fn a_newer_generation_in_quarantine_leaves_only_its_own_surbs_to_admit() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        for i in 0..3 {
+            store.insert_surbs(pseudonym, vec![([i as u8; 8], surb_gen(relayer, DIRECT, 0)?)]);
+        }
+        for i in 10..12 {
+            store.insert_surbs(pseudonym, vec![([i as u8; 8], surb_gen(relayer, DIRECT, 1)?)]);
+        }
+
+        store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+
+        assert_eq!(
+            2,
+            store
+                .admitted_surbs_per_pseudonym
+                .get(&pseudonym)
+                .context("the admitted ring must exist after admission")?
+                .len(),
+            "only the newer generation's SURBs are admitted"
+        );
+        Ok(())
+    }
+
     /// Re-admitting a fixed pseudonym — a Session reopened on the same one — must not discard what
     /// the admitted ring already holds.
     #[test]
@@ -4959,6 +4987,35 @@ mod tests {
             "a retire whose token matches the current admission must still release the ring"
         );
 
+        Ok(())
+    }
+
+    /// Closing a Session retires the pseudonym's admitted SURB ring and nothing else: the sending-side
+    /// reply openers and the SURB generation survive, so an Entry that reconnects under the same
+    /// pseudonym can still open a reply sealed on a SURB it minted before the close, and its new
+    /// SURBs carry a generation the Exit does not take for an older one.
+    #[test]
+    fn retiring_a_pseudonym_keeps_its_reply_openers_and_surb_generation() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let sender_id = HoprSenderId::from_pseudonym_and_id(&pseudonym, [7u8; 8]);
+
+        store.insert_reply_opener(sender_id, cheap_opener());
+        let generation = store.bump_generation(&pseudonym);
+        let token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+
+        store.retire(&pseudonym, token);
+        store.pseudonym_openers.run_pending_tasks();
+
+        assert!(
+            store.find_reply_opener(&sender_id).is_some(),
+            "a reply sealed on a SURB minted before the close must still open afterwards"
+        );
+        assert_eq!(
+            generation.wrapping_add(1),
+            store.bump_generation(&pseudonym),
+            "the generation must carry on from where the closed Session left it"
+        );
         Ok(())
     }
 

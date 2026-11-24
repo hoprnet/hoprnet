@@ -137,14 +137,20 @@ pub(crate) enum ExitControlKind {
     RefusalLiveCycleCapacity,
     /// Refused: no Session slot.
     RefusalNoSessionSlot,
+    /// Refused: the pseudonym's held PIX Session may not be taken over by this request.
+    RefusalTakeoverIneligible,
     /// Refused: the node could not decide right now.
     RefusalBusy,
+    /// Refused: the Entry asked to resume a Session this node cannot resume.
+    RefusalNotResumable,
     /// The SURB-level report of how many SURBs the Exit holds. Backs off on idle Sessions.
     SurbReport,
     /// A PIX fill packet, sent above the report rate.
     PixFill,
     /// The `SessionEstablished` answering an admitted `StartSession`.
     SessionEstablished,
+    /// The `SessionEstablished` answering a repeated `StartSession`.
+    SessionEstablishedReplay,
     /// The request for the Entry's SSA commitments.
     SsaRequest,
     /// The SSA request, re-sent for want of an answer.
@@ -163,8 +169,10 @@ impl From<PixAdmissionRejection> for ExitControlKind {
             PixAdmissionRejection::TargetPolicy => Self::RefusalTargetPolicy,
             PixAdmissionRejection::LiveCycleCapacity => Self::RefusalLiveCycleCapacity,
             PixAdmissionRejection::NoSessionSlot => Self::RefusalNoSessionSlot,
+            PixAdmissionRejection::TakeoverIneligible => Self::RefusalTakeoverIneligible,
             PixAdmissionRejection::Busy => Self::RefusalBusy,
             PixAdmissionRejection::DirectReturnPath => Self::RefusalDirectReturnPath,
+            PixAdmissionRejection::NotResumable => Self::RefusalNotResumable,
         }
     }
 }
@@ -200,6 +208,8 @@ pub(crate) enum ExitControlOutcome {
     DroppedBudget,
     /// The transport refused it or timed out.
     SendFailed,
+    /// Not sent: the Session held no SURB to send it over.
+    SkippedNoSurb,
 }
 
 /// Counts one packet the Exit sent, or declined to send, on a peer's behalf.
@@ -304,8 +314,10 @@ mod tests {
             PixAdmissionRejection::TargetPolicy,
             PixAdmissionRejection::LiveCycleCapacity,
             PixAdmissionRejection::NoSessionSlot,
+            PixAdmissionRejection::TakeoverIneligible,
             PixAdmissionRejection::Busy,
             PixAdmissionRejection::DirectReturnPath,
+            PixAdmissionRejection::NotResumable,
         ];
 
         let labels: std::collections::BTreeSet<String> = rejections

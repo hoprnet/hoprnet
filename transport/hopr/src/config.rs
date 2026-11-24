@@ -223,6 +223,13 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub probe: ProbeConfig,
+    /// Priority scheduling of the outgoing traffic classes.
+    ///
+    /// The class order is fixed: session data (pongs included), then probes, then noise. The probe
+    /// share is the only configurable part.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub output_priority: crate::output_priority::OutputPriorityConfig,
     /// Session protocol global configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -913,6 +920,10 @@ fn default_session_max_frames_behind_gap() -> Option<usize> {
     Some(256)
 }
 
+fn default_session_forward_receipts() -> bool {
+    true
+}
+
 fn default_session_surb_target_notify() -> bool {
     true
 }
@@ -1159,6 +1170,14 @@ pub struct SessionGlobalConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_session_surb_target_notify"))]
     pub surb_target_notify: bool,
 
+    /// Whether Exits report the Session packets they received, and this node judges forward relayers
+    /// from those receipts. Off, no receipts are asked for, sent or recorded.
+    ///
+    /// Default is true.
+    #[default(default_session_forward_receipts())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_forward_receipts"))]
+    pub forward_receipts: bool,
+
     /// How many later frames may queue behind a missing one before the reassembler gives up on it
     /// and releases what it already has.
     ///
@@ -1234,6 +1253,52 @@ mod tests {
             *incoming.quota_range.end(),
             "the accepted range must be anchored at the nominal default quota"
         );
+    }
+
+    /// The probe share is reachable from a node's configuration file, rejects a value outside
+    /// `0.0..=1.0`, and defaults when the file omits it. The behavioural side of the share lives
+    /// with the scheduler in [`crate::output_priority`].
+    #[test]
+    fn output_priority_config_is_nested_and_validated() {
+        assert!(HoprProtocolConfig::default().validate().is_ok());
+
+        let rejected = HoprProtocolConfig {
+            output_priority: crate::output_priority::OutputPriorityConfig {
+                probe_share: 1.1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(
+            rejected.validate().is_err(),
+            "a probe share above one must be rejected through the parent config"
+        );
+
+        let accepted = HoprProtocolConfig {
+            output_priority: crate::output_priority::OutputPriorityConfig {
+                probe_share: 0.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(accepted.validate().is_ok());
+    }
+
+    #[test]
+    fn forward_receipts_should_be_on_by_default() {
+        assert!(SessionGlobalConfig::default().forward_receipts);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn forward_receipts_should_be_optional_in_the_config() -> anyhow::Result<()> {
+        let omitted: SessionGlobalConfig =
+            serde_saphyr::from_str("idle_timeout: 3m\n").context("config without the setting must parse")?;
+        assert!(omitted.forward_receipts);
+        let off: SessionGlobalConfig =
+            serde_saphyr::from_str("forward_receipts: false\n").context("config turning it off must parse")?;
+        assert!(!off.forward_receipts);
+        Ok(())
     }
 
     #[test]
@@ -1660,6 +1725,57 @@ mod tests {
         );
     }
 
+    /// The default resume window is longer than a short idle timeout, which must not stop a node from
+    /// starting: the session manager caps the window instead.
+    #[test]
+    fn a_short_session_idle_timeout_does_not_invalidate_the_default_resume_window() {
+        for idle_timeout in [
+            Duration::from_millis(2500),
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ] {
+            let cfg = HoprProtocolConfig {
+                session: SessionGlobalConfig {
+                    idle_timeout,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            assert!(
+                Duration::from_secs(60) >= idle_timeout / 2,
+                "the default window is above the cap at {idle_timeout:?}"
+            );
+            cfg.validate()
+                .unwrap_or_else(|error| panic!("an idle timeout of {idle_timeout:?} must validate: {error}"));
+        }
+    }
+
+    #[test]
+    fn the_pix_resume_window_defaults_to_a_minute() {
+        assert_eq!(
+            Duration::from_secs(60),
+            IncomingSessionPixConfig::default().resume_window
+        );
+    }
+
+    /// `resume_window` is settable from a configuration file, in humantime.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn the_pix_resume_window_is_configurable() -> anyhow::Result<()> {
+        let cfg: IncomingSessionPixConfig =
+            serde_saphyr::from_str("resume_window: 2m\n").context("config with a resume window must parse")?;
+        assert_eq!(Duration::from_secs(120), cfg.resume_window);
+
+        let disabled: IncomingSessionPixConfig =
+            serde_saphyr::from_str("resume_window: 0s\n").context("a zero window must parse")?;
+        assert_eq!(Duration::ZERO, disabled.resume_window);
+
+        let omitted: IncomingSessionPixConfig =
+            serde_saphyr::from_str("enforce_pix: true\n").context("config without the setting must parse")?;
+        assert_eq!(Duration::from_secs(60), omitted.resume_window);
+        Ok(())
+    }
+
     // The reversed range is the point of the test: `quota_range` is operator-settable, so an
     // inverted range is reachable from a config file and must be rejected by validation rather
     // than silently matching nothing.
@@ -2063,6 +2179,9 @@ mod tests {
         // configuration whose declared memory cannot hold the batch it asks for. Leaving the default
         // 2 GiB here would make every case below fail on memory rather than on the batch range this
         // test is about.
+        //
+        // The delivery time is lowered for the same reason: the batch-scaled window has to stay shorter
+        // than the reconstructor's registration lifetime, and 20 s x the ceiling does not.
         let with_supervision = |supervision: SupervisorConfig| HoprProtocolConfig {
             incoming_session_pix_config: IncomingSessionPixConfig {
                 max_live_cycle_bytes: u64::MAX,
@@ -2076,6 +2195,7 @@ mod tests {
             assert!(
                 with_supervision(SupervisorConfig {
                     ssas_per_request,
+                    max_ssa_delivery_time: Duration::from_secs(4),
                     ..Default::default()
                 })
                 .validate()
@@ -2087,6 +2207,7 @@ mod tests {
         assert!(
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
+                max_ssa_delivery_time: Duration::from_secs(4),
                 ..Default::default()
             })
             .validate()
@@ -2107,6 +2228,7 @@ mod tests {
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
                 max_deposit_wait: per_cycle,
+                max_ssa_delivery_time: Duration::from_secs(4),
                 ..Default::default()
             })
             .validate()

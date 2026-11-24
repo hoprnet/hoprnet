@@ -95,7 +95,9 @@ impl<const C: usize> TryFrom<&[u8]> for SegmentRequest<C> {
         if value.len() == Self::SIZE {
             let mut ret = Self::default();
             for (frame_id, missing) in value
-                .chunks_exact(Self::ENTRY_SIZE)
+                .as_chunks::<{ size_of::<FrameId>() + size_of::<SeqNum>() }>()
+                .0
+                .iter()
                 .map(|c| c.split_at(size_of::<FrameId>()))
             {
                 let frame_id = FrameId::from_be_bytes(frame_id.try_into().map_err(|_| SessionError::ParseError)?);
@@ -226,8 +228,10 @@ impl<'a, const C: usize> TryFrom<&'a [u8]> for FrameAcknowledgements<C> {
             Ok(Self(
                 // chunks_exact discards the remainder bytes
                 value
-                    .chunks_exact(size_of::<FrameId>())
-                    .map(|v| FrameId::from_be_bytes(v.try_into().unwrap()))
+                    .as_chunks::<{ size_of::<FrameId>() }>()
+                    .0
+                    .iter()
+                    .map(|v| FrameId::from_be_bytes(*v))
                     .filter(|f| *f > 0)
                     .collect(),
             ))

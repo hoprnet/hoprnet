@@ -88,9 +88,8 @@ impl SlotNotify {
         let woken = {
             let mut inner = self.inner.lock();
             inner.generation += 1;
-            // `drain` rather than `mem::take`: an empty drain allocates nothing and the inner
-            // `Vec` keeps its capacity, which is the common case on a gate that rarely parks.
-            inner.wakers.drain(..).collect::<Vec<_>>()
+            // Taking an empty `Vec` allocates nothing, which is the common case on a gate that rarely parks.
+            std::mem::take(&mut inner.wakers)
         };
         for (_, waker) in woken {
             waker.wake();

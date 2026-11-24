@@ -53,6 +53,13 @@ pub trait SocketState<const C: usize>: Send {
     /// Called when a frame could not be completed from the segments received from Downstream.
     fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError>;
 
+    /// Called when all the frames from `first` to `last`, both inclusive, could not be completed from the
+    /// segments received from Downstream.
+    ///
+    /// The Socket reports each run of consecutive frame ids it gives up on in one call, and a run can
+    /// span nearly the whole [`FrameId`] range, so it must be handled in one step, not frame by frame.
+    fn frames_discarded(&mut self, first: FrameId, last: FrameId) -> Result<(), SessionError>;
+
     /// Called when a segment of a Frame was sent to the Downstream.
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
 
@@ -115,6 +122,10 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
         Ok(())
     }
 
+    fn frames_discarded(&mut self, _: FrameId, _: FrameId) -> Result<(), SessionError> {
+        Ok(())
+    }
+
     fn segment_sent(&mut self, _: &Segment) -> Result<(), SessionError> {
         Ok(())
     }
@@ -153,6 +164,7 @@ mod tests {
             fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError>;
             fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError>;
             fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError>;
+            fn frames_discarded(&mut self, first: FrameId, last: FrameId) -> Result<(), SessionError>;
             fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
         }
     }
@@ -210,6 +222,11 @@ mod tests {
         fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError> {
             tracing::debug!(id = self.1, "frame_discarded called");
             self.0.lock().unwrap().frame_discarded(id)
+        }
+
+        fn frames_discarded(&mut self, first: FrameId, last: FrameId) -> Result<(), SessionError> {
+            tracing::debug!(id = self.1, "frames_discarded called");
+            self.0.lock().unwrap().frames_discarded(first, last)
         }
 
         fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError> {
@@ -276,11 +293,11 @@ mod tests {
             .with(mockall::predicate::eq(2))
             .returning(|_| Ok::<_, SessionError>(()));
         bob_state
-            .expect_frame_discarded()
+            .expect_frames_discarded()
             .once()
             .in_sequence(&mut bob_seq)
-            .with(mockall::predicate::eq(1))
-            .returning(|_| Ok::<_, SessionError>(()));
+            .with(mockall::predicate::eq(1), mockall::predicate::eq(1))
+            .returning(|_, _| Ok::<_, SessionError>(()));
         bob_state
             .expect_frame_emitted()
             .once()

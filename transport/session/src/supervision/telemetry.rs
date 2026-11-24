@@ -282,12 +282,18 @@ pub enum PixAdmissionRejection {
     LiveCycleCapacity,
     /// The node is already managing `maximum_sessions`, or this pseudonym already holds a slot.
     NoSessionSlot,
+    /// This pseudonym holds a PIX Session slot that a resume request may not take over: it is not
+    /// established, is an older attempt, is draining or poisoned, was never paid for, or was
+    /// negotiated on other terms. Answered `NotResumable`, unlike [`NoSessionSlot`](Self::NoSessionSlot).
+    TakeoverIneligible,
     /// This node could not decide right now — the session server did not answer in time, or its
     /// request channel was full.
     Busy,
     /// The initiation packet carried a SURB with a direct (0-hop) return path, over which no PIX
     /// share can be delivered.
     DirectReturnPath,
+    /// The peer asked to resume a Session this node cannot resume.
+    NotResumable,
 }
 
 impl PixAdmissionRejection {
@@ -388,6 +394,13 @@ pub struct PixTurnEvents {
     /// any of them — counting it there would break the identity the census exists to keep exact. It
     /// is a rate of repeats, and only that.
     pub ssa_requests_resent: u32,
+    /// Unanswered *opening* `SsaRequest`s the supervisor asked to have sent again.
+    ///
+    /// Counted apart from [`ssa_requests_resent`](Self::ssa_requests_resent): a lost first request
+    /// and a successor the Entry is not yet willing to admit are different faults, and a rate that
+    /// mixed them would hide which one a deployment suffers from. The same reasoning keeps it out of
+    /// the [`PixCycleEvent`] census.
+    pub opening_ssa_requests_resent: u32,
     /// Newly accepted shares that advanced reconstruction.
     pub useful_shares: u64,
     /// Newly accepted shares that did not — the negotiated surplus, and duplicates.
@@ -757,6 +770,9 @@ fn record_events(events: PixTurnEvents, scope: EventScope) {
     if events.ssa_requests_resent > 0 {
         emit_ssa_requests_resent(u64::from(events.ssa_requests_resent));
     }
+    if events.opening_ssa_requests_resent > 0 {
+        emit_opening_ssa_requests_resent(u64::from(events.opening_ssa_requests_resent));
+    }
     // Confirmed deposit value pairs with `Funded`, which is not census-coupled, so it is emitted in
     // both scopes for the same reason that count is.
     if events.deposit_confirmed_uhopr > 0 {
@@ -842,6 +858,15 @@ fn emit_cycles_total(event: PixCycleEvent, count: u64) {
     probe::add(&format!("cycles_total/{event}"), count as i64);
     #[cfg(not(any(feature = "telemetry", test)))]
     let _ = (event, count);
+}
+
+fn emit_opening_ssa_requests_resent(count: u64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::add_opening_ssa_requests_resent(count);
+    #[cfg(test)]
+    probe::add("opening_ssa_requests_resent", count as i64);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = count;
 }
 
 fn emit_ssa_requests_resent(count: u64) {
@@ -1230,6 +1255,7 @@ mod tests {
                 recovered: 1,
                 failed: 1,
                 ssa_requests_resent: 5,
+                opening_ssa_requests_resent: 2,
                 useful_shares: 7,
                 surplus_shares: 4,
                 deposit_confirmed_uhopr: 500_000,
@@ -1257,6 +1283,11 @@ mod tests {
             5,
             probe::get("ssa_requests_resent"),
             "a re-send is only ever a rate, like a share arrival, and moves no cycle through the census"
+        );
+        assert_eq!(
+            2,
+            probe::get("opening_ssa_requests_resent"),
+            "an opening re-send is a rate on its own series"
         );
         for coupled in ["requested", "recovered", "failed"] {
             assert_eq!(
@@ -1385,9 +1416,14 @@ mod tests {
         );
         assert_eq!("no_pix_support", PixAdmissionRejection::NoPixSupport.to_string());
         assert_eq!(
+            "takeover_ineligible",
+            PixAdmissionRejection::TakeoverIneligible.to_string()
+        );
+        assert_eq!(
             "direct_return_path",
             PixAdmissionRejection::DirectReturnPath.to_string()
         );
+        assert_eq!("not_resumable", PixAdmissionRejection::NotResumable.to_string());
     }
 
     /// A refusal is only a PIX admission refusal if the peer was asking for PIX.
@@ -1407,8 +1443,10 @@ mod tests {
             PixAdmissionRejection::TargetPolicy,
             PixAdmissionRejection::LiveCycleCapacity,
             PixAdmissionRejection::NoSessionSlot,
+            PixAdmissionRejection::TakeoverIneligible,
             PixAdmissionRejection::Busy,
             PixAdmissionRejection::DirectReturnPath,
+            PixAdmissionRejection::NotResumable,
         ] {
             assert!(reason.record_if_pix(pix), "{reason} refused a PIX offer");
             assert!(
@@ -1440,6 +1478,14 @@ mod tests {
             .is_empty(),
             "a turn whose only event was a re-send still has something to publish"
         );
+        assert!(
+            !PixTurnEvents {
+                opening_ssa_requests_resent: 1,
+                ..Default::default()
+            }
+            .is_empty(),
+            "a turn whose only event was an opening re-send still has something to publish"
+        );
     }
 
     /// A re-send is counted on its own series and moves no lifecycle counter.
@@ -1456,11 +1502,13 @@ mod tests {
             snapshot(PixGateMode::Predeposit, 1),
             PixTurnEvents {
                 ssa_requests_resent: 3,
+                opening_ssa_requests_resent: 2,
                 ..Default::default()
             },
         );
 
         assert_eq!(3, probe::get("ssa_requests_resent"));
+        assert_eq!(2, probe::get("opening_ssa_requests_resent"));
         for event in ["requested", "committed", "funded", "recovered", "failed"] {
             assert_eq!(
                 0,
