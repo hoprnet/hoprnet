@@ -747,9 +747,11 @@ fn forward_pack_budget(
                 .map(|deficit| deficit.max(usize::from(state.silence_sustain())))
         }) {
             Some(needed) => needed.min(max_data_surbs),
-            // Unbalanced session or disabled balancer (`target == 0`): reserve room for 1 organic
-            // SURB per packet without throttling small datagrams down to the 7-SURB ceiling.
-            None => 1,
+            // Unbalanced session or disabled balancer (`target == 0`): preserve the caller's
+            // configured per-packet SURB allowance (bounded by `max_data_surbs`) so packing does
+            // not shrink SURB headroom when no balancer is refilling. Single-message fallback in
+            // `PackBuffer` still sends datagrams larger than the reserved budget on their own.
+            None => max_data_surbs,
         };
         HoprPacket::max_message_with_surbs(reserved_surbs).saturating_sub(Tag::SIZE)
     }))
@@ -2133,6 +2135,50 @@ mod tests {
                 .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 1),
             "forward session without surb_management must preserve room for >=1 SURB per packet, got lengths \
              {total_lens:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn forward_session_without_surb_management_preserves_configured_surb_allowance() -> anyhow::Result<()> {
+        let id = SessionId::random();
+        let dst = *OffchainKeypair::random().public();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded();
+
+        // With `surb_management = None` and `max_surbs_per_data_packet = 4`, each 1,400-byte
+        // datagram fits alongside 4 SURBs (~1,638 B budget) and must not be combined with a
+        // second 1,400-byte datagram that would shrink headroom down to 1 SURB.
+        let mut session = HoprSession::new(
+            id,
+            DestinationRouting::forward_only(dst, RoutingOptions::Hops(1.try_into()?)),
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation | Capability::NoDelay,
+                datagram_pack_delay: Some(Duration::from_millis(20)),
+                max_surbs_per_data_packet: 4,
+                ..Default::default()
+            },
+            (tx, futures::stream::pending()),
+            None,
+        )?;
+
+        for i in 0..4u8 {
+            session.write_all(&[i; 1_400]).await?;
+        }
+        session.close().await?;
+
+        let mut total_lens = Vec::new();
+        while let Some((_, out)) = rx.next().await {
+            total_lens.push(out.data.total_len());
+        }
+        assert!(
+            total_lens.len() >= 4,
+            "1,400 B datagrams must not pack past the 4-SURB budget, got {total_lens:?}"
+        );
+        assert!(
+            total_lens
+                .iter()
+                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 4),
+            "every packet must retain room for >=4 SURBs, got lengths {total_lens:?}"
         );
         Ok(())
     }

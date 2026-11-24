@@ -390,19 +390,22 @@ async fn run_packer<const C: usize, W>(
                     }
                 } else if timer.is_none() {
                     // `pack_buf` holds `msg`, which was buffered at `buffered_at`. If writing an
-                    // overflow packet already spent `>= pack_delay`, emit the buffered packet
-                    // right away rather than starting a fresh full window; otherwise arm for the
-                    // remaining time until `buffered_at + pack_delay`.
-                    let deadline = buffered_at + pack_delay;
+                    // overflow packet already spent `>= pack_delay` (or `pack_delay` overflows
+                    // `Instant`), emit the buffered packet right away rather than panicking or
+                    // starting a fresh full window; otherwise arm for the remaining time until
+                    // `buffered_at + pack_delay`.
                     let after_write = Instant::now();
-                    if after_write >= deadline {
-                        if let Some(pkt) = pack_buf.take()
-                            && let Err(err) = flush_packet(&mut writer, &pkt).await
-                        {
-                            break Err(err);
+                    match buffered_at.checked_add(pack_delay) {
+                        Some(deadline) if after_write < deadline => {
+                            timer = Some(FlushTimer::arm_until(deadline, deadline - after_write));
                         }
-                    } else {
-                        timer = Some(FlushTimer::arm_until(deadline, deadline - after_write));
+                        _ => {
+                            if let Some(pkt) = pack_buf.take()
+                                && let Err(err) = flush_packet(&mut writer, &pkt).await
+                            {
+                                break Err(err);
+                            }
+                        }
                     }
                 }
             }
@@ -627,7 +630,7 @@ mod tests {
     }
 
     #[test]
-    fn pack_buffer_handles_isolated_burst_overflow_and_budget_limits() {
+    fn pack_buffer_handles_isolated_burst_overflow_and_budget_limits() -> anyhow::Result<()> {
         let t0 = Instant::now();
         let delay = Duration::from_millis(20);
         let mut buf = PackBuffer::<200>::new(delay);
@@ -666,7 +669,7 @@ mod tests {
         let t3 = t2 + Duration::from_millis(5);
         let out = buf.push(&[4u8; 80], t3, 200);
         assert_eq!(None, out.overflow);
-        let pkt = out.immediate.expect("near-full buffer must flush immediately");
+        let pkt = out.immediate.context("near-full buffer must flush immediately")?;
         assert_eq!(180, pkt.len());
         assert_eq!(0, buf.buffered_len());
 
@@ -699,6 +702,7 @@ mod tests {
         let out = buf.push(&[8u8; 40], t7, 200);
         assert_eq!(None, out.overflow);
         assert_eq!(Some(Bytes::from(vec![8u8; 40])), out.immediate);
+        Ok(())
     }
 
     #[test]
@@ -1622,21 +1626,21 @@ mod tests {
         struct DelayedNthWrite {
             delay_on_write_index: usize,
             delay: Duration,
-            write_times: Arc<Mutex<Vec<Instant>>>,
+            writes: Arc<Mutex<Vec<(Instant, usize)>>>,
             sleep: Option<Pin<Box<tokio::time::Sleep>>>,
         }
 
         impl AsyncWrite for DelayedNthWrite {
             fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
                 let this = self.as_mut().get_mut();
-                if this.write_times.lock().len() == this.delay_on_write_index {
+                if this.writes.lock().len() == this.delay_on_write_index {
                     let sleep = this
                         .sleep
                         .get_or_insert_with(|| Box::pin(tokio::time::sleep(this.delay)));
                     futures::ready!(sleep.as_mut().poll(cx));
                     this.sleep = None;
                 }
-                this.write_times.lock().push(Instant::now());
+                this.writes.lock().push((Instant::now(), buf.len()));
                 Poll::Ready(Ok(buf.len()))
             }
 
@@ -1653,40 +1657,45 @@ mod tests {
         let budget = PackPayloadBudget::new(|| 1_100);
         assert!(format!("{budget:?}").contains("PackPayloadBudget"));
 
-        let write_times = Arc::new(Mutex::new(Vec::new()));
+        let overhead = {
+            let mut buf = BytesMut::new();
+            SessionCodec::<WIRE_MTU>.encode(test_segment_msg(1, &[]), &mut buf)?;
+            buf.len()
+        };
+        let payload_300 = vec![0x33; 300 - overhead];
+        let payload_510 = vec![0x55; 510 - overhead];
+
+        let writes = Arc::new(Mutex::new(Vec::new()));
         let writer = DelayedNthWrite {
-            // Write #0 = isolated msg0; Write #1 = overflow packet (msg1 + msg2), stalled 120 ms;
-            // Write #2 = buffered msg3, which must flush right after Write #1 finishes!
+            // Write #0 = isolated 300 B; Write #1 = overflow packet (300 + 300 = 600 B) stalled
+            // 120 ms (> 80 ms pack_delay); Write #2 = buffered 510 B message (remaining 590 B >=
+            // 510 B so `outcome.immediate` is `None`), flushed immediately once Write #1 finishes
+            // because its `buffered_at + pack_delay` deadline has already passed.
             delay_on_write_index: 1,
             delay: Duration::from_millis(120),
-            write_times: write_times.clone(),
+            writes: writes.clone(),
             sleep: None,
         };
         let mut sink =
             WholeMessagePackingSink::<WIRE_MTU>::new(writer, pack_delay, Some(budget), tracing::Span::none());
 
-        let payload = vec![0x33; 450];
-        // msg0 exits idle (Write #0 immediately); msg1 + msg2 pack into 900+ B; msg3 overflows
-        // msg1+msg2 (Write #1 stalled 120 ms > 80 ms pack_delay) while msg3 waits in `pack_buf`.
-        for i in 1..=4u32 {
-            sink.feed(test_segment_msg(i, &payload)).await?;
-        }
+        sink.feed(test_segment_msg(1, &payload_300)).await?;
+        sink.feed(test_segment_msg(2, &payload_300)).await?;
+        sink.feed(test_segment_msg(3, &payload_300)).await?;
+        sink.feed(test_segment_msg(4, &payload_510)).await?;
 
         let deadline = Instant::now() + Duration::from_secs(2);
-        while write_times.lock().len() < 3 && Instant::now() < deadline {
+        while writes.lock().len() < 3 && Instant::now() < deadline {
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
-        let times = write_times.lock().clone();
-        assert_eq!(
-            3,
-            times.len(),
-            "expected isolated, overflow, and immediate post-stall flush"
-        );
-        let gap_after_overflow = times[2].saturating_duration_since(times[1]);
+        let recorded = writes.lock().clone();
+        let lens: Vec<usize> = recorded.iter().map(|(_, len)| *len).collect();
+        assert_eq!(vec![300, 600, 510], lens);
+        let gap_after_overflow = recorded[2].0.saturating_duration_since(recorded[1].0);
         assert!(
             gap_after_overflow < pack_delay / 2,
-            "buffered msg3 should flush immediately after stalled overflow write, not wait another {pack_delay:?} \
-             (gap={gap_after_overflow:?})"
+            "buffered 510 B message should flush immediately after stalled overflow write, not wait another \
+             {pack_delay:?} (gap={gap_after_overflow:?})"
         );
         sink.close().await?;
         Ok(())
@@ -1782,19 +1791,56 @@ mod tests {
             Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::WriteZero
         ));
 
-        // 3. Writer write error during timer-expired flush surfaces on subsequent operations.
+        // 3. Writer write error during timer-expired flush: write #0 (isolated) succeeds, then msg #2 stays buffered
+        //    until `pack_delay` expires and write #1 fails with ConnectionReset. Verify the worker records the error
+        //    before explicit `flush()`.
+        struct FailAfterFirstWrite {
+            attempts: Arc<std::sync::atomic::AtomicUsize>,
+        }
+
+        impl AsyncWrite for FailAfterFirstWrite {
+            fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+                let n = self.attempts.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+                if n == 0 {
+                    Poll::Ready(Ok(buf.len()))
+                } else {
+                    Poll::Ready(Err(std::io::Error::new(
+                        std::io::ErrorKind::ConnectionReset,
+                        "timer write boom",
+                    )))
+                }
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        let attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let mut timer_err_sink = WholeMessagePackingSink::<WIRE_MTU>::new(
-            FailingWriter {
-                fail_on_write: true,
-                fail_on_flush: false,
-                fail_on_close: false,
+            FailAfterFirstWrite {
+                attempts: attempts.clone(),
             },
-            Duration::from_millis(10),
+            Duration::from_millis(20),
             None,
             tracing::Span::none(),
         );
-        timer_err_sink.feed(test_segment_msg(4, b"boom")).await?;
-        tokio::time::sleep(Duration::from_millis(30)).await;
+        timer_err_sink.feed(test_segment_msg(4, b"first-ok")).await?;
+        timer_err_sink.feed(test_segment_msg(5, b"timer-boom")).await?;
+
+        let deadline = Instant::now() + Duration::from_secs(1);
+        while timer_err_sink.stored_error().is_none() && Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(2, attempts.load(std::sync::atomic::Ordering::Acquire));
+        assert!(matches!(
+            timer_err_sink.stored_error(),
+            Some(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::ConnectionReset
+        ));
         assert!(matches!(
             timer_err_sink.flush().await,
             Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::ConnectionReset

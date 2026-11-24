@@ -242,6 +242,42 @@ enum WriteState {
     Draining(usize),
 }
 
+/// Synchronous `Sink` adapter mapping `Segment` into `SessionMessage<C>` without the 1-item
+/// pending-future buffer of `futures::SinkExt::with`, so `start_send` delivers directly to the
+/// inner sink and `poll_drain_segments` does not need a trailing `poll_ready` poll.
+#[pin_project::pin_project]
+struct SegmentMapSink<S, F> {
+    #[pin]
+    inner: S,
+    map: F,
+}
+
+impl<const C: usize, S, F> futures::Sink<Segment> for SegmentMapSink<S, F>
+where
+    S: futures::Sink<SessionMessage<C>>,
+    F: FnMut(Segment) -> SessionMessage<C>,
+{
+    type Error = S::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
+        let this = self.project();
+        let msg = (this.map)(item);
+        this.inner.start_send(msg)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
+    }
+}
+
 /// Socket-like object implementing the Session protocol that can operate on any transport that
 /// implements [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`].
 ///
@@ -493,6 +529,11 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
         let (packets_out, packets_in) = if let Some(pack_delay) = cfg.pack_delay {
+            if std::time::Instant::now().checked_add(pack_delay).is_none() {
+                return Err(SessionError::InvalidConfig(
+                    "pack_delay exceeds representable Instant deadline".into(),
+                ));
+            }
             let (transport_rx, transport_tx) = futures::AsyncReadExt::split(transport);
             (
                 future::Either::Left(packing::WholeMessagePackingSink::<C>::new(
@@ -519,8 +560,9 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let packets_in = stop_on_invalid_header(packets_in);
 
         // Pipeline IN: Data incoming from Upstream
-        let upstream_frames_in = packets_out
-            .with(move |segment: Segment| {
+        let upstream_frames_in = SegmentMapSink {
+            inner: packets_out,
+            map: move |segment: Segment| {
                 #[cfg(feature = "telemetry")]
                 s0.outgoing_message(SessionMessageDiscriminants::Segment);
                 if let Some(progress) = &progress_out {
@@ -529,9 +571,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         .fetch_max(segment.frame_id, std::sync::atomic::Ordering::Relaxed);
                 }
 
-                future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
-            })
-            .segmenter_with_terminating_segment_from::<C>(frame_size, cfg.datagram, first_frame_id);
+                SessionMessage::<C>::Segment(segment)
+            },
+        }
+        .segmenter_with_terminating_segment_from::<C>(frame_size, cfg.datagram, first_frame_id);
 
         // Everything below the first frame id counts as seen, a predecessor stream's frames included
         let last_emitted_frame = Arc::new(AtomicU32::new(first_frame_id - 1));
@@ -2882,6 +2925,22 @@ mod tests {
             #[cfg(feature = "telemetry")]
             NoopTracker,
         );
+        assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_stateless_socket_should_reject_unrepresentable_pack_delay() -> anyhow::Result<()> {
+        let (alice, _bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let result = SessionSocket::<MTU, _>::stateless_builder(
+            "alice",
+            alice,
+            SessionSocketConfig {
+                pack_delay: Some(Duration::MAX),
+                ..Default::default()
+            },
+        )
+        .build();
         assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
         Ok(())
     }

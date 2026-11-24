@@ -117,12 +117,15 @@ where
                 State::BufferingFrame => {
                     // Datagram mode: emit exactly one frame per write so datagram boundaries are
                     // preserved (the peer reads one datagram per read), regardless of `frame_size`.
-                    // Segment `buf` directly — there is nothing to accumulate, so the `frame`
-                    // buffer is left untouched. Segments drain on the next poll_write / poll_flush.
+                    // Check downstream readiness before accepting `buf` so a single-segment
+                    // datagram is submitted synchronously without stranding a stored length in
+                    // `Draining` if the caller cancels a pending write.
                     if *this.datagram {
                         if buf.is_empty() {
                             return Poll::Ready(Ok(0));
                         }
+                        futures::ready!(this.inner.as_mut().poll_ready(cx).map_err(std::io::Error::other))?;
+
                         segment_into(buf, session_socket_mtu::<C>(), *this.frame_id, this.ready_segments)
                             .map_err(std::io::Error::other)?;
 
@@ -133,7 +136,11 @@ where
                         );
 
                         *this.frame_id += 1;
-                        *this.state = State::WritingFrame;
+                        let first = this.ready_segments.pop_front().unwrap();
+                        this.inner.as_mut().start_send(first).map_err(std::io::Error::other)?;
+                        if !this.ready_segments.is_empty() {
+                            *this.state = State::WritingFrame;
+                        }
 
                         return Poll::Ready(Ok(buf.len()));
                     }
@@ -289,10 +296,6 @@ where
                 *this.frame_id += 1;
                 *this.state = State::WritingFrame;
             } else {
-                // Drive any sink combinator (e.g. `SinkExt::with`) so the last segment submitted
-                // via `start_send` is forwarded into the underlying sink without calling
-                // `poll_flush`.
-                futures::ready!(this.inner.as_mut().poll_ready(cx).map_err(std::io::Error::other))?;
                 *this.state = State::BufferingFrame;
                 tracing::trace!("all segments drained");
                 return Poll::Ready(Ok(()));
