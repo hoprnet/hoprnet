@@ -5,14 +5,14 @@
 //! *candidate pool* has collapsed to a single first relayer, but that says nothing about where the
 //! draws actually go over time: a pool of ten can still serve one relayer for hours.
 //!
-//! This module measures that in the two dimensions an observer can use to tell sessions apart:
+//! This module measures that in the two dimensions an operator can use to tell sessions apart:
 //!
-//! - **First hop, per direction.** The first relayer of the forward path and of a return path is the only relay that
-//!   learns who talks to whom, so each direction is scored on its own. A session whose forward and return path leave
-//!   through the same relay exposes the pair; one that keeps both first hops varied does not.
-//! - **Whole route.** A route is a forward path together with the return path of one SURB. Scoring whole routes catches
-//!   a correlation the first hops cannot show, such as a stable pair of relayers that every packet reuses behind varied
-//!   outer hops.
+//! - **First hop, per direction.** A relay on the route sees only its previous and next node, so the first relayer of a
+//!   leg is what puts the session next to the rest of that route. Each direction is scored on its own: a forward leg
+//!   that always leaves through one relay leaves that position with one peer, however varied the return legs are.
+//! - **Whole route.** A route is a forward path together with the return path of one SURB. It counts distinct complete
+//!   routes, so a shared inner relay is invisible to it; what it shows is a correlation across the legs, such as two
+//!   forward and two return paths that only ever pair as `(1,1)` and `(2,2)`.
 //!
 //! Every score is the effective number of distinct values, `exp(H)` for the Shannon entropy `H` of
 //! the distribution: 1.0 when every draw used the same value, tending to the number of distinct
