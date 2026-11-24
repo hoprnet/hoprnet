@@ -114,10 +114,11 @@ pub struct StartInitiation<T, C> {
     /// and the lower 32 bits of them are the SURB balancer target.
     ///
     /// The least significant 64 bits are reserved: the lowest 32 carry the sender's session idle timeout in
-    /// whole seconds (`0` if not announced), bit 32 is reserved for forward receipts (hoprnet#8702), and bit 33
-    /// marks an attempt to resume a Session (answered by [`StartProtocol::SessionResumed`]). Bits 34 to 63 stay
-    /// reserved (for a resume secret, see hoprnet#8723). Senders set unused bits to `0` and receivers ignore
-    /// them, so that they can be allocated later without breaking older decoders.
+    /// whole seconds (`0` if not announced), bit 32 asks the Exit for forward receipts (see
+    /// [`StartProtocol::ForwardReceipts`]), and bit 33 marks an attempt to resume a Session (answered by
+    /// [`StartProtocol::SessionResumed`]). Bits 34 to 63 stay reserved (for a resume secret, see hoprnet#8723).
+    /// Senders set unused bits to `0` and receivers ignore them, so that they can be allocated later without
+    /// breaking older decoders.
     pub additional_data: u128,
 }
 
@@ -177,6 +178,7 @@ pub struct StartResumed<I> {
 ///      Entry->>Exit: SsaCommit (SessionID, SsaIndex, CoeffIndex, PolyCoeffs)
 ///      Entry->>Exit: KeepAlive (SessionID)
 ///      Exit->>Entry: KeepAlive (SessionID)
+///      Note over Entry,Exit: if the Entry set the receipts bit, ForwardReceipts (SessionID, Seq, Tags) from Exit to Entry
 ///      Note over Entry,Exit: Data
 ///      else If Exit cannot accept a new session
 ///      Exit->>Entry: SessionError (Challenge, Reason)
@@ -202,11 +204,12 @@ pub enum StartProtocol<I, T, C, G, K, D> {
     SessionError(StartErrorType<I>),
     /// A ping message to keep the session alive.
     KeepAlive(KeepAliveMessage<I>),
+    /// Receipts of the Session packets that reached the Exit.
+    ForwardReceipts(ForwardReceiptsMessage<I>) = 6,
     /// Confirmation that the counterparty took over a Session it still held (see [`StartResumed`]).
     ///
     /// Sent only in answer to a resume attempt, in place of
-    /// [`SessionEstablished`](StartProtocol::SessionEstablished). It has tag 7 because tag 6 is reserved for
-    /// forward receipts (hoprnet#8702).
+    /// [`SessionEstablished`](StartProtocol::SessionEstablished).
     SessionResumed(StartResumed<I>) = 7,
 }
 
@@ -470,6 +473,22 @@ pub struct KeepAliveMessage<I> {
     pub additional_data: u64,
 }
 
+/// The most tags a [`ForwardReceiptsMessage`] can carry.
+pub const MAX_FORWARD_RECEIPT_TAGS: usize = 768;
+
+/// Receipt of the Session packets that reached the Exit, sent by the Exit to the Entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ForwardReceiptsMessage<I> {
+    /// Session ID.
+    pub session_id: I,
+    /// Receipt number, starting at 1; the last interval it covers.
+    pub seq: u32,
+    /// The first interval it covers: it repeats the tags of `first_seq..=seq`, so that a lost receipt is covered.
+    pub first_seq: u32,
+    /// Tags of the packets received in those intervals, see `forward_receipt_tag` of the packet info.
+    pub tags: Vec<u32>,
+}
+
 /// [Flags](KeepAliveFlag) that can be sent via the [`KeepAliveMessage`].
 ///
 /// The flags can define the meaning of the `additional_data` field.
@@ -701,6 +720,21 @@ where
                 data.extend_from_slice(&ping.additional_data.to_be_bytes());
                 let session_id = serde_cbor_2::to_vec(&ping.session_id)?;
                 data.extend(session_id);
+            }
+            StartProtocol::ForwardReceipts(receipts) => {
+                if receipts.tags.len() > MAX_FORWARD_RECEIPT_TAGS {
+                    return Err(StartProtocolError::ParseError("fr.too_many_tags".into()));
+                }
+                if receipts.first_seq > receipts.seq {
+                    return Err(StartProtocolError::ParseError("fr.first_seq".into()));
+                }
+                data.extend_from_slice(&receipts.seq.to_be_bytes());
+                data.extend_from_slice(&receipts.first_seq.to_be_bytes());
+                data.extend_from_slice(&(receipts.tags.len() as u16).to_be_bytes());
+                for tag in &receipts.tags {
+                    data.extend_from_slice(&tag.to_be_bytes());
+                }
+                data.extend(serde_cbor_2::to_vec(&receipts.session_id)?);
             }
             StartProtocol::SsaCommit(commit) => {
                 data.extend_from_slice(&commit.ssa_index.get().to_be_bytes());
@@ -1039,6 +1073,42 @@ where
                         // it does not recognize as "some reason", so a reason may be added without
                         // a protocol version bump.
                         reason: StartErrorReason::from_repr(body[reason_start]).unwrap_or(StartErrorReason::Unknown),
+                    })
+                }
+                StartProtocolDiscriminants::ForwardReceipts => {
+                    const PREFIX: usize = 2 * size_of::<u32>() + size_of::<u16>();
+                    if body.len() < PREFIX {
+                        return Err(StartProtocolError::InvalidLength);
+                    }
+                    let seq = u32::from_be_bytes(body[..4].try_into().map_err(|_| StartProtocolError::InvalidLength)?);
+                    let first_seq =
+                        u32::from_be_bytes(body[4..8].try_into().map_err(|_| StartProtocolError::InvalidLength)?);
+                    if first_seq > seq {
+                        return Err(StartProtocolError::ParseError("fr.first_seq".into()));
+                    }
+                    let count = u16::from_be_bytes(
+                        body[8..PREFIX]
+                            .try_into()
+                            .map_err(|_| StartProtocolError::InvalidLength)?,
+                    ) as usize;
+                    if count > MAX_FORWARD_RECEIPT_TAGS {
+                        return Err(StartProtocolError::ParseError("fr.too_many_tags".into()));
+                    }
+                    // One byte at least is left for the CBOR session id
+                    let ids_end = PREFIX + count * size_of::<u32>();
+                    if body.len() <= ids_end {
+                        return Err(StartProtocolError::InvalidLength);
+                    }
+                    StartProtocol::ForwardReceipts(ForwardReceiptsMessage {
+                        seq,
+                        first_seq,
+                        tags: body[PREFIX..ids_end]
+                            .as_chunks::<{ size_of::<u32>() }>()
+                            .0
+                            .iter()
+                            .map(|c| u32::from_be_bytes(*c))
+                            .collect(),
+                        session_id: serde_cbor_2::from_slice(&body[ids_end..])?,
                     })
                 }
                 StartProtocolDiscriminants::KeepAlive => {
@@ -1413,10 +1483,10 @@ mod tests {
     }
 
     #[test]
-    fn reserved_tag_6_should_decode_as_unknown_message() {
+    fn unassigned_tag_8_should_decode_as_unknown_message() {
         let data = [
             StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::START_PROTOCOL_VERSION,
-            6,
+            8,
             0,
             1,
             0,
@@ -1438,10 +1508,10 @@ mod tests {
         assert_eq!(3, StartProtocolDiscriminants::SsaRequest as u8);
         assert_eq!(4, StartProtocolDiscriminants::SessionError as u8);
         assert_eq!(5, StartProtocolDiscriminants::KeepAlive as u8);
+        assert_eq!(6, StartProtocolDiscriminants::ForwardReceipts as u8);
         assert_eq!(7, StartProtocolDiscriminants::SessionResumed as u8);
-        // Tag 6 is skipped (reserved for forward receipts), so the count is one less than the last tag + 1.
-        assert_eq!(7, <StartProtocolDiscriminants as strum::EnumCount>::COUNT);
-        assert!(StartProtocolDiscriminants::from_repr(6).is_none());
+        assert_eq!(8, <StartProtocolDiscriminants as strum::EnumCount>::COUNT);
+        assert!(StartProtocolDiscriminants::from_repr(8).is_none());
 
         // A message of an existing kind, as an old peer encodes it, still decodes
         let old = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionEstablished(
@@ -2549,6 +2619,156 @@ mod tests {
 
     fn is_parse_error(error: &StartProtocolError, what: &str) -> bool {
         matches!(error, StartProtocolError::ParseError(context) if context == what)
+    }
+
+    /// The discriminants are wire values: each keeps its tag.
+    #[test]
+    fn start_protocol_discriminants_should_be_pinned() {
+        use StartProtocolDiscriminants as D;
+        assert_eq!(
+            [
+                D::StartSession as u8,
+                D::SessionEstablished as u8,
+                D::SsaCommit as u8,
+                D::SsaRequest as u8,
+                D::SessionError as u8,
+                D::KeepAlive as u8,
+                D::ForwardReceipts as u8,
+            ],
+            [0, 1, 2, 3, 4, 5, 6]
+        );
+    }
+
+    #[test]
+    fn start_protocol_forward_receipts_should_round_trip() -> anyhow::Result<()> {
+        type Msg = StartProtocol<SimplePseudonym, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>;
+        for count in [0, 1, MAX_FORWARD_RECEIPT_TAGS] {
+            let msg_1 = Msg::ForwardReceipts(ForwardReceiptsMessage {
+                session_id: SimplePseudonym::random(),
+                seq: 7,
+                first_seq: 3,
+                tags: (0..count as u32).map(|i| i.wrapping_mul(0x9e37_79b9)).collect(),
+            });
+            let (tag, msg) = msg_1.clone().encode()?;
+            assert!(msg.len() <= ApplicationData::PAYLOAD_SIZE, "must fit within a packet");
+            assert_eq!(msg_1, Msg::decode(tag, &msg)?);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_forward_receipts_should_refuse_too_many_tags() -> anyhow::Result<()> {
+        let msg = StartProtocol::<u32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::ForwardReceipts(
+            ForwardReceiptsMessage {
+                session_id: 10_u32,
+                seq: 1,
+                first_seq: 1,
+                tags: vec![0; MAX_FORWARD_RECEIPT_TAGS + 1],
+            },
+        );
+        let error = msg
+            .encode()
+            .err()
+            .ok_or_else(|| anyhow::anyhow!("too many tags must not encode"))?;
+        assert!(is_parse_error(&error, "fr.too_many_tags"));
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_forward_receipts_should_refuse_a_first_seq_after_its_seq() -> anyhow::Result<()> {
+        let receipts = |first_seq| {
+            StartProtocol::<u32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::ForwardReceipts(
+                ForwardReceiptsMessage {
+                    session_id: 10_u32,
+                    seq: 3,
+                    first_seq,
+                    tags: vec![],
+                },
+            )
+        };
+        let error = receipts(4)
+            .encode()
+            .err()
+            .ok_or_else(|| anyhow::anyhow!("a first_seq after its seq must not encode"))?;
+        assert!(is_parse_error(&error, "fr.first_seq"));
+        receipts(3).encode()?;
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_a_truncated_forward_receipts_list() {
+        let mut body = 1_u32.to_be_bytes().to_vec();
+        body.extend_from_slice(&1_u32.to_be_bytes());
+        body.extend_from_slice(&3_u16.to_be_bytes());
+        body.extend_from_slice(&[0; 8]);
+        body.push(0x0a);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    /// The fixed part of a receipt body: `seq`, `first_seq` and the number of tags.
+    fn receipts_prefix(count: u16) -> Vec<u8> {
+        let mut body = 1_u32.to_be_bytes().to_vec();
+        body.extend_from_slice(&1_u32.to_be_bytes());
+        body.extend_from_slice(&count.to_be_bytes());
+        body
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_a_forward_receipts_count_above_the_maximum() {
+        let count = MAX_FORWARD_RECEIPT_TAGS + 1;
+        let mut body = receipts_prefix(count as u16);
+        body.extend(std::iter::repeat_n(0, count * size_of::<u32>()));
+        body.push(0x0a);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
+            Err(error) if is_parse_error(&error, "fr.too_many_tags")
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_a_forward_receipts_body_ending_after_the_tags() {
+        let mut body = receipts_prefix(2);
+        body.extend_from_slice(&[0; 8]);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_trailing_bytes_after_the_forward_receipts_session_id() {
+        let mut body = receipts_prefix(1);
+        body.extend_from_slice(&[0; 4]);
+        body.push(0x0a);
+        assert!(decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body).is_ok());
+        body.push(0x0a);
+        assert!(decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body).is_err());
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_a_forward_receipts_first_seq_after_its_seq() {
+        let mut body = 3_u32.to_be_bytes().to_vec();
+        body.extend_from_slice(&4_u32.to_be_bytes());
+        body.extend_from_slice(&0_u16.to_be_bytes());
+        body.push(0x0a);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
+            Err(error) if is_parse_error(&error, "fr.first_seq")
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_an_unknown_discriminant() {
+        assert!(matches!(
+            Decoder::decode(
+                Decoder::START_PROTOCOL_MESSAGE_TAG,
+                &[Decoder::START_PROTOCOL_VERSION, 8, 0, 1, 0]
+            ),
+            Err(StartProtocolError::UnknownMessage)
+        ));
     }
 
     /// The proof rides on constant-term messages only, and its presence is implied by the

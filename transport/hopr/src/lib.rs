@@ -318,8 +318,9 @@ async fn dispatch_incoming_messages<G, In, Out>(
             let _entered = span.enter();
             let _dispatch = tracing::debug_span!("session.dispatch").entered();
             hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
-            // try_send); it never blocks. However, the crossfire stream that feeds
+            // `dispatch_message` is synchronous (moka::sync + crossfire try_send) and
+            // never yields; the locks it takes, the forward receipts' among them, are
+            // held briefly. However, the crossfire stream that feeds
             // this loop does not participate in tokio's cooperative budget, so
             // `future::ready` — which is always Poll::Ready — would let this task
             // monopolize its worker thread under a saturated inbound queue (Processed
@@ -590,7 +591,9 @@ where
         // The pending maps are bounded by the byte budget the operator sets, per map, so the pair's
         // worst case is twice it; see `SurbRoundTripRegistry::with_budget`.
         let surb_round_trips =
-            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes);
+            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes)
+                .with_forward_receipts(cfg.session.forward_receipts);
+        let forward_receipts = surb_round_trips.forward().cloned();
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
@@ -598,6 +601,12 @@ where
             selector,
             planner_config,
         );
+        let path_planner = match forward_receipts {
+            Some(forward) => {
+                path_planner.with_forward_exclusions(Arc::new(move |exit| forward.excluded_relayers(exit)))
+            }
+            None => path_planner,
+        };
 
         // Bound before the struct literal rather than inside it so `set_surb_admission` below can
         // reach the manager: the seam depends on `path_planner`, which does not exist inside the
@@ -645,6 +654,7 @@ where
             // Session's SURB admission has to wait out this window, and it is the operator's own
             // pipeline setting here that decides how long that is.
             surb_resolution_wait: crate::path::resolve::surb_resolution_wait(cfg.packet.pipeline.surb_resolution_wait),
+            forward_receipts: cfg.session.forward_receipts,
             ..Default::default()
         }));
 
@@ -655,6 +665,10 @@ where
         let _ = smgr.set_surb_admission(Arc::new(StoreSurbAdmission {
             store: path_planner.surb_store.clone(),
         }));
+
+        if let Some(forward) = surb_round_trips.forward() {
+            let _ = smgr.set_forward_receipt_sink(forward.clone());
+        }
 
         // The store's admitted class cannot see the session config, so the invariant that it must
         // hold every Session that can be managed at once is checked here, where both figures are in

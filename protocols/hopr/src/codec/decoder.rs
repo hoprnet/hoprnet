@@ -281,6 +281,14 @@ where
                                 .saturating_sub(1)
                         })
                         .min(),
+                    forward_receipt_tag: replied_on_surb.get().is_none().then(|| {
+                        u32::from_be_bytes([
+                            incoming.packet_tag[0],
+                            incoming.packet_tag[1],
+                            incoming.packet_tag[2],
+                            incoming.packet_tag[3],
+                        ])
+                    }),
                 };
 
                 // Store all incoming SURBs if any

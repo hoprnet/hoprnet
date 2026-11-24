@@ -149,24 +149,24 @@ hopr-utils = { package = "hopr-utilities", version = "0.21.0", default-features 
 hopr-utils-session = { version = "1.3.0", path = "utils-session" }
 hopr-utils-tracing = { version = "0.1.0", path = "utils-tracing", default-features = false }
 
-hopr-crypto-packet = { version = "2.3.0", path = "crypto/packet", default-features = false, features = [
+hopr-crypto-packet = { version = "2.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
 hopr-lib = { version = "5.0.0-rc.5", path = "hopr/hopr-lib" }
-hopr-protocol-app = { version = "1.2.0", path = "protocols/app", default-features = false }
-hopr-protocol-hopr = { version = "6.4.0", path = "protocols/hopr", default-features = false, features = [
+hopr-protocol-app = { version = "1.3.0", path = "protocols/app", default-features = false }
+hopr-protocol-hopr = { version = "6.6.0", path = "protocols/hopr", default-features = false, features = [
   "rayon",
 ] }
 hopr-protocol-pix = { version = "0.3.1", path = "protocols/pix", default-features = false, features = [
   "rayon",
 ] }
 hopr-protocol-session = { version = "2.0.0", path = "protocols/session", default-features = false }
-hopr-protocol-start = { version = "4.0.0", path = "protocols/start", default-features = false }
+hopr-protocol-start = { version = "4.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.11.0" }
-hopr-transport = { version = "0.53.0", path = "transport/hopr" }
+hopr-transport = { version = "0.54.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
-hopr-transport-session = { version = "0.36.0", path = "transport/session", default-features = false }
+hopr-transport-session = { version = "0.37.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = { version = "0.35.0" }
 

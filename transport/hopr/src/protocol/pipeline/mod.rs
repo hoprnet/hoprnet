@@ -616,6 +616,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             num_saved_surbs: aux_info.num_surbs,
                             num_evicted_surbs: aux_info.num_evicted_surbs,
                             min_return_path_hops: aux_info.min_return_path_hops,
+                            forward_receipt_tag: aux_info.forward_receipt_tag,
                         }
                     }), span.clone()))
                 })
@@ -1481,6 +1482,7 @@ mod tests {
                     encrypted_pix_share: None,
                     data: Bytes::copy_from_slice(data.as_ref()),
                     minted_surbs: Vec::new(),
+                    forward_receipt_tag: None,
                 })
             } else {
                 Err(std::io::Error::other("context test stops after encoding entry"))
@@ -1503,6 +1505,7 @@ mod tests {
                 encrypted_pix_share: None,
                 data: Bytes::new(),
                 minted_surbs: Vec::new(),
+                forward_receipt_tag: None,
             })
         }
     }
