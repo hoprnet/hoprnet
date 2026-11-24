@@ -13,6 +13,8 @@ use tokio::{sync::watch, time::Instant};
 ///
 /// A dial of `m` spaces generated probes `pace / m` apart, where `pace` is [`ProbeConfig::pace`](crate::ProbeConfig).
 /// It carries any positive multiplier, not only the presets. Probing off is [`ProbeControl::set_dial`] with `None`.
+///
+/// The default is 3.0 times the base rate.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Dial(f64);
 
@@ -23,7 +25,7 @@ impl Dial {
     pub const LOW: Self = Self(0.1);
     /// Half of the base rate.
     pub const MEDIUM: Self = Self(0.5);
-    /// Twice the base rate. Overcharge for a short burst, such as a new session that needs path evidence fast.
+    /// Twice the base rate. A raise above [`Dial::HIGH`], and below the default.
     pub const ULTRA: Self = Self(2.0);
 
     /// A dial at `multiplier`, or `None` when it is not a positive finite number.
@@ -41,8 +43,12 @@ impl Dial {
 }
 
 impl Default for Dial {
+    /// Three times the base rate.
+    ///
+    /// This dial with a probe share of `0.4` kept the return path within its recovery bound in the
+    /// integration runs, so a node probes at 3x unless an application sets another dial.
     fn default() -> Self {
-        Self::HIGH
+        Self(3.0)
     }
 }
 
@@ -246,6 +252,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn the_generator_is_pulled_only_when_a_probe_is_due() {
         let control = ProbeControl::default();
+        control.set_dial(Some(Dial::HIGH));
         let (inner, polled) = counting();
         let mut stream = std::pin::pin!(paced(inner, &control, PACE));
 
@@ -279,6 +286,16 @@ mod tests {
         let held = tokio::time::timeout(Duration::from_secs(1), stream.next()).await;
 
         assert!(held.is_err());
+    }
+
+    #[test]
+    fn the_default_dial_is_three_times_the_base_rate() {
+        assert_eq!(3.0, Dial::default().multiplier());
+        assert_eq!(
+            Some(Dial::default()),
+            ProbeControl::default().dial(),
+            "generated probing must start on the default dial"
+        );
     }
 
     #[test]

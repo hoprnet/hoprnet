@@ -1147,6 +1147,7 @@ mod tests {
             ..Default::default()
         };
         let control = ProbeControl::default();
+        control.set_dial(Some(crate::Dial::HIGH));
 
         test_with_probing_control(cfg, control.clone(), paced_store(), move |iface: TestInterface| {
             let control = control.clone();
