@@ -630,15 +630,24 @@ impl BalancerStateValues {
             return 0;
         }
 
-        let guard = self.organic_budget.lock();
-        let counter = guard.produced_counter();
-        let in_tick = counter.load(Ordering::Acquire).saturating_sub(guard.absorbed_produced);
+        let mut guard = self.organic_budget.lock();
+        let current_produced = guard.produced_counter().load(Ordering::Acquire);
+        let in_tick = current_produced.saturating_sub(guard.absorbed_produced);
         let grant = match self.organic_surbs_budget(in_tick) {
             OrganicSurbBudget::Unbounded => max_surbs,
             OrganicSurbBudget::Bounded(budget) => max_surbs.min(usize::try_from(budget).unwrap_or(usize::MAX)),
         };
         if grant > 0 {
-            counter.fetch_add(grant as u64, Ordering::Release);
+            // Replies counted after `on_counterparty_wiped()` and before the first replacement SURB
+            // is minted can only have spent wiped old-generation SURBs, so advance the wipe
+            // consumption baseline before crediting the fresh stock.
+            if let Some((wipe_produced, _)) = guard.wiped_at
+                && current_produced == wipe_produced
+                && let Some(consumed_now) = guard.external_consumed.as_ref().map(|c| c.load(Ordering::Acquire))
+            {
+                guard.wiped_at = Some((wipe_produced, Some(consumed_now)));
+            }
+            guard.produced_counter().fetch_add(grant as u64, Ordering::Release);
         }
         grant
     }
@@ -676,12 +685,24 @@ impl BalancerStateValues {
 
         let (mut current, next_estimator_state, absorbed_produced) =
             if let Some((wipe_produced, wipe_consumed)) = guard.wiped_at.take() {
+                // Re-read the attached estimator counters under `organic_budget` so a tick whose
+                // initial snapshot spanned a wipe + refill + replies never pairs pre-refill
+                // `produced` with post-wipe `consumed` and invents phantom SURBs on the next tick.
+                let effective_produced = guard
+                    .external_produced
+                    .as_ref()
+                    .map_or(snapshot.produced, |p| snapshot.produced.max(p.load(Ordering::Acquire)));
+                let effective_consumed = guard
+                    .external_consumed
+                    .as_ref()
+                    .map_or(snapshot.consumed, |c| snapshot.consumed.max(c.load(Ordering::Acquire)));
+
                 // The counterparty dropped everything it held at the wipe instant: pre-wipe
-                // production and consumption belong to the discarded generation, while both
-                // post-wipe production and post-wipe consumption (replies using fresh
-                // new-generation SURBs) must stay reflected in the restarted level.
-                let post_wipe_produced = snapshot.produced.saturating_sub(wipe_produced);
-                let post_wipe_consumed = wipe_consumed.map_or(0, |wc| snapshot.consumed.saturating_sub(wc));
+                // production and consumption belong to the discarded generation, while post-wipe
+                // production and consumption after the first replacement SURB are reflected in the
+                // restarted level.
+                let post_wipe_produced = effective_produced.saturating_sub(wipe_produced);
+                let post_wipe_consumed = wipe_consumed.map_or(0, |wc| effective_consumed.saturating_sub(wc));
                 let net_post_wipe = post_wipe_produced.saturating_sub(post_wipe_consumed);
                 tracing::debug!(
                     believed = self.buffer_level.load(Ordering::Acquire),
@@ -692,8 +713,8 @@ impl BalancerStateValues {
                     post_wipe_consumed,
                     "counterparty SURBs were wiped, restarting the level estimate from the wipe checkpoint"
                 );
-                let produced_baseline = snapshot.produced.max(wipe_produced);
-                let consumed_baseline = wipe_consumed.map_or(snapshot.consumed, |wc| snapshot.consumed.max(wc));
+                let produced_baseline = effective_produced.max(wipe_produced);
+                let consumed_baseline = wipe_consumed.map_or(effective_consumed, |wc| effective_consumed.max(wc));
                 (
                     net_post_wipe,
                     SimpleSurbFlowEstimator {
@@ -739,7 +760,7 @@ impl BalancerStateValues {
             guard.absorbed_produced = guard.local_produced.load(Ordering::Acquire);
         }
         self.produced_before_lag.store(produced_before_lag, Ordering::Relaxed);
-        self.produced_at_update.store(snapshot.produced, Ordering::Release);
+        self.produced_at_update.store(absorbed_produced, Ordering::Release);
 
         (current, next_estimator_state)
     }
@@ -1242,10 +1263,11 @@ where
         // full error for the whole window, and when the window ends it would answer a level at or past
         // the target with the ceiling. The refill stops by itself the moment the target is reached. The
         // controller's bounds are not touched.
+        let effective_target = self.state.effective_target();
         let refill_cap = self.state.pace_refill(dt);
         let output = match refill_cap {
             Some(cap) => {
-                if usable >= self.controller.bounds().target() {
+                if usable >= effective_target {
                     0
                 } else {
                     cap
@@ -1262,7 +1284,17 @@ where
                         "refill pacing is over, the controller restarts from the current level"
                     );
                 }
-                let output = self.controller.next_control_output(usable);
+                // If an inferred counterparty capacity lowered `effective_target` below the
+                // configured target and `usable` already reached `effective_target`, present the
+                // configured target to the controller so a PID controller resets its integral and
+                // stops scheduling empty 0-SURB keep-alives (on Exit `observed_counterparty_capacity`
+                // is always 0, so `effective_target == target`).
+                let control_level = if effective_target > 0 && usable >= effective_target {
+                    usable.max(self.controller.bounds().target())
+                } else {
+                    usable
+                };
+                let output = self.controller.next_control_output(control_level);
                 if self.state.take_correction_cap() {
                     // A report just lowered the believed level. What the controller sees as a deficit
                     // is a correction of the estimate, not SURBs the counterparty is missing, and the
@@ -3450,5 +3482,138 @@ mod tests {
         assert_eq!(92, state.buffer_level());
         assert_eq!(Some(8), state.organic_surbs_deficit());
         assert!(state.take_correction_cap());
+    }
+
+    /// Regression test: after a deficit winds up the PID integral and organic data packets refill
+    /// the counterparty back to the target (or an inferred `effective_target` plateau), subsequent
+    /// balancer ticks must output `0` instead of scheduling empty 0-SURB keep-alives forever.
+    #[test]
+    fn organic_refill_to_target_after_deficit_schedules_zero_balancer_output() {
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 100,
+            max_surbs_per_sec: 1_000,
+            surb_decay: None,
+        });
+
+        // Reach full buffer (100).
+        surb_estimator.produced.fetch_add(100, Ordering::Release);
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+        assert_eq!(100, state.buffer_level());
+
+        // Spend 40 SURBs -> tick observes 60/100 and winds up the PID integral term.
+        surb_estimator.consumed.fetch_add(40, Ordering::Release);
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+        assert_eq!(60, state.buffer_level());
+        assert!(output.load(Ordering::Acquire) > 0);
+
+        // Five organic data packets refill the remaining 40 SURBs to 100.
+        for _ in 0..5 {
+            assert_eq!(8, state.claim_organic_surbs(8));
+        }
+        assert_eq!(0, state.claim_organic_surbs(8));
+
+        // Subsequent ticks at 100 must output 0 (no empty keep-alive loop).
+        for _ in 0..3 {
+            std::thread::sleep(Duration::from_millis(20));
+            balancer.update();
+            assert_eq!(100, state.buffer_level());
+            assert_eq!(0, output.load(Ordering::Acquire));
+        }
+
+        // Settle in-flight production lag, then infer a lower counterparty capacity (60) after a
+        // flat plateau of peer reports.
+        state.publish_production(140, 140);
+        for _ in 0..=CAPACITY_PLATEAU_THRESHOLD {
+            state.observe_reported_level(60);
+        }
+        assert_eq!(60, state.effective_target());
+
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+        assert_eq!(60, state.buffer_level());
+        assert_eq!(0, output.load(Ordering::Acquire));
+    }
+
+    /// Regression test: replies arriving after `on_counterparty_wiped()` but before any fresh
+    /// post-wipe SURB is minted can only have spent discarded old-generation SURBs and must not
+    /// debit the replacement stock when the first post-wipe tick commits.
+    #[test]
+    fn late_pre_wipe_replies_before_first_replacement_do_not_debit_fresh_stock() {
+        let (mut balancer, surb_estimator, state, _output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 16,
+            max_surbs_per_sec: 1_000,
+            surb_decay: None,
+        });
+
+        surb_estimator.produced.fetch_add(100, Ordering::Release);
+        surb_estimator.consumed.fetch_add(20, Ordering::Release);
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+
+        // Wipe at produced=100, consumed=20.
+        state.on_counterparty_wiped();
+
+        // Three late replies from the pre-wipe generation arrive before any new SURB is minted.
+        surb_estimator.consumed.fetch_add(3, Ordering::Release);
+
+        // First replacement packet mints 8 fresh SURBs; no fresh SURBs have been spent yet.
+        assert_eq!(8, state.claim_organic_surbs(8));
+
+        std::thread::sleep(Duration::from_millis(20));
+        balancer.update();
+        assert_eq!(8, state.buffer_level());
+        assert_eq!(Some(8), state.organic_surbs_deficit());
+    }
+
+    /// Regression test: if a balancer tick snapshots `produced` before a wipe + refill + reply
+    /// sequence and snapshots `consumed` afterwards, `commit_tick_update` must re-read the live
+    /// counters under `organic_budget` so `last_estimator_state.produced` advances to the
+    /// post-refill total instead of inventing phantom SURBs on the following tick.
+    #[test]
+    fn commit_tick_update_across_wipe_uses_live_counters_atomically() {
+        let surb_estimator = AtomicSurbFlowEstimator::default();
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 16,
+            max_surbs_per_sec: 1_000,
+            surb_decay: None,
+        });
+        state.attach_estimator(&surb_estimator);
+
+        surb_estimator.produced.store(100, Ordering::Release);
+        surb_estimator.consumed.store(20, Ordering::Release);
+        state.commit_buffer_level(16, 100);
+        state.publish_production(100, 100);
+
+        // Simulate a tick that read `produced = 100` before the wipe, then the wipe happened,
+        // 8 fresh SURBs were claimed (`produced = 108`), and 8 replies spent them (`consumed = 28`),
+        // before the tick finished reading `consumed = 28`.
+        state.on_counterparty_wiped();
+        assert_eq!(8, state.claim_organic_surbs(8));
+        surb_estimator.consumed.fetch_add(8, Ordering::Release);
+
+        let torn_snapshot = SimpleSurbFlowEstimator {
+            produced: 100,
+            consumed: 28,
+            evicted: 0,
+            refunded: 0,
+        };
+        let (committed, next_state) = state.commit_tick_update(torn_snapshot, -8, 100, 0);
+        assert_eq!(0, committed);
+        assert_eq!(108, next_state.produced);
+        assert_eq!(28, next_state.consumed);
+
+        // The next tick seeing `(108, 28)` must compute a 0 delta rather than +8 phantom SURBs.
+        let next_snapshot = SimpleSurbFlowEstimator {
+            produced: 108,
+            consumed: 28,
+            evicted: 0,
+            refunded: 0,
+        };
+        let delta = next_snapshot.estimated_surb_buffer_change(&next_state);
+        assert_eq!(Some(0), delta);
+        let (next_committed, _) = state.commit_tick_update(next_snapshot, delta.unwrap_or_default(), 108, 0);
+        assert_eq!(0, next_committed);
     }
 }
