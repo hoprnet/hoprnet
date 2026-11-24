@@ -1035,6 +1035,9 @@ mod tests {
     ///
     /// The bound is what makes the assertion mean something: the packet of the other pseudonym has
     /// to be emitted well inside [`TEST_SURB_WAIT`], not merely before the stream ends.
+    ///
+    /// This is the acceptance test for the fix: on the code before it, the packet waited the whole
+    /// [`TEST_SURB_WAIT`] behind the starved one and this bound fired.
     #[test_log::test(tokio::test)]
     async fn a_starved_return_packet_should_not_delay_another_pseudonym() -> anyhow::Result<()> {
         let starved = HoprPseudonym::random();
