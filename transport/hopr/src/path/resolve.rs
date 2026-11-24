@@ -112,8 +112,9 @@ fn parking_key(routing: &DestinationRouting) -> Option<HoprPseudonym> {
 
 /// Packets that wait for SURBs, one FIFO per pseudonym, kept outside the ordered stage.
 ///
-/// Parking ends a packet's future at once, which frees its [`buffered`] slot and with it the
-/// emission of every packet submitted behind it.
+/// Parking ends a packet's future at once, which frees its
+/// [`buffered`](futures::StreamExt::buffered) slot and with it the emission of every packet
+/// submitted behind it.
 ///
 /// Only the head of a queue is retried, and a packet for a pseudonym that has one parked cannot
 /// resolve ahead of it: that is the ordering guarantee the reassembler needs, kept per session
