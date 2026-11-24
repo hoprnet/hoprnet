@@ -46,6 +46,13 @@ lazy_static::lazy_static! {
         "hopr_path_route_diversity",
         "Effective number of distinct full routes (exp of the Shannon entropy) over recent packets"
     ).unwrap();
+    /// Draws each diversity score covers, zero when it has none: a score gauge keeps its last
+    /// value after its draws are evicted, so an alert on the score alone can stay firing.
+    static ref METRIC_PATH_DIVERSITY_DRAWS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_path_diversity_draws",
+        "Draws the diversity score of each dimension currently covers",
+        &["dimension"]
+    ).unwrap();
 }
 
 /// Rejects a temper exponent outside `(0, 1]`.
@@ -750,8 +757,11 @@ type PlannerCacheValue = Arc<CandidateSet>;
 
 /// Identity of one whole route: the forward path together with the return path of one SURB.
 ///
+/// Compiled only where something reads the route dimension: the score gauge, or the tests.
+///
 /// Hashed rather than kept whole because the diversity window only needs equality: two packets that
 /// took the same route must hash the same, and the hash costs 8 bytes instead of two paths.
+#[cfg(any(test, feature = "telemetry"))]
 fn route_hash(forward: &ValidatedPath, ret: &ValidatedPath) -> u64 {
     use std::hash::{Hash as _, Hasher as _};
 
@@ -783,6 +793,12 @@ fn publish_path_diversity(tracker: &DiversityTracker) {
     if let Some(score) = scores.route {
         METRIC_PATH_ROUTE_DIVERSITY.set(score);
     }
+    // A gauge keeps the last value its series had, so a score whose draws were all evicted would
+    // otherwise keep reporting concentration the node no longer has. The counts below are what the
+    // documented alert requires to be positive.
+    METRIC_PATH_DIVERSITY_DRAWS.set(&["forward"], scores.forward_first_hop_draws as f64);
+    METRIC_PATH_DIVERSITY_DRAWS.set(&["return"], scores.return_first_hop_draws as f64);
+    METRIC_PATH_DIVERSITY_DRAWS.set(&["route"], scores.route_draws as f64);
 }
 
 /// Publishes the pooled diversity scores on their gauges.
@@ -1491,10 +1507,15 @@ where
         let first_relayer = (forward_planned && forward.len() > 1)
             .then(|| forward.first().copied())
             .flatten();
+        // The route dimension has no threshold and only the gauge reads it, so a build without
+        // telemetry does not hash a pair per SURB or keep its window at all.
+        #[cfg(any(test, feature = "telemetry"))]
         let routes = return_paths
             .iter()
             .map(|ret| route_hash(forward, ret))
             .collect::<Vec<_>>();
+        #[cfg(not(any(test, feature = "telemetry")))]
+        let _ = (return_paths, return_hops);
 
         let mut tracker = self.paths.return_path_diversity.lock();
         if let Some(first_relayer) = first_relayer {
@@ -1502,8 +1523,11 @@ where
             // their own hop counts name, so a differing return leg cannot move the forward score.
             tracker.record_forward_first_hop((destination, forward_hops), first_relayer);
         }
-        if let Some(return_hops) = return_hops {
-            tracker.record_routes((destination, return_hops), &routes);
+        // Keyed by the return leg where the planner chose one, and by the forward leg otherwise:
+        // a direct or explicit return still pairs with the forward path on every SURB it carries.
+        #[cfg(any(test, feature = "telemetry"))]
+        if !routes.is_empty() {
+            tracker.record_routes((destination, return_hops.unwrap_or(forward_hops)), &routes);
         }
         publish_path_diversity(&tracker);
     }
@@ -1597,7 +1621,7 @@ where
 
                 // Both legs are known only here, so this is where the forward first hop and the
                 // whole routes are recorded. A packet with no SURBs still has a forward first hop.
-                if forward_planned || return_hops.is_some() {
+                if forward_planned || !return_paths.is_empty() {
                     self.record_route_diversity(
                         *destination,
                         forward_hops,
@@ -3020,6 +3044,43 @@ mod tests {
             within(route, 4.0),
             "route score {route} must lie within the four combinations the graph offers"
         );
+        anyhow::Ok(())
+    }
+
+    /// A return leg the planner did not choose still pairs with the forward path on every SURB it
+    /// carries, so the route dimension sees those packets: only a forward leg that was also fixed
+    /// leaves the gauges untouched.
+    #[tokio::test]
+    async fn a_direct_return_still_feeds_the_route_dimension() -> anyhow::Result<()> {
+        let (planner, _graph) = two_relayer_bidirectional_planner();
+        for _ in 0..20 {
+            let (routing, ..) = planner
+                .resolve_routing(
+                    10,
+                    2,
+                    DestinationRouting::Forward {
+                        destination: Box::new(NodeId::Offchain(pubkey(&SECRET_DEST))),
+                        pseudonym: None,
+                        forward_options: RoutingOptions::Hops(1.try_into()?),
+                        // A direct return: no draw, but every SURB still takes a return path.
+                        return_options: Some(RoutingOptions::Hops(0.try_into()?)),
+                    },
+                )
+                .await?;
+            match routing {
+                ResolvedTransportRouting::Forward { return_paths, .. } => {
+                    assert_eq!(2, return_paths.len(), "vacuity guard: two SURBs per packet");
+                }
+                other => panic!("expected a forward routing, got {other:?}"),
+            }
+        }
+
+        let scores = planner.path_diversity_scores();
+        assert!(
+            scores.route_draws > 0,
+            "a direct return still pairs with the forward path on every SURB"
+        );
+        assert!(scores.route.is_some(), "so the route dimension must have a score");
         anyhow::Ok(())
     }
 

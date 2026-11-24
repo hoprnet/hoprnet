@@ -64,6 +64,16 @@ pub(crate) struct Scores {
     pub forward_first_hop: Option<f64>,
     pub return_first_hop: Option<f64>,
     pub route: Option<f64>,
+    /// Draws the pooled score of each dimension covers, zero when it has none.
+    ///
+    /// Published next to the score because a gauge keeps its last value after its draws are
+    /// evicted: only this count says whether a score was computed from anything.
+    #[cfg_attr(not(any(test, feature = "telemetry")), allow(dead_code))]
+    pub forward_first_hop_draws: usize,
+    #[cfg_attr(not(any(test, feature = "telemetry")), allow(dead_code))]
+    pub return_first_hop_draws: usize,
+    #[cfg_attr(not(any(test, feature = "telemetry")), allow(dead_code))]
+    pub route_draws: usize,
 }
 
 /// Effective number of distinct values of a draw distribution: `exp(H)` over the counts.
@@ -74,9 +84,14 @@ pub(crate) struct Scores {
 ///
 /// `None` when nothing was drawn: the score is undefined there, and a caller must not publish an
 /// invented value.
-fn effective_size(drawn: usize, sum_count_log_count: f64) -> Option<f64> {
+fn effective_size(drawn: usize, distinct: usize, sum_count_log_count: f64) -> Option<f64> {
     if drawn == 0 {
         return None;
+    }
+    // One value is the collapsed case, and it must read exactly 1.0: the WARN and the alert
+    // compare against 1.0, and the accumulated sum leaves a rounding error that a `<=` misses.
+    if distinct <= 1 {
+        return Some(1.0);
     }
     let total = drawn as f64;
     // H = ln N - (Σ c ln c) / N, so exp(H) = N * exp(-Σ c ln c / N).
@@ -150,11 +165,7 @@ impl<K: Copy + Eq + Hash> DiversityWindow<K> {
 
     /// Effective number of distinct values in the window; `None` while it holds no draw.
     fn score(&self) -> Option<f64> {
-        effective_size(self.drawn.len(), self.sum_count_log_count)
-    }
-
-    fn draws(&self) -> usize {
-        self.drawn.len()
+        effective_size(self.drawn.len(), self.counts.len(), self.sum_count_log_count)
     }
 }
 
@@ -200,7 +211,11 @@ impl<K: Copy + Eq + Hash> Pooled<K> {
     }
 
     fn score(&self) -> Option<f64> {
-        effective_size(self.drawn, self.sum_count_log_count)
+        effective_size(self.drawn, self.counts.len(), self.sum_count_log_count)
+    }
+
+    fn draws(&self) -> usize {
+        self.drawn
     }
 }
 
@@ -209,6 +224,13 @@ struct SessionWindows {
     forward_first_hop: DiversityWindow<OffchainPublicKey>,
     return_first_hop: DiversityWindow<OffchainPublicKey>,
     route: DiversityWindow<u64>,
+    /// Draws each dimension has ever taken for this session, which the warm-up reads.
+    ///
+    /// Cumulative on purpose: the retained count never exceeds the window, so a window shorter
+    /// than the warm-up would otherwise keep the score from ever being judged.
+    forward_first_hop_drawn: usize,
+    return_first_hop_drawn: usize,
+    route_drawn: usize,
     /// Tracker tick of the last recorded draw, for least-recently-updated eviction.
     last_drawn: u64,
 }
@@ -271,11 +293,13 @@ impl DiversityTracker {
                 &mut self.pooled_forward_first_hop,
                 &[first_hop],
             );
+            session.forward_first_hop_drawn += 1;
         }
         self.apply_threshold(key, Dimension::ForwardFirstHop);
     }
 
     /// Records the routes one packet's SURBs took, under the key of the return leg that chose them.
+    #[cfg(any(test, feature = "telemetry"))]
     pub(crate) fn record_routes(&mut self, key: DiversityKey, routes: &[u64]) {
         if routes.is_empty() {
             return;
@@ -287,6 +311,7 @@ impl DiversityTracker {
                 .get_mut(&key)
                 .expect("the session was created by tick_and_evict");
             record_batch(&mut session.route, &mut self.pooled_route, routes);
+            session.route_drawn += routes.len();
         }
         self.apply_threshold(key, Dimension::Route);
     }
@@ -307,6 +332,7 @@ impl DiversityTracker {
                 &mut self.pooled_return_first_hop,
                 first_hops,
             );
+            session.return_first_hop_drawn += first_hops.len();
         }
         self.apply_threshold(key, Dimension::ReturnFirstHop);
     }
@@ -318,6 +344,9 @@ impl DiversityTracker {
             forward_first_hop: self.pooled_forward_first_hop.score(),
             return_first_hop: self.pooled_return_first_hop.score(),
             route: self.pooled_route.score(),
+            forward_first_hop_draws: self.pooled_forward_first_hop.draws(),
+            return_first_hop_draws: self.pooled_return_first_hop.draws(),
+            route_draws: self.pooled_route.draws(),
         }
     }
 
@@ -347,19 +376,23 @@ impl DiversityTracker {
             forward_first_hop: DiversityWindow::new(window_size),
             return_first_hop: DiversityWindow::new(window_size),
             route: DiversityWindow::new(window_size),
+            forward_first_hop_drawn: 0,
+            return_first_hop_drawn: 0,
+            route_drawn: 0,
             last_drawn: tick,
         });
         session.last_drawn = tick;
     }
 
-    fn draws_of(&self, key: &DiversityKey, dimension: Dimension) -> usize {
+    /// Draws `key` has ever taken in `dimension`, which the warm-up requires before a WARN.
+    fn drawn_total_of(&self, key: &DiversityKey, dimension: Dimension) -> usize {
         let Some(session) = self.sessions.get(key) else {
             return 0;
         };
         match dimension {
-            Dimension::ForwardFirstHop => session.forward_first_hop.draws(),
-            Dimension::ReturnFirstHop => session.return_first_hop.draws(),
-            Dimension::Route => session.route.draws(),
+            Dimension::ForwardFirstHop => session.forward_first_hop_drawn,
+            Dimension::ReturnFirstHop => session.return_first_hop_drawn,
+            Dimension::Route => session.route_drawn,
         }
     }
 
@@ -412,7 +445,7 @@ impl DiversityTracker {
         let Some(score) = self.score_of(&key, dimension) else {
             return;
         };
-        if self.draws_of(&key, dimension) < MIN_DRAWS_FOR_THRESHOLD {
+        if self.drawn_total_of(&key, dimension) < MIN_DRAWS_FOR_THRESHOLD {
             return;
         }
         let breached = (dimension, key);
@@ -594,6 +627,76 @@ mod tests {
             tracker
                 .session_score(&key(), Dimension::Route)
                 .context("score of three evenly used routes")?,
+        );
+        anyhow::Ok(())
+    }
+
+    /// A window holding one relayer must read exactly 1.0, not 1.0000000000000009: the WARN and
+    /// the alert compare against 1.0, and a collapse they miss is the case they exist for.
+    #[test]
+    fn a_single_relayer_reads_exactly_one() -> anyhow::Result<()> {
+        let mut tracker = DiversityTracker::new(200, 1.0);
+        // Six draws through one relayer, then enough through another to evict every one of them.
+        draw_forward(&mut tracker, &[relayer(1)], 6);
+        draw_forward(&mut tracker, &[relayer(2)], 400);
+
+        assert_eq!(
+            1.0,
+            tracker
+                .session_score(&key(), Dimension::ForwardFirstHop)
+                .context("session score of a single relayer")?,
+        );
+        assert_eq!(
+            1.0,
+            tracker
+                .scores()
+                .forward_first_hop
+                .context("pooled score of a single relayer")?,
+        );
+        anyhow::Ok(())
+    }
+
+    /// The warm-up counts draws, not retained draws: a window shorter than the warm-up would
+    /// otherwise never let its score be judged.
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn a_window_shorter_than_the_warm_up_still_warns() {
+        let logs = crate::tests::support::Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::TRACE));
+        let _other_dispatch = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let mut tracker = DiversityTracker::new(5, 1.0);
+
+        draw_forward(&mut tracker, &[relayer(1)], MIN_DRAWS_FOR_THRESHOLD * 2);
+
+        assert_eq!(
+            1,
+            logs.records("path relayer diversity at or below the configured minimum")
+                .len(),
+            "a five-draw window must still judge a score once enough draws have been taken"
+        );
+    }
+
+    /// The published counts follow the pool, so an alert that requires data stops firing once the
+    /// draws it described are gone.
+    #[test]
+    fn the_published_counts_follow_the_pooled_draws() -> anyhow::Result<()> {
+        let mut tracker = DiversityTracker::new(10, 0.0);
+        tracker.record_returns(key(), &[relayer(1), relayer(2)]);
+        let scores = tracker.scores();
+        assert_eq!(2, scores.return_first_hop_draws);
+        assert_eq!(0, scores.route_draws);
+
+        // Evict the only session that ever drew a return path.
+        for i in 0..(MAX_TRACKED_SESSIONS as u32) {
+            let key: DiversityKey = (relayer((i % 200) as u8 + 2), 1 + i / 200);
+            tracker.record_forward_first_hop(key, relayer(9));
+        }
+        let scores = tracker.scores();
+        assert_eq!(None, scores.return_first_hop, "the pooled score must be empty");
+        assert_eq!(0, scores.return_first_hop_draws, "and so must its draw count");
+        assert_eq!(
+            MAX_TRACKED_SESSIONS, scores.forward_first_hop_draws,
+            "the sessions that replaced it drew forward hops of their own"
         );
         anyhow::Ok(())
     }

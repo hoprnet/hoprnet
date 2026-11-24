@@ -17,6 +17,7 @@
 | `hopr_path_length`                                        | SimpleHistogram | Distribution of number of hops of sent messages                                                                                                                                                                                                                                                                                                                                                      | buckets: 0.0,1.0,2.0,3.0,4.0                                                       |
 | `hopr_path_relayer_diversity`                             | MultiGauge      | Effective number of distinct first relayers (exp of the Shannon entropy) over the recent path draws, one score per direction                                                                                                                                                                                                                                                                         | keys: direction                                                                    |
 | `hopr_path_route_diversity`                               | SimpleGauge     | Effective number of distinct full routes (exp of the Shannon entropy) over the recent SURBs: a forward path together with the return path of one SURB                                                                                                                                                                                                                                                |                                                                                    |
+| `hopr_path_diversity_draws`                               | MultiGauge      | Draws the diversity score of each dimension currently covers, zero when it covers none; a score gauge keeps its last value after its draws are evicted                                                                                                                                                                                                                                               | keys: dimension                                                                    |
 | `hopr_pix_admission_rejections_total`                     | MultiCounter    | Incoming PIX sessions refused before establishment, by reason                                                                                                                                                                                                                                                                                                                                        | keys: reason                                                                       |
 | `hopr_pix_closures_total`                                 | MultiCounter    | Sessions closed by the PIX supervisor, by reason                                                                                                                                                                                                                                                                                                                                                     | keys: reason                                                                       |
 | `hopr_pix_cycle_accepted_share_fraction`                  | MultiHistogram  | Shares accepted for an SSA cycle over its useful-share target, observed once at finalization; exceeds one for a conforming Entry's surplus                                                                                                                                                                                                                                                           | keys: outcome; buckets: 0.05,0.25,0.5,0.75,0.9,1.0,1.25,1.5,2.0,2.5,3.0,3.5,4.0    |
@@ -140,11 +141,13 @@ pooled over the sessions the planner tracks.
   any more. Read it next to the node's traffic when a session ends.
 
 `hopr_path_route_diversity` covers the whole route: one forward path together with the return path of
-one SURB. It catches what the first hops cannot show, such as a stable pair of relayers reused behind
-varied outer hops. Each SURB contributes one observation and a packet without SURBs contributes
-none, so a packet carrying ten SURBs weighs ten times one carrying a single SURB. The score ranges
-from `1.0`, one route for every recent SURB, up to the number of distinct forward-and-return
-combinations the graph offers.
+one SURB. It counts distinct complete routes, so four evenly used outer-hop combinations score four
+even when every route reuses the same inner relay. What it can show is a correlation across the two
+legs: two forward paths and two return paths that only ever pair as `(1,1)` and `(2,2)` score two,
+while the same legs paired all four ways score four. Each SURB contributes one observation and a
+packet without SURBs contributes none, so a packet carrying ten SURBs weighs ten times one carrying
+a single SURB. The score ranges from `1.0`, one route for every recent SURB, up to the number of
+distinct forward-and-return combinations the graph offers.
 
 A path the caller fixes contributes nothing to the first-hop score, because the planner did not
 choose it. The route score still counts those packets whenever the return leg is the planner's, so
@@ -159,11 +162,12 @@ that default, a session whose forward paths all leave through one relayer warns 
 session elsewhere keeps the pooled gauge above `1.0`.
 
 Alert on a pooled first-hop score staying at the bottom of its range, which is every session
-concentrated on one shared relayer:
+concentrated on one shared relayer. `hopr_path_diversity_draws` says whether the score covers any
+draws at all, because a gauge keeps its last value after its draws are evicted:
 
 ```yaml
 - alert: ReturnPathDiversityCollapsed
-  expr: hopr_path_relayer_diversity{direction="return"} <= 1.0
+  expr: hopr_path_relayer_diversity{direction="return"} <= 1.0 and hopr_path_diversity_draws{dimension="return"} > 0
   for: 15m
 ```
 
