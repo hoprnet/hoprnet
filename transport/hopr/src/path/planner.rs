@@ -1517,8 +1517,9 @@ where
         #[cfg(not(any(test, feature = "telemetry")))]
         let _ = (return_paths, return_hops);
 
-        // Recorded only: the gauges are published from the background sweep, which keeps the
-        // packet path free of setting eight series.
+        // Recorded only where a sweep will publish: the gauges are set from the background sweep
+        // so the packet path does not set eight series. A build without the tokio runtime never
+        // starts that sweep, so there this is the only publisher and it runs per packet.
         let mut tracker = self.paths.return_path_diversity.lock();
         if let Some(first_relayer) = first_relayer {
             // Keyed by the forward leg's hops: a session's two legs are scored in the sessions
@@ -1531,6 +1532,8 @@ where
         if !routes.is_empty() {
             tracker.record_routes((destination, return_hops.unwrap_or(forward_hops)), &routes);
         }
+        #[cfg(all(feature = "telemetry", not(feature = "runtime-tokio"), not(test)))]
+        publish_path_diversity(&tracker);
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -1622,7 +1625,9 @@ where
 
                 // Both legs are known only here, so this is where the forward first hop and the
                 // whole routes are recorded. A packet with no SURBs still has a forward first hop.
-                if forward_planned || !return_paths.is_empty() {
+                // Only a planner-chosen leg makes this traffic the planner's own: direct and
+                // explicit pairs still carry SURBs, and neighbour probes use exactly that shape.
+                if forward_planned || (return_hops.is_some() && !return_paths.is_empty()) {
                     self.record_route_diversity(
                         *destination,
                         forward_hops,
@@ -3051,6 +3056,33 @@ mod tests {
             within(route, 4.0),
             "route score {route} must lie within the four combinations the graph offers"
         );
+        anyhow::Ok(())
+    }
+
+    /// Traffic the planner chose neither leg of is not the planner's own: a direct packet carries
+    /// SURBs too, and neighbour probes route that way, so it must not enter the windows.
+    #[tokio::test]
+    async fn a_packet_the_planner_routed_neither_leg_of_is_not_observed() -> anyhow::Result<()> {
+        let (planner, _graph) = two_relayer_bidirectional_planner();
+        for _ in 0..20 {
+            planner
+                .resolve_routing(
+                    10,
+                    2,
+                    DestinationRouting::Forward {
+                        destination: Box::new(NodeId::Offchain(pubkey(&SECRET_DEST))),
+                        pseudonym: None,
+                        forward_options: RoutingOptions::Hops(0.try_into()?),
+                        return_options: Some(RoutingOptions::Hops(0.try_into()?)),
+                    },
+                )
+                .await?;
+        }
+
+        let scores = planner.path_diversity_scores();
+        assert_eq!(0, scores.forward_first_hop_draws, "no forward leg was scored");
+        assert_eq!(0, scores.return_first_hop_draws, "no return path was drawn");
+        assert_eq!(0, scores.route_draws, "and no route was the planner's to count");
         anyhow::Ok(())
     }
 

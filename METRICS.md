@@ -142,9 +142,10 @@ pooled over the sessions the planner tracks.
 
 `hopr_path_route_diversity` covers the whole route: one forward path together with the return path of
 one SURB. It counts distinct complete routes, so four evenly used outer-hop combinations score four
-even when every route reuses the same inner relay. What it can show is a correlation across the two
-legs: two forward paths and two return paths that only ever pair as `(1,1)` and `(2,2)` score two,
-while the same legs paired all four ways score four. Each SURB contributes one observation and a
+even when every route reuses the same inner relay: a shared inner relay is invisible to it, and the
+score is not a measure of how many relays a route passes through. What it can show is a correlation
+across the two legs: two forward paths and two return paths that only ever pair as `(1,1)` and
+`(2,2)` score two, while the same legs paired all four ways score four. Each SURB contributes one observation and a
 packet without SURBs contributes none, so a packet carrying ten SURBs weighs ten times one carrying
 a single SURB. The score ranges from `1.0`, one route for every recent SURB, up to the number of
 distinct forward-and-return combinations the graph offers.
@@ -167,14 +168,15 @@ draws at all, because a gauge keeps its last value after its draws are evicted:
 
 ```yaml
 - alert: ReturnPathDiversityCollapsed
-  expr: hopr_path_relayer_diversity{direction="return"} <= 1.0 and hopr_path_diversity_draws{dimension="return"} > 0
+  expr: hopr_path_relayer_diversity{direction="return"} <= 1.0 and ignoring(direction, dimension) hopr_path_diversity_draws{dimension="return"} > 0
   for: 15m
 ```
 
-The gauges only move when the node actually resolves a path, so a steady score can mean that nothing
-was drawn rather than that traffic concentrated. The expressions read the last published value; the
-`for` clause is what requires the condition to hold, and it fires on an idle node too. Read them
-together with the node's message volume.
+The gauges are published from the planner's background sweep, once per `path_planner.refresh_period`,
+and from the packet path in a build without the tokio runtime, which never starts that sweep. They
+only move when the node actually resolves a path, so a steady score can mean that nothing was drawn
+rather than that traffic concentrated. The expressions read the last published value, and the `for`
+clause is what requires the condition to hold; read them with the node's message volume.
 
 `path_planner.diversity_metric_window` caps each `(destination, hops)` window at that many draws
 (default `200`), so a gauge pools up to that many draws per tracked session and direction and can
