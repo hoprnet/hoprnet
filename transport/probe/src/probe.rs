@@ -350,6 +350,10 @@ impl Probe {
         processes.insert(
             HoprProbeProcess::Emit,
             hopr_utils::spawn_as_abortable_named!("probe_emit", async move {
+                // The generator owns the handles that steer and wake the stream built from it; dropping
+                // it would leave that stream idle for good once it first runs out of probes.
+                let _generator = probing_traffic_generator;
+
                 direct_neighbors
                     .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                         let active_neighbor_probes = active_neighbor_probes.clone();
@@ -1327,6 +1331,9 @@ mod tests {
             routing: DestinationRouting,
             path_id: hopr_api::types::internal::routing::PathId,
         },
+        /// Offers neighbor probes only while the generator itself is alive, like a generator whose
+        /// stream goes idle for good once the handles the generator owns are dropped.
+        NeighborWhileOwned(Arc<()>),
     }
 
     impl hopr_api::ct::ProbingTrafficGeneration for TestProbeStrategy {
@@ -1355,8 +1362,74 @@ mod tests {
                         futures::stream::pending(),
                     ))
                 }
+                Self::NeighborWhileOwned(owner) => {
+                    let owner = Arc::downgrade(owner);
+                    let while_owned = futures::stream::repeat_with(move || owner.upgrade().is_some())
+                        .take_while(|alive| futures::future::ready(*alive))
+                        .map(|_| {
+                            ProbeRouting::Neighbor(DestinationRouting::Forward {
+                                destination: Box::new(NEIGHBOURS[0].into()),
+                                pseudonym: Some(HoprPseudonym::random()),
+                                forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
+                                return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
+                            })
+                        });
+                    Box::pin(futures::StreamExt::chain(while_owned, futures::stream::pending()))
+                }
             }
         }
+    }
+
+    /// The stream built from a generator must keep running after `continuously_scan` returns: a
+    /// generator whose stream depends on handles the generator owns would otherwise stop probing.
+    #[tokio::test]
+    async fn probe_should_keep_the_traffic_generator_alive_while_scanning() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(200),
+            interval: std::time::Duration::from_secs(0),
+            ..Default::default()
+        };
+
+        let probing_allocator = hopr_transport_tag_allocator::create_allocators(
+            ReservedTag::range().end..u16::MAX as u64 + 1,
+            [
+                (hopr_transport_tag_allocator::Usage::Session, 2048),
+                (hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry, 4000),
+                (hopr_transport_tag_allocator::Usage::ProvingTelemetry, 10000),
+            ],
+        )
+        .expect("tag allocators should be created")
+        .into_iter()
+        .find_map(|(u, alloc)| matches!(u, hopr_transport_tag_allocator::Usage::ProvingTelemetry).then_some(alloc))
+        .expect("probing allocator should exist");
+
+        let (to_network_tx, mut to_network_rx) =
+            futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
+        let (_manual_probe_tx, manual_probe_rx) =
+            futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(100);
+        let store = PeerStore {
+            me: *OFFCHAIN_KEYPAIR.public(),
+            get_peers: Arc::new(RwLock::new(VecDeque::new())),
+            on_finished: Arc::new(RwLock::new(Vec::new())),
+        };
+
+        let (jhs, _classifier) = Probe::new(cfg, probing_allocator)
+            .continuously_scan(
+                to_network_tx,
+                manual_probe_rx,
+                TestProbeStrategy::NeighborWhileOwned(Arc::new(())),
+                store,
+            )
+            .await;
+
+        let emitted = tokio::time::timeout(Duration::from_secs(1), to_network_rx.next()).await;
+        jhs.abort_all();
+
+        anyhow::ensure!(
+            matches!(emitted, Ok(Some(_))),
+            "no probe was emitted after the scan started"
+        );
+        Ok(())
     }
 
     /// Regression test for hoprnet/hoprnet#7972: each probe type must be emitted with the
