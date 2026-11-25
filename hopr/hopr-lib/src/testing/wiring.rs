@@ -11,26 +11,13 @@ use hopr_ticket_manager::{
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 
 use crate::{
-    Hopr,
+    HoprEntry, HoprExit, HoprRelay, HoprRelayExit,
     builder::{ChainKeypair, HoprBuilder, Keypair, OffchainKeypair},
     config::HoprLibConfig,
     errors::HoprLibError,
 };
 
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
-
-pub type FullHopr<
-    Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
-    Graph = SharedChannelGraph,
-    Net = HoprNetwork,
-    TMgr = SharedTicketManager,
-> = Hopr<Chain, Graph, Net, TMgr>;
-
-pub type EdgeHopr<
-    Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
-    Graph = SharedChannelGraph,
-    Net = HoprNetwork,
-> = Hopr<Chain, Graph, Net, ()>;
 
 type FullyConfiguredBuilder<Chain> = crate::builder::HoprBuilderConfigured<
     Chain,
@@ -102,10 +89,10 @@ where
     Ok(builder)
 }
 
-/// Builds an edge (entry/exit) HOPR node with a custom chain connector.
-pub async fn build_edge_with_chain<
+/// Builds an entry (source) HOPR node with a custom chain connector.
+pub async fn build_entry_with_chain<
     Chain,
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -117,7 +104,7 @@ pub async fn build_edge_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
+) -> anyhow::Result<Arc<HoprEntry<Chain, SharedChannelGraph, HoprNetwork>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -137,15 +124,15 @@ where
         chain_connector,
     )?;
 
-    let node = builder.with_session_server(server).build_edge(ticket_factory).await?;
+    let node = builder.with_session_exit(server).build_entry(ticket_factory).await?;
 
     Ok(Arc::new(node))
 }
 
-/// Builds a full relay HOPR node with a custom chain connector.
-pub async fn build_full_with_chain<
+/// Builds a relay HOPR node with a custom chain connector.
+pub async fn build_relay_with_chain<
     Chain,
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -157,7 +144,7 @@ pub async fn build_full_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<FullHopr<Chain>>>
+) -> anyhow::Result<Arc<HoprRelay<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -178,63 +165,20 @@ where
     )?;
 
     let node = builder
-        .with_session_server(server)
-        .build_full(ticket_manager, ticket_factory)
+        .with_session_exit(server)
+        .build_relay(ticket_manager, ticket_factory)
         .await?;
-
-    Ok(Arc::new(node))
-}
-
-/// Builds an entry HOPR node with a custom chain connector.
-///
-/// Entry nodes do not process tickets, do not have ticket manager state,
-/// and do not accept incoming sessions.
-pub async fn build_entry_with_chain<
-    Chain,
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
->(
-    chain_key: &ChainKeypair,
-    packet_key: &OffchainKeypair,
-    config: HoprLibConfig,
-    probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
-    chain_connector: Chain,
-    server: Srv,
-) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
-where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
-{
-    if let Some(ref pcfg) = probe_cfg {
-        validator::Validate::validate(pcfg)?;
-    }
-
-    let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
-
-    let builder = make_builder(
-        chain_key,
-        packet_key,
-        config,
-        probe_cfg.unwrap_or_default(),
-        chain_connector,
-    )?;
-
-    let node = builder.with_session_server(server).build_entry(ticket_factory).await?;
 
     Ok(Arc::new(node))
 }
 
 /// Builds an exit HOPR node with a custom chain connector.
 ///
-/// Exit nodes accept incoming sessions and process PIX acknowledgements,
-/// but do not process tickets (no ticket manager state).
-pub async fn build_exit_with_chain<
+/// An exit is a relay that also terminates Sessions and resolves PIX shares, so it takes a ticket
+/// manager like [`build_relay_with_chain`] does.
+pub async fn build_relay_exit_with_chain<
     Chain,
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -246,7 +190,54 @@ pub async fn build_exit_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
+) -> anyhow::Result<Arc<HoprRelayExit<Chain, SharedChannelGraph, HoprNetwork, SharedTicketManager>>>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    if let Some(ref pcfg) = probe_cfg {
+        validator::Validate::validate(pcfg)?;
+    }
+
+    let (ticket_manager, ticket_factory) = ticket_manager_from_chain(&chain_connector, RedbStore::new_temp()?)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to seed ticket manager: {e}"))?;
+
+    let builder = make_builder(
+        chain_key,
+        packet_key,
+        config,
+        probe_cfg.unwrap_or_default(),
+        chain_connector,
+    )?;
+
+    let node = builder
+        .with_session_exit(server)
+        .build_relay_exit(ticket_manager, ticket_factory)
+        .await?;
+
+    Ok(Arc::new(node))
+}
+
+/// Builds a non-relaying exit HOPR node with a custom chain connector.
+///
+/// A test target: it terminates Sessions and resolves PIX shares but processes no tickets, so it
+/// takes no ticket manager.
+#[cfg(feature = "exit")]
+pub async fn build_exit_with_chain<
+    Chain,
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+>(
+    chain_key: &ChainKeypair,
+    packet_key: &OffchainKeypair,
+    config: HoprLibConfig,
+    probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
+    chain_connector: Chain,
+    server: Srv,
+) -> anyhow::Result<Arc<HoprExit<Chain, SharedChannelGraph, HoprNetwork>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -266,7 +257,7 @@ where
         chain_connector,
     )?;
 
-    let node = builder.with_session_server(server).build_exit(ticket_factory).await?;
+    let node = builder.with_session_exit(server).build_exit(ticket_factory).await?;
 
     Ok(Arc::new(node))
 }
@@ -413,7 +404,7 @@ pub(crate) mod tests {
                     graph_for_ct,
                 )
             })
-            .with_session_server(crate::testing::dummies::EchoServer::default())
+            .with_session_exit(crate::testing::dummies::EchoServer::default())
             .build_entry(ticket_factory)
             .await?;
 

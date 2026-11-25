@@ -7,6 +7,7 @@ pub enum NetworkError {
     #[error("performing an operation on own PeerId")]
     DisallowedOperationOnOwnPeerIdError,
 }
+#[cfg(feature = "session-entry")]
 use hopr_transport_session::errors::TransportSessionError;
 use thiserror::Error;
 
@@ -30,6 +31,7 @@ pub enum HoprTransportError {
     #[error("Probe error: {0}")]
     Probe(#[from] ProbeError),
 
+    #[cfg(feature = "session-entry")]
     #[error("Transport session error: {0}")]
     Session(#[from] TransportSessionError),
 

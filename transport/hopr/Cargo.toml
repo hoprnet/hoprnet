@@ -1,7 +1,7 @@
 [package]
 name = "hopr-transport"
 description = "Implements the main HOPR transport interface for the core library"
-version = "0.54.2"
+version = "0.55.0"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -33,6 +33,23 @@ doctest = false
 default = ["pix-bjj", "p2p-announce-quic", "tracing-context"]
 # Capture the producer span when enqueueing messages across transport tasks.
 tracing-context = ["hopr-utils-tracing/tracing-context"]
+# Node role features. A role's code is only compiled when its role feature is on, so a binary built
+# for one role does not carry the packet processing of the others. None of them is a default: role
+# selection is the consumer's decision, and `hopr-lib` turns on exactly the role its entity needs.
+#
+# The roles are additive building blocks: `entry` (a source node that admits no incoming Sessions),
+# `relay` (the full ticket and incoming-acknowledgement pipeline) and `exit` (terminates Sessions and
+# resolves PIX shares, processes no tickets). `relay` together with `exit` is the relaying exit: it
+# keeps the ticket path and adds the Session exit. They are the transport side of the entity split in
+# `hopr-lib`.
+relay = ["hopr-protocol-hopr/relaying"]
+entry = ["session-entry"]
+exit = ["session-exit"]
+# The session stack: the `SessionManager` wiring, incoming-Session admission and the client-side
+# Session API. `session-exit` implies `session-entry` because both are served by one manager and
+# an Exit establishes Sessions on its return path too.
+session-entry = ["dep:hopr-transport-session"]
+session-exit = ["session-entry"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`, making PIX stealth addresses
 # Baby JubJub public keys instead of Ethereum addresses. Default, because it is what
 # production settles.
@@ -60,6 +77,9 @@ testing = [
   "dep:hopr-chain-connector",
   "dep:hopr-ticket-manager",
   "dep:tokio",
+  "entry",
+  "exit",
+  "relay",
   "hopr-utils/runtime-tokio",
 ]
 telemetry = [
@@ -67,7 +87,7 @@ telemetry = [
   "hopr-api/types-telemetry",
   "hopr-network-graph/telemetry",
   "hopr-protocol-hopr/telemetry",
-  "hopr-transport-session/telemetry",
+  "hopr-transport-session?/telemetry",
   "hopr-utils/network-types-telemetry",
   "hopr-transport-mixer/telemetry",
 ]
@@ -75,7 +95,7 @@ p2p-announce-quic = []
 runtime-tokio = [
   "hopr-utils/runtime-tokio",
   "hopr-utils/network-types-runtime-tokio",
-  "hopr-transport-session/runtime-tokio",
+  "hopr-transport-session?/runtime-tokio",
 ]
 serde = [
   "dep:serde",
@@ -152,7 +172,7 @@ hopr-transport-mixer = { workspace = true, features = [
   "poisson",
 ] }
 hopr-transport-probe = { workspace = true }
-hopr-transport-session = { workspace = true }
+hopr-transport-session = { workspace = true, optional = true }
 hopr-transport-tag-allocator = { workspace = true }
 
 # Optional deps enabled by the `testing` feature.
@@ -168,6 +188,9 @@ hopr-ticket-manager = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
+# The unit tests drive every role, so they need every role compiled in whatever the invoking command
+# selected (`cargo nextest run --lib` enables none of them).
+hopr-transport = { path = ".", features = ["entry", "relay", "exit"] }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bimap = { workspace = true }

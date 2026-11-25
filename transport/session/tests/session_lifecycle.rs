@@ -13,7 +13,7 @@ use hopr_api::types::{
 use hopr_protocol_app::v1::{ApplicationData, IncomingPacketInfo};
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
-    ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, MockMsgSender, SessionClientConfig,
+    ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, MockMsgSender, SessionEntryConfig,
     SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig,
     testing::{mock_packet_planning, msg_type, start_msg_match},
 };
@@ -150,7 +150,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target.clone()),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation,
                     surb_management: None,
@@ -317,7 +317,7 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target.clone()),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation,
                     surb_management: None,
@@ -460,7 +460,7 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
         .new_session(
             bob_peer,
             SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-            SessionClientConfig {
+            SessionEntryConfig {
                 capabilities: None.into(),
                 pseudonym: alice_pseudonym.into(),
                 surb_management: None,
@@ -546,7 +546,7 @@ async fn session_manager_should_timeout_new_session_attempt_when_no_response() -
         .new_session(
             bob_peer,
             SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-            SessionClientConfig {
+            SessionEntryConfig {
                 capabilities: None.into(),
                 pseudonym: None,
                 surb_management: None,
@@ -713,7 +713,7 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation,
                     surb_management: None,
@@ -842,7 +842,7 @@ async fn an_entry_without_a_surb_balancer_should_get_the_reply_to_its_requests()
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::Segmentation.into(),
                     surb_management: None,
@@ -997,7 +997,7 @@ async fn a_lost_session_established_is_recovered_by_repeating_the_start_session(
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation,
                     surb_management: None,

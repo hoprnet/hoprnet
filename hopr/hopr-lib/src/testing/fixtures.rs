@@ -17,12 +17,12 @@ use tracing::info;
 
 #[cfg(feature = "explicit-path")]
 #[allow(deprecated)]
-use crate::HoprSessionClientExplicitPathConfig;
+use crate::HoprSessionEntryExplicitPathConfig;
 use crate::{
-    HopRouting, HoprSessionClientConfig, SessionCapabilities, SurbBalancerConfig,
+    HopRouting, HoprSessionEntryConfig, SessionCapabilities, SurbBalancerConfig,
     api::{
         network::NetworkView,
-        node::{HasNetworkView, HoprNodeOperations, HoprSessionClientOperations, HoprState},
+        node::{HasNetworkView, HoprNodeOperations, HoprSessionEntryOperations, HoprState},
         types::{
             crypto::{
                 keypairs::Keypair,
@@ -196,7 +196,7 @@ impl ClusterGuard {
             .connect_to(
                 path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                HoprSessionClientConfig {
+                HoprSessionEntryConfig {
                     forward_path: routing,
                     return_path: routing,
                     capabilities,
@@ -245,7 +245,7 @@ impl ClusterGuard {
             .connect_to_using_explicit_path(
                 path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                HoprSessionClientExplicitPathConfig {
+                HoprSessionEntryExplicitPathConfig {
                     forward_path,
                     return_path,
                     capabilities: Default::default(),
@@ -836,7 +836,7 @@ fn cluster_fixture_inner(
                         establish_retry_timeout,
                     );
 
-                    let instance = crate::testing::wiring::build_full_with_chain(
+                    let instance = crate::testing::wiring::build_relay_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
@@ -905,15 +905,31 @@ fn cluster_fixture_inner(
 /// Intermediate result from a `block_on` build — avoids moving `runtime` into the async block.
 enum RawRoleNode {
     Entry(
-        Arc<crate::testing::wiring::EdgeHopr<TestingConnector>>,
+        Arc<
+            crate::HoprEntry<TestingConnector, hopr_network_graph::SharedChannelGraph, hopr_transport_p2p::HoprNetwork>,
+        >,
         TestingConnector,
     ),
     Relay(
-        Arc<crate::testing::wiring::FullHopr<TestingConnector>>,
+        Arc<
+            crate::HoprRelay<
+                TestingConnector,
+                hopr_network_graph::SharedChannelGraph,
+                hopr_transport_p2p::HoprNetwork,
+                crate::testing::wiring::SharedTicketManager,
+            >,
+        >,
         TestingConnector,
     ),
     Exit(
-        Arc<crate::testing::wiring::EdgeHopr<TestingConnector>>,
+        Arc<
+            crate::HoprRelayExit<
+                TestingConnector,
+                hopr_network_graph::SharedChannelGraph,
+                hopr_transport_p2p::HoprNetwork,
+                crate::testing::wiring::SharedTicketManager,
+            >,
+        >,
         TestingConnector,
     ),
 }
@@ -921,7 +937,7 @@ enum RawRoleNode {
 enum RoleThreadNode {
     Entry(TestedHopr<()>),
     Relay(TestedHopr),
-    Exit(TestedHopr<()>),
+    Exit(TestedHopr),
 }
 
 /// A guard for role-typed clusters (Entry + Relays + Exit).
@@ -932,7 +948,7 @@ enum RoleThreadNode {
 pub struct RoleClusterGuard {
     pub entry: TestedHopr<()>,
     pub relays: Vec<TestedHopr>,
-    pub exit: TestedHopr<()>,
+    pub exit: TestedHopr,
     pub chain_client: BlokliTestClient<FullStateEmulator>,
 }
 
@@ -966,7 +982,7 @@ pub async fn build_role_cluster_with_exit_server<Srv>(
     exit_server: Srv,
 ) -> anyhow::Result<RoleClusterGuard>
 where
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+    Srv: hopr_api::node::HoprSessionExit<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -1080,7 +1096,7 @@ where
                         .await?;
                         Ok(RawRoleNode::Entry(instance, connector))
                     } else if is_exit {
-                        let instance = crate::testing::wiring::build_exit_with_chain(
+                        let instance = crate::testing::wiring::build_relay_exit_with_chain(
                             &onchain_keys[i],
                             &offchain_keys[i],
                             config,
@@ -1091,7 +1107,7 @@ where
                         .await?;
                         Ok(RawRoleNode::Exit(instance, connector))
                     } else {
-                        let instance = crate::testing::wiring::build_full_with_chain(
+                        let instance = crate::testing::wiring::build_relay_with_chain(
                             &onchain_keys[i],
                             &offchain_keys[i],
                             config,
@@ -1111,7 +1127,7 @@ where
                         RoleThreadNode::Entry(TestedHopr::<()>::new(runtime, instance, connector))
                     }
                     RawRoleNode::Exit(instance, connector) => {
-                        RoleThreadNode::Exit(TestedHopr::<()>::new(runtime, instance, connector))
+                        RoleThreadNode::Exit(TestedHopr::new(runtime, instance, connector))
                     }
                     RawRoleNode::Relay(instance, connector) => {
                         RoleThreadNode::Relay(TestedHopr::new(runtime, instance, connector))
@@ -1123,7 +1139,7 @@ where
 
     let mut entry: Option<TestedHopr<()>> = None;
     let mut relays: Vec<TestedHopr> = Vec::new();
-    let mut exit: Option<TestedHopr<()>> = None;
+    let mut exit: Option<TestedHopr> = None;
 
     for handle in handles {
         let thread_result = handle

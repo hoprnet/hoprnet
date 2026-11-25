@@ -263,7 +263,7 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
 }
 
 /// Wires a paired session to a `ConnectedUdpStream` via `transfer_session_datagram` (exactly as
-/// `hopr-session-server-forwarder` does on the exit node) and returns the client-side session plus
+/// `hopr-session-exit-forwarder` does on the exit node) and returns the client-side session plus
 /// the UDP address datagrams should be sent to. The session requests `NoDelay`, which on a stateless
 /// session preserves UDP datagram boundaries (the #8356 fix): one frame per write, one datagram per
 /// read. The forwarding task is detached and cancelled when the test runtime shuts down.

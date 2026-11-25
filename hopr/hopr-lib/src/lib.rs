@@ -12,6 +12,19 @@
 //!
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
+// A build that enables no entity feature has no node to assemble, so the pieces that exist only to
+// build one are unused by design. Only that combination is affected; consumers that build a node
+// enable one of `edge`, `relay` or `exit`.
+#![cfg_attr(
+    not(any(feature = "entry", feature = "relay", feature = "exit")),
+    allow(dead_code, unused_imports, unused_variables)
+)]
+
+// Only the exit entity has the Session exit (server) capability; an entry establishes Sessions and a
+// relay neither establishes nor admits them.
+#[cfg(all(feature = "session-exit", not(feature = "exit")))]
+compile_error!("the `session-exit` feature belongs to the `exit` entity: enable `exit` instead");
+
 /// Helper functions.
 mod helpers;
 
@@ -73,6 +86,7 @@ use hopr_api::{
 ///
 /// Use this when sizing buffers or computing how many session frames a given
 /// wxHOPR balance can fund (together with the on-chain ticket price).
+#[cfg(feature = "session-entry")]
 pub use hopr_transport::SESSION_MTU;
 /// Packet mixing API, re-exported so a consumer takes the mixer through `hopr-lib` alone instead of
 /// pinning `hopr-transport-mixer` as a separate dependency.
@@ -80,7 +94,7 @@ pub use hopr_transport::SESSION_MTU;
 /// Both `hopr_lib::mixer` and `hopr_lib::exports::transport::mixer` name the same items.
 pub use hopr_transport::mixer;
 use hopr_transport::{ApplicationDataIn, HoprTransport, HoprTransportProcess, OffchainPublicKey};
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 pub use hopr_transport::{
     FlowControlConfig, HoprSession, HoprSessionConfigurator, InvalidPixParams, LOCAL_PIX_SUITE, PixParams,
     SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
@@ -95,7 +109,7 @@ use crate::errors::HoprLibError;
 /// Public routing configuration for session opening in `hopr-lib`.
 ///
 /// This intentionally exposes only hop-count based routing.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HopRouting(
@@ -105,7 +119,7 @@ pub struct HopRouting(
     >,
 );
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl HopRouting {
     /// Maximum number of hops that can be configured.
     pub const MAX_HOPS: usize = hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS;
@@ -116,7 +130,7 @@ impl HopRouting {
     }
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl TryFrom<usize> for HopRouting {
     type Error = hopr_api::types::primitive::errors::GeneralError;
 
@@ -125,14 +139,14 @@ impl TryFrom<usize> for HopRouting {
     }
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl From<HopRouting> for hopr_api::types::internal::routing::RoutingOptions {
     fn from(value: HopRouting) -> Self {
         Self::Hops(value.0)
     }
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 impl std::fmt::Display for HopRouting {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}-hop routing", self.hop_count())
@@ -143,9 +157,9 @@ impl std::fmt::Display for HopRouting {
 ///
 /// Unlike transport-level configuration, this API intentionally does not expose
 /// explicit intermediate paths.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
-pub struct HoprSessionClientConfig {
+pub struct HoprSessionEntryConfig {
     /// Forward route selection policy.
     pub forward_path: HopRouting,
     /// Return route selection policy.
@@ -193,13 +207,13 @@ pub struct HoprSessionClientConfig {
 }
 
 /// Session client configuration for explicit intermediate-path routing.
-#[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[cfg(all(feature = "session-entry", feature = "explicit-path"))]
 #[deprecated(
     since = "4.0.2-rc.1",
     note = "temporary compatibility API; remove once the explicit path is not needed anymore."
 )]
 #[derive(Debug, Clone, PartialEq)]
-pub struct HoprSessionClientExplicitPathConfig {
+pub struct HoprSessionEntryExplicitPathConfig {
     /// Explicit forward intermediate path.
     pub forward_path: Vec<hopr_api::types::internal::NodeId>,
     /// Explicit return intermediate path.
@@ -214,13 +228,13 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
-    /// As [`HoprSessionClientConfig::max_frames_behind_gap`].
+    /// As [`HoprSessionEntryConfig::max_frames_behind_gap`].
     pub max_frames_behind_gap: Option<usize>,
 }
 
-#[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[cfg(all(feature = "session-entry", feature = "explicit-path"))]
 #[allow(deprecated)]
-impl Default for HoprSessionClientExplicitPathConfig {
+impl Default for HoprSessionEntryExplicitPathConfig {
     fn default() -> Self {
         Self {
             forward_path: Vec::default(),
@@ -235,9 +249,9 @@ impl Default for HoprSessionClientExplicitPathConfig {
     }
 }
 
-#[cfg(feature = "session-client")]
-impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
-    fn from(value: HoprSessionClientConfig) -> Self {
+#[cfg(feature = "session-entry")]
+impl From<HoprSessionEntryConfig> for hopr_transport::SessionEntryConfig {
+    fn from(value: HoprSessionEntryConfig) -> Self {
         Self {
             forward_path_options: value.forward_path.into(),
             return_path_options: value.return_path.into(),
@@ -251,12 +265,12 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
     }
 }
 
-#[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[cfg(all(feature = "session-entry", feature = "explicit-path"))]
 #[allow(deprecated)]
-impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionClientConfig {
+impl TryFrom<HoprSessionEntryExplicitPathConfig> for hopr_transport::SessionEntryConfig {
     type Error = hopr_api::types::primitive::errors::GeneralError;
 
-    fn try_from(value: HoprSessionClientExplicitPathConfig) -> Result<Self, Self::Error> {
+    fn try_from(value: HoprSessionEntryExplicitPathConfig) -> Result<Self, Self::Error> {
         let forward =
             hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(value.forward_path.try_into()?);
         let ret = hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(value.return_path.try_into()?);
@@ -279,16 +293,18 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
 pub(crate) enum HoprLibProcess {
     #[strum(to_string = "transport: {0}")]
     Transport(HoprTransportProcess),
+    #[cfg(feature = "session-exit")]
     #[strum(to_string = "session server providing the exit node session stream functionality")]
-    #[allow(dead_code)] // constructed only with feature = "session-server"
-    SessionServer,
+    SessionExit,
+    #[cfg(feature = "session-exit")]
     #[strum(to_string = "session server deciding the terms incoming sessions are admitted on")]
-    #[allow(dead_code)] // constructed only with feature = "session-server"
     SessionAdmission,
     #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
+    #[cfg(feature = "relay")]
     #[strum(to_string = "on received ticket event (winning or rejected)")]
     TicketEvents,
+    #[cfg(feature = "relay")]
     #[strum(to_string = "neglecting tickets on closed channels")]
     ChannelClosureNeglect,
     #[cfg(feature = "state-dump")]
@@ -380,6 +396,38 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) processes: AbortableList<HoprLibProcess>,
 }
 
+/// A source node: establishes Sessions, relays nothing, admits none.
+///
+/// - `Chain` is the connector the builder was given, which must satisfy [`HoprChainApi`] as the build does.
+/// - `Graph` and `Net` are the graph and network the builder assembled.
+/// - The ticket manager is fixed to `()`. That is the role's limitation, not a default: a source node has no ticket
+///   manager, so it can neither process nor emit tickets.
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_entry`.
+pub type HoprEntry<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
+
+/// A relay: full ticket processing and forwarding, no Session server of its own.
+///
+/// `TMgr` is the node's ticket manager and must implement [`TicketManagement`]; without one the
+/// builder has nothing to process tickets with. `Chain`, `Graph` and `Net` carry the same requirements as
+/// [`HoprEntry`]'s.
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_relay`.
+pub type HoprRelay<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
+
+/// A relaying exit: a relay that also terminates Sessions and resolves PIX shares.
+///
+/// Built when both `relay` and `exit` are enabled; same parameters and `TMgr` requirement as
+/// [`HoprRelay`].
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_relay_exit`.
+pub type HoprRelayExit<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
+
+/// An exit that terminates Sessions without relaying: no ticket manager, like [`HoprEntry`].
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_exit`.
+pub type HoprExit<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
+
 impl<Chain, Graph, Net, TMgr> std::fmt::Debug for Hopr<Chain, Graph, Net, TMgr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Hopr")
@@ -416,7 +464,7 @@ where
         self.transport_api.probe_control()
     }
 
-    #[cfg(feature = "session-client")]
+    #[cfg(feature = "session-entry")]
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
         if HoprNodeOperations::status(self) == state {
             Ok(())
@@ -425,12 +473,12 @@ where
         }
     }
 
-    #[cfg(feature = "session-client")]
+    #[cfg(feature = "session-entry")]
     async fn connect_to_with_transport_config(
         &self,
         destination: hopr_api::types::primitive::prelude::Address,
         target: SessionTarget,
-        cfg: hopr_transport::SessionClientConfig,
+        cfg: hopr_transport::SessionEntryConfig,
     ) -> Result<(HoprSession, HoprSessionConfigurator), HoprLibError> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
@@ -453,7 +501,7 @@ where
     }
 
     /// Opens a session using explicit intermediate paths for forward and return routing.
-    #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[cfg(all(feature = "session-entry", feature = "explicit-path"))]
     #[allow(deprecated)]
     #[deprecated(
         since = "4.0.2-rc.1",
@@ -463,18 +511,18 @@ where
         &self,
         destination: hopr_api::types::primitive::prelude::Address,
         target: SessionTarget,
-        cfg: HoprSessionClientExplicitPathConfig,
+        cfg: HoprSessionEntryExplicitPathConfig,
     ) -> Result<(HoprSession, HoprSessionConfigurator), HoprLibError> {
-        let transport_cfg = hopr_transport::SessionClientConfig::try_from(cfg)
+        let transport_cfg = hopr_transport::SessionEntryConfig::try_from(cfg)
             .map_err(|error| HoprLibError::GeneralError(error.to_string()))?;
         self.connect_to_with_transport_config(destination, target, transport_cfg)
             .await
     }
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 #[async_trait::async_trait]
-impl<Chain, Graph, Net, TMgr> hopr_api::node::HoprSessionClientOperations for Hopr<Chain, Graph, Net, TMgr>
+impl<Chain, Graph, Net, TMgr> hopr_api::node::HoprSessionEntryOperations for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = OffchainPublicKey> + Clone + Send + Sync + 'static,
@@ -484,7 +532,7 @@ where
     Net: hopr_api::network::NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     TMgr: Send + Sync + 'static,
 {
-    type Config = HoprSessionClientConfig;
+    type Config = HoprSessionEntryConfig;
     type Error = HoprLibError;
     type Session = HoprSession;
     type SessionConfigurator = HoprSessionConfigurator;
@@ -496,7 +544,7 @@ where
         target: Self::Target,
         cfg: Self::Config,
     ) -> Result<(Self::Session, Self::SessionConfigurator), Self::Error> {
-        self.connect_to_with_transport_config(destination, target, hopr_transport::SessionClientConfig::from(cfg))
+        self.connect_to_with_transport_config(destination, target, hopr_transport::SessionEntryConfig::from(cfg))
             .await
     }
 }
@@ -844,7 +892,7 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 }
 
 /// Whether a failed Session establishment is worth repeating: not when the peer permanently rejected it.
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 fn is_retryable_session_error(error: &errors::HoprTransportError) -> bool {
     !matches!(
         error,
@@ -857,7 +905,7 @@ fn is_retryable_session_error(error: &errors::HoprTransportError) -> bool {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "session-client")]
+    #[cfg(feature = "session-entry")]
     #[test]
     fn permanent_session_rejections_are_not_retried() {
         use hopr_transport::{StartErrorReason, TransportSessionError};
@@ -986,7 +1034,7 @@ mod tests {
         assert!(unknown.is_unavailable());
     }
 
-    #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[cfg(all(feature = "session-entry", feature = "explicit-path"))]
     #[allow(deprecated)]
     #[test]
     fn explicit_path_config_converts_into_intermediate_path_routing_options() -> anyhow::Result<()> {
@@ -997,7 +1045,7 @@ mod tests {
         let k2 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
         let k3 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
 
-        let cfg = hopr_transport::SessionClientConfig::try_from(HoprSessionClientExplicitPathConfig {
+        let cfg = hopr_transport::SessionEntryConfig::try_from(HoprSessionEntryExplicitPathConfig {
             forward_path: vec![k1, k2],
             return_path: vec![k3],
             capabilities: SessionCapability::Segmentation.into(),

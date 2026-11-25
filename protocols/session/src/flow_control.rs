@@ -56,7 +56,7 @@ pub enum FlowControlMode {
 /// the opt-in robustness knobs are off. This is the **clean** profile.
 ///
 /// Flow control is enabled per-session by *providing* this config (the transport's
-/// `SessionClientConfig::flow_control` is an `Option` — `None` leaves the session unpaced with
+/// `SessionEntryConfig::flow_control` is an `Option` — `None` leaves the session unpaced with
 /// today's behaviour), so there is no separate `enabled` flag.
 #[derive(Clone, Copy, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct FlowControlConfig {

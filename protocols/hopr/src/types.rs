@@ -121,6 +121,7 @@ impl std::fmt::Debug for IncomingFinalPacket {
 }
 
 /// Incoming packet that must be forwarded.
+#[cfg(feature = "relaying")]
 pub struct IncomingForwardedPacket {
     /// Packet tag.
     pub packet_tag: PacketTag,
@@ -138,6 +139,7 @@ pub struct IncomingForwardedPacket {
     pub ack_key_prev_hop: HalfKey,
 }
 
+#[cfg(feature = "relaying")]
 impl std::fmt::Debug for IncomingForwardedPacket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IncomingForwardedPacket")
@@ -177,6 +179,7 @@ pub enum IncomingPacket {
     /// Packet is intended for us
     Final(Box<IncomingFinalPacket>),
     /// Packet must be forwarded
+    #[cfg(feature = "relaying")]
     Forwarded(Box<IncomingForwardedPacket>),
     /// The packet contains acknowledgements of delivered packets.
     Acknowledgement(Box<IncomingAcknowledgementPacket>),
@@ -187,6 +190,7 @@ impl IncomingPacket {
     pub fn packet_tag(&self) -> &PacketTag {
         match self {
             IncomingPacket::Final(f) => &f.packet_tag,
+            #[cfg(feature = "relaying")]
             IncomingPacket::Forwarded(f) => &f.packet_tag,
             IncomingPacket::Acknowledgement(f) => &f.packet_tag,
         }
@@ -196,6 +200,7 @@ impl IncomingPacket {
     pub fn previous_hop(&self) -> &OffchainPublicKey {
         match self {
             IncomingPacket::Final(f) => &f.previous_hop,
+            #[cfg(feature = "relaying")]
             IncomingPacket::Forwarded(f) => &f.previous_hop,
             IncomingPacket::Acknowledgement(f) => &f.previous_hop,
         }

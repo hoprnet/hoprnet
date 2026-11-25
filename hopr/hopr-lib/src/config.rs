@@ -1,11 +1,14 @@
+#[cfg(feature = "relay")]
 use std::time::Duration;
 
 use hopr_api::types::primitive::prelude::*;
+#[cfg(feature = "session-entry")]
+pub use hopr_transport::config::SessionGlobalConfig;
 pub use hopr_transport::{
     TagAllocatorConfig,
     config::{
         HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, MixerConfig, ProbeConfig,
-        SessionGlobalConfig, TransitLatencyConfig, TransportConfig, looks_like_domain,
+        TransitLatencyConfig, TransportConfig, looks_like_domain,
     },
 };
 use validator::{Validate, ValidationError};
@@ -42,7 +45,7 @@ pub struct SafeModule {
     pub module_address: Address,
 }
 
-#[cfg(feature = "session-server")]
+#[cfg(feature = "session-exit")]
 #[inline]
 fn default_incoming_session_capacity() -> usize {
     256
@@ -87,6 +90,9 @@ pub struct HoprLibConfig {
     /// be creating invalid outgoing tickets.
     ///
     /// Default is 15 seconds, minimum is 1 second.
+    ///
+    /// Only a relay emits tickets, so only a build with the `relay` feature carries the setting.
+    #[cfg(feature = "relay")]
     #[default(default_out_index_sync_period())]
     #[validate(custom(function = "validate_out_index_sync_period"))]
     #[cfg_attr(
@@ -96,8 +102,8 @@ pub struct HoprLibConfig {
     pub out_index_sync_period: Duration,
     /// Capacity of the incoming session channel (number of buffered sessions).
     ///
-    /// Only relevant when the `session-server` feature is enabled. Default is 256.
-    #[cfg(feature = "session-server")]
+    /// Only relevant when the `session-exit` feature is enabled. Default is 256.
+    #[cfg(feature = "session-exit")]
     #[default(default_incoming_session_capacity())]
     #[cfg_attr(feature = "serde", serde(default = "default_incoming_session_capacity"))]
     pub incoming_session_capacity: usize,
@@ -109,8 +115,10 @@ pub struct HoprLibConfig {
     pub disable_protocol_checks: bool,
 }
 
+#[cfg(feature = "relay")]
 const MINIMUM_OUT_SYNC_PERIOD: Duration = Duration::from_secs(1);
 
+#[cfg(feature = "relay")]
 fn validate_out_index_sync_period(lifetime: &Duration) -> Result<(), ValidationError> {
     if lifetime < &MINIMUM_OUT_SYNC_PERIOD {
         Err(ValidationError::new("out_index_sync_period is too low"))
@@ -119,6 +127,7 @@ fn validate_out_index_sync_period(lifetime: &Duration) -> Result<(), ValidationE
     }
 }
 
+#[cfg(feature = "relay")]
 fn default_out_index_sync_period() -> Duration {
     Duration::from_secs(15)
 }

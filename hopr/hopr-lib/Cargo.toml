@@ -1,7 +1,7 @@
 [package]
 name = "hopr-lib"
 description = "HOPR library implementing the HOPR protocol"
-version = "5.0.0-rc.6"
+version = "5.0.0-rc.7"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -88,7 +88,32 @@ state-dump = [
   "hopr-network-graph?/state-dump",
   "hopr-transport-p2p?/state-dump",
 ]
-default = ["pix-bjj", "transport-announce-quic"]
+# Entity sets. The node split's basic functional division is `entry` <-> `relay` <-> `exit`. The three
+# are additive building blocks, each carrying the network-wide presets (`pix-bjj`,
+# `transport-announce-quic`), so a consumer takes one with `default-features = false, features = ["entry"]`
+# and nothing else:
+#
+# * `entry` — a source node: establishes Sessions, relays nothing, admits none.
+# * `relay` — a pure relay: ticket and acknowledgement processing, no Session stack and no PIX.
+# * `exit`  — terminates Sessions and resolves PIX shares; processes no tickets, so it takes no ticket
+#             manager (`build_exit`).
+#
+# Enabling `relay` and `exit` together is the relaying exit (`build_relay_exit`): the ticket path plus
+# the Session exit. The `testing` feature enables all three.
+entry = [
+  "session-entry",
+  "hopr-transport/entry",
+  "pix-bjj",
+  "transport-announce-quic",
+]
+relay = ["hopr-transport/relay", "pix-bjj", "transport-announce-quic"]
+exit = [
+  "session-exit",
+  "hopr-transport/exit",
+  "pix-bjj",
+  "transport-announce-quic",
+]
+default = ["relay"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]
 # Overrides `pix-bjj`, giving Ethereum deposit addresses that a plain transfer can reach.
@@ -128,9 +153,15 @@ serde = [
   "hopr-utils/serde",
   "hopr-transport/serde",
 ]
-session-client = ["hopr-api/node-session-client"]
-explicit-path = ["session-client"]
-session-server = ["hopr-api/node-session-server"]
+session-entry = ["hopr-api/node-session-entry", "hopr-transport/session-entry"]
+explicit-path = ["session-entry"]
+# An Exit establishes Sessions on its return path, and one manager serves both directions, so the
+# server side carries the client side with it.
+session-exit = [
+  "session-entry",
+  "hopr-api/node-session-exit",
+  "hopr-transport/session-exit",
+]
 transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
 
 # === utility features ===
@@ -142,8 +173,9 @@ utils_parallel = [] # utility parallelization functionality
 profiling = ["dep:pprof"]
 
 testing = [
-  "session-server",
-  "session-client",
+  "entry",
+  "relay",
+  "exit",
   "runtime-tokio",
   "dep:bytesize",
   "dep:hex-literal",
@@ -210,7 +242,14 @@ hopr-utils = { workspace = true, features = [
   "parallelize-rayon",
   "platform",
 ] }
-hopr-transport = { workspace = true }
+# `default-features = false` so the entity features below are the only way a role gets compiled in:
+# a default-on role in `hopr-transport` would come back for every build and silently undo the fence.
+# Of the three defaults it drops, `pix-bjj` and `p2p-announce-quic` are forwarded by this crate's
+# own `pix-bjj` and `transport-announce-quic` features (both in `default`), and `tracing-context`
+# is listed here because every build needs it.
+hopr-transport = { workspace = true, default-features = false, features = [
+  "tracing-context",
+] }
 
 # Concrete components for the emulated-node testing feature only.
 hopr-chain-connector = { workspace = true, optional = true }
@@ -253,7 +292,9 @@ hopr-utils = { workspace = true, features = [
 # Self dev-dependency so the integration tests get a tokio session stack (`transfer_session*`,
 # tokio AsyncRead/Write on HoprSession) without requiring `--features runtime-tokio` on the
 # command line. Mirrors the `testing` self dev-dep pattern in transport/session.
-hopr-lib = { path = ".", features = ["runtime-tokio"] }
+hopr-lib = { path = ".", default-features = false, features = [
+  "runtime-tokio",
+] }
 
 
 [package.metadata.cargo-machete]

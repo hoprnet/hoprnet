@@ -6,7 +6,7 @@
 //! `1` on small hosts, halving relay forwarding. The fix makes the default a CPU-derived deep queue
 //! (`available_parallelism * 8`) instead. These tests drive real-QUIC multi-hop traffic (mock chain)
 //! and assert the fix holds end to end.
-#![cfg(feature = "session-client")]
+#![cfg(feature = "session-entry")]
 
 use std::time::Duration;
 

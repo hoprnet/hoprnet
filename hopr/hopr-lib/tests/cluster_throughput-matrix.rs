@@ -9,16 +9,16 @@
 // All tests are `#[ignore]`d by default — cluster bootstrap takes 60–120 s.
 // Run the full suite:
 //
-//   cargo nextest run -p hopr-lib --features session-client \
+//   cargo nextest run -p hopr-lib --features session-entry \
 //       --test 'cluster_throughput-matrix' -j 1 --run-ignored all -- --no-capture
 //
 // Run a single variant (e.g. latency 1-hop with 50ms, case index 1):
 //
-//   cargo nextest run -p hopr-lib --features session-client \
+//   cargo nextest run -p hopr-lib --features session-entry \
 //       --test 'cluster_throughput-matrix' -j 1 --run-ignored all \
 //       -- 'latency_matrix::case_1' --no-capture
 
-#![cfg(feature = "session-client")]
+#![cfg(feature = "session-entry")]
 
 use std::time::Duration;
 

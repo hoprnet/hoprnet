@@ -472,7 +472,7 @@ pub type IncomingSession = hopr_api::node::IncomingSession<HoprSession>;
 /// Where a [`SessionAdmissionRequest`](hopr_api::node::SessionAdmissionRequest)'s answer is delivered.
 ///
 /// The error is a string rather than the session server's own type because that type is chosen by
-/// whoever installs the server and is unnameable from here — the same erasure the session-server
+/// whoever installs the server and is unnameable from here — the same erasure the session-exit
 /// wiring already performs when it logs a processing failure. The message is for the Exit's own
 /// operator; the peer is told only [`StartErrorReason::TargetNotAdmitted`].
 ///

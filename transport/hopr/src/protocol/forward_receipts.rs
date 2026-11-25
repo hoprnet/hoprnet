@@ -7,6 +7,10 @@
 //! draws to that Exit until the verdict is lifted. Everything is judged within one pseudonym, so a Session's receipts
 //! never judge another Session's packets.
 
+// Only a Session entry sends packets over forward paths and records receipts for them. The rest of the
+// transport still names the type, so a relay compiles it without calling it.
+#![cfg_attr(not(feature = "session-entry"), allow(dead_code))]
+
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     sync::atomic::{AtomicBool, Ordering},
@@ -18,6 +22,7 @@ use hopr_api::types::{
     crypto::types::OffchainPublicKey,
     internal::prelude::{HoprPseudonym, HoprSurbId, RoutingOptions, SURB_ID_SIZE},
 };
+#[cfg(feature = "session-entry")]
 use hopr_transport_session::ForwardReceiptSink;
 use parking_lot::{Mutex, RwLock};
 
@@ -571,6 +576,7 @@ fn id_of(tag: u32) -> HoprSurbId {
     id
 }
 
+#[cfg(feature = "session-entry")]
 impl ForwardReceiptSink for ForwardReceipts {
     fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32]) {
         self.receipts_at(pseudonym, seq, first_seq, tags, Instant::now());

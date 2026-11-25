@@ -9,7 +9,7 @@
 // For a profiling run use the `cluster_throughput` example binary instead, which
 // gives a clean single entry point for `cargo flamegraph` / `perf`.
 
-#![cfg(feature = "session-client")]
+#![cfg(feature = "session-entry")]
 
 use std::time::Duration;
 

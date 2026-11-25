@@ -83,7 +83,7 @@ mockall = { workspace = true, optional = true }
 
 hopr-api = { workspace = true, features = [
   "types-random",
-  "node-session-server",
+  "node-session-exit",
 ] }
 hopr-utils = { workspace = true, features = [
   "network-types",

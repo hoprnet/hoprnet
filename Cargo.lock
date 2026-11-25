@@ -4147,9 +4147,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "6.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52fa34d384c9a17f088253c7f9292f940fef017f357f044ebcf67bb28a99ad05"
+version = "6.2.0"
+source = "git+https://github.com/hoprnet/hopr-api?rev=9d1902d306bfe68dc73bded165a1def8e87476ea#9d1902d306bfe68dc73bded165a1def8e87476ea"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4267,7 +4266,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "5.0.0-rc.6"
+version = "5.0.0-rc.7"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4365,7 +4364,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "6.6.0"
+version = "6.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4402,7 +4401,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-pix"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4513,7 +4512,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.54.2"
+version = "0.55.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4542,6 +4541,7 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-ticket-manager",
+ "hopr-transport",
  "hopr-transport-mixer",
  "hopr-transport-probe",
  "hopr-transport-session",
@@ -7496,7 +7496,7 @@ dependencies = [
  "quinn-udp 0.5.16",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -7536,7 +7536,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -7549,7 +7549,7 @@ checksum = "47091c86514c2e11452cb228dee77037334b99d92a23e4c69aa5982261f39247"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "windows-sys 0.61.2",
 ]
 

@@ -2,8 +2,8 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
 use hopr_lib::{
-    HopRouting, HoprSessionClientConfig,
-    api::node::HoprSessionClientOperations,
+    HopRouting, HoprSessionEntryConfig,
+    api::node::HoprSessionEntryOperations,
     errors::HoprTransportError,
     exports::{
         network::types::prelude::{IpOrHost, SealedHost},
@@ -19,7 +19,7 @@ use tokio::time::sleep;
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[cfg(feature = "session-client")]
+#[cfg(feature = "session-entry")]
 /// Verifies keep-alive semantics by establishing a session without channels,
 /// pinging it before and after expiration and asserting stale sessions vanish.
 async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
@@ -33,7 +33,7 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .connect_to(
             dst.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            HoprSessionClientConfig {
+            HoprSessionEntryConfig {
                 forward_path: HopRouting::try_from(0_usize)?,
                 return_path: HopRouting::try_from(0_usize)?,
                 capabilities: SessionCapabilities::empty(),

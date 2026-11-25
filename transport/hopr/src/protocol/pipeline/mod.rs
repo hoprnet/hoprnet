@@ -17,9 +17,11 @@ use hopr_crypto_packet::{HoprPixSpec, HoprShareResolution, HoprSsaCommitmentStat
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_protocol_pix::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PixSpec, PolynomialIndex,
-    ShareResolution, SsaCommitmentProof, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
+    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PolynomialIndex,
+    SsaCommitmentProof, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
+#[cfg(feature = "exit")]
+use hopr_protocol_pix::{PixSpec, ShareResolution};
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
     runtime::AbortableList,
@@ -193,8 +195,7 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
             let exit_ack_proc = exit_ack_proc.clone();
             let counters = counters.clone();
             async move {
-                hopr_transport_session::counters::ENCODE_STAGE_ENTRIES
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                crate::counters::ENCODE_STAGE_ENTRIES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 // The SURB-batch generation was captured with the return-path plan and carried on
                 // `packet_info`; stamp that, not a value re-read at encode time.
                 let generation = data.packet_info.and_then(|info| info.surb_generation);
@@ -327,6 +328,9 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     let ticket_proc_success = ticket_proc;
     let ticket_events_unack = ticket_events.clone();
     futures::pin_mut!(app_incoming);
+    // Only the forwarding branch uses these; a node built without `relay` forwards nothing.
+    #[cfg(not(feature = "relay"))]
+    let _ = (&wire_outgoing, &ticket_proc_success, &ticket_events_unack);
 
     let res = wire_incoming
         // Use `map().buffered()` (FuturesOrdered) instead of `then_concurrent()` (FuturesUnordered)
@@ -355,7 +359,9 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     Ok(Ok(Ok(packet))) => {
                         if let IncomingPacket::Final(packet) = &packet {
                             output_span.record("session_id", tracing::field::display(packet.sender));
-                        } else if let IncomingPacket::Forwarded(packet) = &packet
+                        }
+                        #[cfg(feature = "relay")]
+                        if let IncomingPacket::Forwarded(packet) = &packet
                             && !output_span.is_disabled()
                         {
                             output_span.record("next_hop", packet.next_hop.to_peerid_str());
@@ -481,7 +487,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                 }
                 IncomingPacket::Final(final_packet) => {
                     let mut ack_outgoing_success = ack_outgoing_success.clone();
-                    Either::Right(Either::Left(async move {
+                    Either::Right(final_branch(async move {
                         let IncomingFinalPacket {
                             previous_hop,
                             sender,
@@ -506,6 +512,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         Some(WithContext::new((sender, plain_text, info), output_span))
                     }))
                 }
+                #[cfg(feature = "relay")]
                 IncomingPacket::Forwarded(fwd_packet) => {
                     let ticket_proc = ticket_proc_success.clone();
                     let mut wire_outgoing = wire_outgoing.clone();
@@ -747,6 +754,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 ///
 /// Used by Exit nodes: they do not receive any incoming tickets but still use the incoming acknowledgements
 /// to recover SSAs and forward them to the `recovered_ssa` sink.
+#[cfg(feature = "exit")]
 async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
     ack_incoming: AckIn,
     exit_proc: A,
@@ -816,11 +824,12 @@ async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
 
 /// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
 ///
-/// Used by Entry and Exit nodes — neither processes incoming ticket acknowledgements.
+/// Used by Edge and Exit nodes — neither processes incoming ticket acknowledgements.
 /// Entry nodes receive acks from relays (they pay for forwarding), Exit nodes keep
 /// the pipeline alive for future PIX use. In both cases the queue must be actively
 /// drained; dropping the receiver causes every inbound ack dispatch to fail with
 /// `SendError(disconnected)`.
+#[cfg(feature = "entry")]
 async fn start_drain_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
 where
     AckIn: futures::Stream + Send + 'static,
@@ -842,6 +851,7 @@ where
     );
 }
 
+#[cfg(feature = "relay")]
 async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
@@ -859,12 +869,18 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
     SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
 {
+    // A pure relay resolves no exit shares, so it has nothing to hand these to.
+    #[cfg(not(feature = "exit"))]
+    let _ = (&exit_ack_proc, &recovered_ssa);
+
     ack_incoming
         .for_each_concurrent(concurrency, move |message| {
             let ((peer, acks), span) = message.into().into_parts();
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
+            #[cfg(feature = "exit")]
             let exit_proc = exit_ack_proc.clone();
+            #[cfg(feature = "exit")]
             let mut ssa_evt = recovered_ssa.clone();
             async move {
                 tracing::trace!(num = acks.len(), "received acknowledgements");
@@ -884,27 +900,38 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                 // When there are no pending shares, avoid the clone and move acks directly into
                 // the ticket future — a single blocking spawn, no concurrent join needed.
                 // Clone before the `if` so it stays alive for `is_expected_error` after the join.
-                let exit_proc_for_spawn = exit_proc.clone();
-                let (ticket_result, exit_result) = if exit_proc.has_pending_shares(&peer) {
-                    let ack_clone = acks.clone();
-                    let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                        move || ticket_proc.acknowledge_tickets(peer, ack_clone),
-                        "ack_decode",
-                    );
-                    let exit_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                        move || exit_proc_for_spawn.acknowledge_shares(peer, acks),
-                        "exit_ack_decode",
-                    );
-                    let (t_r, e_r) = futures::future::join(ticket_fut, exit_fut).await;
-                    (t_r, Some(e_r))
-                } else {
-                    let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                        move || ticket_proc.acknowledge_tickets(peer, acks),
-                        "ack_decode",
-                    );
-                    let t_r = ticket_fut.await;
-                    (t_r, None)
+                #[cfg(feature = "exit")]
+                let (ticket_result, exit_result) = {
+                    let exit_proc_for_spawn = exit_proc.clone();
+                    if exit_proc.has_pending_shares(&peer) {
+                        let ack_clone = acks.clone();
+                        let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                            move || ticket_proc.acknowledge_tickets(peer, ack_clone),
+                            "ack_decode",
+                        );
+                        let exit_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                            move || exit_proc_for_spawn.acknowledge_shares(peer, acks),
+                            "exit_ack_decode",
+                        );
+                        let (t_r, e_r) = futures::future::join(ticket_fut, exit_fut).await;
+                        (t_r, Some(e_r))
+                    } else {
+                        let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                            move || ticket_proc.acknowledge_tickets(peer, acks),
+                            "ack_decode",
+                        );
+                        let t_r = ticket_fut.await;
+                        (t_r, None)
+                    }
                 };
+
+                // A pure relay has no exit shares: one blocking spawn for the tickets.
+                #[cfg(not(feature = "exit"))]
+                let ticket_result = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                    move || ticket_proc.acknowledge_tickets(peer, acks),
+                    "ack_decode",
+                )
+                .await;
 
                 match ticket_result {
                     Ok(Ok(resolutions)) if !resolutions.is_empty() => {
@@ -951,28 +978,31 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                     }
                 }
 
-                // Process PIX share acknowledgements (skipped when no pending shares).
-                if let Some(result) = exit_result {
-                    match result {
-                        Ok(Ok(ssa_priv_keys)) if !ssa_priv_keys.is_empty() => {
-                            if let Err(error) = ssa_evt
-                                .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
-                                .await
-                            {
-                                tracing::error!(%peer, %error, "failed to send pix resolution");
+                #[cfg(feature = "exit")]
+                {
+                    // Process PIX share acknowledgements (skipped when no pending shares).
+                    if let Some(result) = exit_result {
+                        match result {
+                            Ok(Ok(ssa_priv_keys)) if !ssa_priv_keys.is_empty() => {
+                                if let Err(error) = ssa_evt
+                                    .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
+                                    .await
+                                {
+                                    tracing::error!(%peer, %error, "failed to send pix resolution");
+                                }
                             }
-                        }
-                        Ok(Ok(_)) => {
-                            tracing::trace!(%peer, "empty pix share resolution batch");
-                        }
-                        Ok(Err(ref error)) if exit_proc.is_expected_error(error) => {
-                            tracing::trace!(%peer, %error, "pix share acknowledgement skipped");
-                        }
-                        Ok(Err(error)) => {
-                            tracing::error!(%peer, %error, "pix share acknowledgement failed");
-                        }
-                        Err(error) => {
-                            tracing::error!(%peer, %error, "failed to spawn pix share acknowledgement")
+                            Ok(Ok(_)) => {
+                                tracing::trace!(%peer, "empty pix share resolution batch");
+                            }
+                            Ok(Err(ref error)) if exit_proc.is_expected_error(error) => {
+                                tracing::trace!(%peer, %error, "pix share acknowledgement skipped");
+                            }
+                            Ok(Err(error)) => {
+                                tracing::error!(%peer, %error, "pix share acknowledgement failed");
+                            }
+                            Err(error) => {
+                                tracing::error!(%peer, %error, "failed to spawn pix share acknowledgement")
+                            }
                         }
                     }
                 }
@@ -988,24 +1018,77 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
         "long-running background task finished"
     );
 }
+/// Places the final-packet future in the branch type the packet match shares with the forwarding one.
+/// Without the `relay` feature there is no forwarding branch, so the unused side is a pending future.
+#[cfg(feature = "relay")]
+fn final_branch<A, B>(f: A) -> Either<A, B> {
+    Either::Left(f)
+}
+
+#[cfg(not(feature = "relay"))]
+fn final_branch<A: std::future::Future>(f: A) -> Either<A, std::future::Pending<A::Output>> {
+    Either::Left(f)
+}
+
 /// Node type for which the packet processing pipeline is being constructed.
 ///
 /// The three HOPR node types differ in how they treat tickets and incoming acknowledgements:
-/// * [`Relay`](NodeType::Relay) — full pipeline, processes tickets and incoming acknowledgements.
-/// * [`Entry`](NodeType::Entry) — does not process tickets and does not even start the incoming acknowledgement
-///   pipeline.
-/// * [`Exit`](NodeType::Exit) — does not process tickets, but still runs the incoming acknowledgement pipeline (which
-///   only drains the stream) for future use.
+/// * `NodeType::Relay` — full pipeline, processes tickets and incoming acknowledgements.
+/// * `NodeType::Entry` — does not process tickets and does not even start the incoming acknowledgement pipeline.
+/// * `NodeType::Exit` — does not process tickets, but still runs the incoming acknowledgement pipeline (which only
+///   drains the stream) for future use.
+///
+/// A variant exists only when its role feature is on, so a build for one role carries neither the
+/// variant nor the pipeline it selects.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum NodeType {
+    #[cfg(feature = "relay")]
     Relay,
+    #[cfg(feature = "entry")]
     Entry,
+    #[cfg(feature = "exit")]
     Exit,
 }
 
+impl NodeType {
+    /// Whether this role takes part in exit-acknowledgement (PIX) share processing.
+    ///
+    /// Every role except a source (Edge) node does: a Relay forwards shares it cannot resolve and
+    /// an Exit recovers them, while an Edge only produces them.
+    #[cfg(feature = "entry")]
+    const fn has_exit_ack_processor(self) -> bool {
+        !matches!(self, NodeType::Entry)
+    }
+
+    /// Whether this role takes part in exit-acknowledgement (PIX) share processing.
+    ///
+    /// Without the `edge` role every compiled role does, so there is nothing to exclude.
+    #[cfg(not(feature = "entry"))]
+    const fn has_exit_ack_processor(self) -> bool {
+        true
+    }
+
+    /// Whether this role admits incoming Sessions and therefore needs a session admission channel.
+    ///
+    /// A source (Edge) node only establishes Sessions, so it neither admits nor is asked about
+    /// them.
+    #[cfg(all(feature = "entry", feature = "session-entry"))]
+    pub(crate) const fn accepts_incoming_sessions(self) -> bool {
+        !matches!(self, NodeType::Entry)
+    }
+
+    /// Whether this role admits incoming Sessions and therefore needs a session admission channel.
+    ///
+    /// Without the `entry` role every compiled role does.
+    #[cfg(all(not(feature = "entry"), feature = "session-entry"))]
+    pub(crate) const fn accepts_incoming_sessions(self) -> bool {
+        true
+    }
+}
+
 /// No-op [`UnacknowledgedTicketProcessor`] used by node types that do not process tickets
-/// (Entry and Exit). All methods are unreachable because the inner pipeline never invokes
-/// them on those node types (Entry skips the ack pipeline entirely, Exit uses the drain
+/// (Edge and Exit). All methods are unreachable because the inner pipeline never invokes
+/// them on those node types (Edge skips the ack pipeline entirely, Exit uses the drain
 /// variant, and the forwarded packet branch never fires on a terminal/source node).
 #[derive(Debug, Default, Copy, Clone)]
 #[doc(hidden)]
@@ -1166,6 +1249,9 @@ where
     let outgoing_ack_tx = ContextSender::new(outgoing_ack_tx).with_timeout(QUEUE_SEND_TIMEOUT);
     let ticket_events = ticket_events.with_timeout(QUEUE_SEND_TIMEOUT);
     let ssa_events = ssa_events.with_timeout(QUEUE_SEND_TIMEOUT);
+    // Only a relay or an exit hands recovered SSA shares to a sink; a source node produces them.
+    #[cfg(not(feature = "exit"))]
+    let _ = &ssa_events;
 
     let encoder = std::sync::Arc::new(codec.0);
     let decoder = std::sync::Arc::new(codec.1);
@@ -1198,7 +1284,7 @@ where
                 // (Relay, Exit, or Relay+Exit). Entry nodes never have a processor.
                 // The Option inside already guards absent processors (e.g. pure Relay
                 // without PIX uses a no-op), so this is safe to pass unconditionally.
-                (node_type != NodeType::Entry).then(|| exit_ack_proc.clone()),
+                node_type.has_exit_ack_processor().then(|| exit_ack_proc.clone()),
                 wire_out.clone(),
                 counters.clone(),
                 output_concurrency
@@ -1241,7 +1327,9 @@ where
         .filter(|&n| n > 0)
         .unwrap_or(DEFAULT_ACK_INPUT_CONCURRENCY);
 
+    #[cfg(any(feature = "relay", feature = "entry", feature = "exit"))]
     match node_type {
+        #[cfg(feature = "relay")]
         NodeType::Relay => {
             processes.insert(
                 PacketPipelineProcesses::AckIn,
@@ -1259,6 +1347,7 @@ where
                 ),
             );
         }
+        #[cfg(feature = "exit")]
         NodeType::Exit => {
             // Exit nodes still run the incoming acknowledgement pipeline (for future PIX use),
             // but only drain the stream — incoming acknowledgements are NOT forwarded to the
@@ -1278,6 +1367,7 @@ where
                 ),
             );
         }
+        #[cfg(feature = "entry")]
         NodeType::Entry => {
             // Entry nodes do not process tickets, but they DO receive ticket acknowledgements
             // (they pay relays for forwarding). The queue must be actively drained so the
@@ -1293,6 +1383,17 @@ where
             );
         }
     }
+
+    // A build without any role has no packet pipeline to feed, but the channels above are still
+    // constructed; naming them keeps that combination warning-free.
+    #[cfg(not(any(feature = "relay", feature = "entry", feature = "exit")))]
+    let _ = (
+        incoming_ack_rx,
+        ssa_events,
+        ack_input_concurrency,
+        ticket_events,
+        ticket_proc,
+    );
 
     processes
 }
@@ -1513,7 +1614,7 @@ mod tests {
     /// Each role starts all four workers, delivers application data and drains acknowledgements appropriately.
     #[cfg(feature = "tracing-context")]
     #[rstest::rstest]
-    #[case::entry(NodeType::Entry)]
+    #[case::edge(NodeType::Entry)]
     #[case::exit(NodeType::Exit)]
     #[case::relay(NodeType::Relay)]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -2248,7 +2349,7 @@ mod tests {
         Ok(())
     }
 
-    /// Regression test for the Entry-node ack-sink bug.
+    /// Regression test for the Edge-node ack-sink bug.
     ///
     /// Before the fix, `NodeType::Entry` dropped `incoming_ack_rx` immediately at
     /// pipeline startup. Every subsequent call to `incoming_ack_tx.send(…)` then

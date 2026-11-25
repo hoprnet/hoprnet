@@ -34,13 +34,13 @@
 //! # Running
 //!
 //! ```sh
-//! cargo nextest run -p hopr-lib --features testing,session-client \
+//! cargo nextest run -p hopr-lib --features testing,session-entry \
 //!     --test transport_probe_delay-size3 -j 1 -- --nocapture
 //! ```
 //!
 //! [`HoprTransport::ping`]: hopr_lib::exports::transport::HoprTransport::ping
 
-#![cfg(feature = "session-client")]
+#![cfg(feature = "session-entry")]
 
 use std::{
     sync::{

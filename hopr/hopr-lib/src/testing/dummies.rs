@@ -58,7 +58,7 @@ impl EchoServer {
 }
 
 #[async_trait::async_trait]
-impl hopr_api::node::HoprSessionServer for EchoServer {
+impl hopr_api::node::HoprSessionExit for EchoServer {
     type Error = HoprLibError;
     type Session = IncomingSession;
 
@@ -107,7 +107,7 @@ impl hopr_api::node::HoprSessionServer for EchoServer {
     }
 }
 
-/// A [`hopr_api::node::HoprSessionServer`] that captures the first incoming [`IncomingSession`]
+/// A [`hopr_api::node::HoprSessionExit`] that captures the first incoming [`IncomingSession`]
 /// into a shared `Arc<Mutex<Option<IncomingSession>>>` for test access.
 ///
 /// After capturing, it holds the session open indefinitely via `futures::future::pending()`
@@ -132,7 +132,7 @@ impl SessionCaptureServer {
 }
 
 #[async_trait::async_trait]
-impl hopr_api::node::HoprSessionServer for SessionCaptureServer {
+impl hopr_api::node::HoprSessionExit for SessionCaptureServer {
     type Error = HoprLibError;
     type Session = IncomingSession;
 

@@ -1,5 +1,5 @@
 // 3-node cluster throughput reference tests (real QUIC transport, mock Blokli chain).
-#![cfg(feature = "session-client")]
+#![cfg(feature = "session-entry")]
 
 use std::time::Duration;
 
@@ -153,13 +153,13 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
 ///
 /// Run all 9 cases with:
 /// ```sh
-/// cargo nextest run -p hopr-lib --features session-client \
+/// cargo nextest run -p hopr-lib --features session-entry \
 ///     --test 'stress_cluster-size3' -j 1 --run-ignored all -- --nocapture
 /// ```
 ///
 /// Run a single case (e.g. 2-hop / 20 MB, case index 5):
 /// ```sh
-/// cargo nextest run -p hopr-lib --features session-client \
+/// cargo nextest run -p hopr-lib --features session-entry \
 ///     --test 'stress_cluster-size3' -j 1 --run-ignored all \
 ///     -- 'hop_mb_matrix::case_5' --nocapture
 /// ```

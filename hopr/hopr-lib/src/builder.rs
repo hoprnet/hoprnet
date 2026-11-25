@@ -5,8 +5,9 @@
 //! 1. **Identity** — `HoprBuilder` → `HoprBuilder::with_identity`
 //! 2. **Configuration** — `HoprBuilderWithIdentity::with_config`
 //! 3. **Component factories** — chain API, graph, network, and cover-traffic
-//! 4. **Session server** (when the `session-server` feature is enabled) — `HoprBuilderConfigured::with_session_server`
-//! 5. **Build** — `build_edge` for an entry/exit node or `build_full` for a relay node with ticket management.
+//! 4. **Session server** (when the `session-exit` feature is enabled) — `HoprBuilderConfigured::with_session_exit`
+//! 5. **Build** — `build_entry` for the source edge, `build_relay` for a relay, `build_relay_exit` for an exit (a relay
+//!    that also terminates Sessions).
 //!
 //! # Example
 //!
@@ -41,14 +42,20 @@ use hopr_api::{
     graph::HoprGraphApi,
     network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
     node::{AtomicHoprState, HoprState, NodeOnchainIdentity, PixEvent, TicketEvent},
-    tickets::{TicketFactory, TicketManagement},
-    types::{
-        chain::chain_events::ChainEvent,
-        internal::prelude::ChannelDirection,
-        primitive::prelude::{Address, HoprBalance},
-    },
+    tickets::TicketFactory,
+    types::primitive::prelude::{Address, HoprBalance},
 };
-use hopr_transport::{HoprTransport, IncomingSession};
+#[cfg(feature = "relay")]
+use hopr_api::{
+    tickets::TicketManagement,
+    types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection},
+};
+use hopr_transport::HoprTransport;
+#[cfg(any(
+    feature = "session-exit",
+    all(feature = "session-entry", any(feature = "relay", feature = "exit"))
+))]
+use hopr_transport::IncomingSession;
 use hopr_utils::{
     network_types::{
         addr::is_public_address,
@@ -95,15 +102,22 @@ const PEER_DISCOVERY_CHANNEL_CAPACITY: usize = 2048;
 type PeerDiscoveryRx =
     Arc<parking_lot::Mutex<Option<futures::stream::BoxStream<'static, (hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>>>;
 
-/// What `into_parts` hands to the shared build path: the configured builder, the two channels the
-/// transport is wired to, and the tasks already spawned for them. The admission sink is optional
-/// because a node built without a session server has nobody to ask.
-type BuildParts<Chain, Graph, Net, Ct, #[cfg(feature = "state-dump")] Dump> = (
-    HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
-    futures::channel::mpsc::Sender<IncomingSession>,
-    Option<hopr_transport::SessionAdmissionSink>,
-    AbortableList<HoprLibProcess>,
-);
+/// What `into_parts` hands to the shared build path: the configured builder, the channels the
+/// transport is wired to, and the tasks already spawned for them.
+///
+/// The session channels exist only when the session stack is compiled in, so a session-less entity
+/// has no field to fill and no channel to carry. The admission sink is optional even then, because
+/// a node built without a session server has nobody to ask.
+struct BuildParts<Chain, Graph, Net, Ct, Dump = ()> {
+    configured: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
+    // Read only by the relay and exit builds; a source node hands the transport no session
+    // channels at all.
+    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+    session_tx: futures::channel::mpsc::Sender<IncomingSession>,
+    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+    admission_tx: Option<hopr_transport::SessionAdmissionSink>,
+    processes: AbortableList<HoprLibProcess>,
+}
 
 /// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
@@ -187,11 +201,11 @@ impl HoprBuilderWithIdentity {
 
 /// Configured builder accepting factory closures for components.
 ///
-/// When the `session-server` feature is enabled, `with_session_server`
+/// When the `session-exit` feature is enabled, `with_session_exit`
 /// must be called before building — it returns a `HoprBuilderWithSession` which
-/// has the `build_edge` / `build_full` methods.
+/// has the `build_entry` / `build_relay` / `build_relay_exit` methods.
 ///
-/// When the feature is disabled, `build_edge` / `build_full` are available directly.
+/// When the feature is disabled, `build_entry` / `build_relay` are available directly.
 pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = (), Dump = ()> {
     ctx: BuildCtx,
     state_dump_factory: Dump,
@@ -322,19 +336,19 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
     /// Attaches a session server for handling incoming sessions.
     ///
     /// Eagerly spawns the server task and returns a [`HoprBuilderWithSession`]
-    /// that has the `build_edge` / `build_full` methods.
+    /// that has the `build_entry` / `build_relay` / `build_relay_exit` methods.
     ///
     /// Two tasks are spawned, not one, because the server is consulted at two different points in a
     /// Session's life. `admit` is asked while the peer's request is still being negotiated and no
     /// Session exists yet; `process` is handed the established byte-stream. Sharing one channel
     /// would put a long-lived `process` in front of the admission decisions queued behind it.
-    #[cfg(feature = "session-server")]
-    pub fn with_session_server(
+    #[cfg(feature = "session-exit")]
+    pub fn with_session_exit(
         self,
         // `Sync` on top of what `process` alone needed: the server is now driven from two
         // independent tasks, and `admit` carries a default body, which `async_trait` can only make
         // `Send` by requiring `&Self` to cross threads.
-        server: impl hopr_api::node::HoprSessionServer<Session = IncomingSession, Error: std::fmt::Display>
+        server: impl hopr_api::node::HoprSessionExit<Session = IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
         + Sync
@@ -387,13 +401,13 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
 
         tracing::debug!(capacity = incoming_session_capacity, "spawning session server");
         let session_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
-            "session_server_for_each_concurrent",
+            "session_exit_for_each_concurrent",
             module_path!(),
             file!(),
             line!(),
         );
         let handle = hopr_utils::spawn_as_abortable_named!(
-            "hopr_lib_session_server",
+            "hopr_lib_session_exit",
             session_rx
                 .for_each_concurrent(None, move |session| {
                     let server = server.clone();
@@ -409,7 +423,7 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
                     })
                 })
                 .inspect(|_| tracing::warn!(
-                    task = %HoprLibProcess::SessionServer,
+                    task = %HoprLibProcess::SessionExit,
                     "long-running background task finished"
                 ))
         );
@@ -428,10 +442,10 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
 // HoprBuilderWithSession — session server attached, ready to build
 // ---------------------------------------------------------------------------
 
-/// Builder with a session server attached. Has `build_edge` / `build_full`.
+/// Builder with a session server attached. Has `build_entry` / `build_relay` / `build_relay_exit`.
 ///
-/// Only exists when the `session-server` feature is enabled.
-#[cfg(feature = "session-server")]
+/// Only exists when the `session-exit` feature is enabled.
+#[cfg(feature = "session-exit")]
 pub struct HoprBuilderWithSession<Chain = (), Graph = (), Net = (), Ct = (), Dump = ()> {
     inner: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
@@ -444,7 +458,13 @@ pub struct HoprBuilderWithSession<Chain = (), Graph = (), Net = (), Ct = (), Dum
 // Intermediate pre-build state
 // ---------------------------------------------------------------------------
 
-struct PreHopr<Chain, Graph, Net, Ct> {
+/// The node pieces handed to a role's transport entry point.
+///
+/// Kept apart from [`PreHopr`] because each role's entry point consumes them, while the assembled
+/// object is built from what remains.
+type TransportInputs<Net, Ct> = (Ct, Net, BoxedProcessFn);
+
+struct PreHopr<Chain, Graph, Net> {
     chain_id: ChainKeypair,
     transport_id: OffchainKeypair,
     cfg: HoprLibConfig,
@@ -461,11 +481,12 @@ struct PreHopr<Chain, Graph, Net, Ct> {
         async_broadcast::InactiveReceiver<PixEvent>,
     ),
     processes: AbortableList<HoprLibProcess>,
+    // Read only by the relay and exit builds; a source node hands the transport no session
+    // channels at all.
+    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
+    #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
     admission_tx: Option<hopr_transport::SessionAdmissionSink>,
-    cover_traffic: Ct,
-    network: Net,
-    network_process: BoxedProcessFn,
 }
 
 // ---------------------------------------------------------------------------
@@ -532,11 +553,8 @@ async fn pre_build_inner<
     Ct,
     #[cfg(feature = "state-dump")] Dump: StateDumpFactory<Chain, Graph, Net>,
 >(
-    configured: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
-    session_tx: futures::channel::mpsc::Sender<IncomingSession>,
-    admission_tx: Option<hopr_transport::SessionAdmissionSink>,
-    mut processes: AbortableList<HoprLibProcess>,
-) -> Result<PreHopr<Chain, Graph, Net, Ct>, HoprLibError>
+    parts: BuildParts<Chain, Graph, Net, Ct, Dump>,
+) -> Result<(PreHopr<Chain, Graph, Net>, TransportInputs<Net, Ct>), HoprLibError>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
@@ -546,6 +564,15 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
 {
+    let BuildParts {
+        configured,
+        #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+        session_tx,
+        #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+        admission_tx,
+        mut processes,
+    } = parts;
+
     let peer_discovery_tx = Some(configured.peer_discovery_tx);
     let ctx = configured.ctx;
     // First, so it is in the log even when the configuration or the chain fails below.
@@ -909,48 +936,93 @@ where
         );
     }
 
-    Ok(PreHopr {
-        chain_id,
-        transport_id,
-        cfg: ctx.cfg,
-        state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
-        transport_api,
-        chain_api,
-        ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
-        pix_event_subscribers: (ssa_tx, ssa_rx.deactivate()),
-        processes,
-        session_tx,
-        admission_tx,
-        cover_traffic,
-        network,
-        network_process,
-    })
+    Ok((
+        PreHopr {
+            chain_id,
+            transport_id,
+            cfg: ctx.cfg,
+            state: Arc::new(AtomicHoprState::new(HoprState::Uninitialized)),
+            transport_api,
+            chain_api,
+            ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
+            pix_event_subscribers: (ssa_tx, ssa_rx.deactivate()),
+            processes,
+            #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+            session_tx,
+            #[cfg(all(feature = "session-entry", any(feature = "relay", feature = "exit")))]
+            admission_tx,
+        },
+        (cover_traffic, network, network_process),
+    ))
 }
 
 // ---------------------------------------------------------------------------
-// Build methods — shared via macro to avoid duplicating edge/full logic
+// Build methods — shared via macro so the two builder shapes carry the same set
 // ---------------------------------------------------------------------------
+
+/// Turns the built parts of a node into the [`Hopr`] object shared by every entity.
+///
+/// The entities differ only in which transport entry point ran and which ticket manager they
+/// carry, so the object assembly, the state transition and the startup line live here once.
+fn into_hopr<Chain, Graph, Net, TMgr>(
+    pre: PreHopr<Chain, Graph, Net>,
+    processes: AbortableList<HoprLibProcess>,
+    ticket_manager: TMgr,
+    started_log: &str,
+) -> Hopr<Chain, Graph, Net, TMgr> {
+    let hopr = Hopr {
+        chain_id: NodeOnchainIdentity {
+            node_address: pre.chain_id.public().to_address(),
+            safe_address: pre.cfg.safe_module.safe_address,
+            module_address: pre.cfg.safe_module.module_address,
+        },
+        cfg: pre.cfg,
+        state: pre.state.clone(),
+        ticket_event_subscribers: pre.ticket_event_subscribers,
+        pix_event_subscribers: pre.pix_event_subscribers,
+        transport_id: pre.transport_id,
+        transport_api: pre.transport_api,
+        chain_api: pre.chain_api,
+        processes,
+        ticket_manager,
+    };
+
+    hopr.state
+        .store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
+    tracing::info!(
+        id = %hopr.transport_id.public().to_peerid_str(),
+        hopr_lib_version = constants::APP_VERSION,
+        "{}",
+        started_log
+    );
+
+    hopr
+}
 
 macro_rules! impl_build_methods {
     () => {
-        /// Builds an entry [`Hopr`] node.
-        pub async fn build_edge<TFact>(
+        /// Body of the source-node build.
+        ///
+        /// Shared, not duplicated: the entity is one role, so there is one body and one log line.
+        #[cfg(feature = "entry")]
+        async fn build_source<TFact>(
             self,
             ticket_factory: TFact,
+            starting_log: &str,
+            started_log: &str,
         ) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
         where
             TFact: TicketFactory + Clone + Send + Sync + 'static,
         {
-            let (configured, session_tx, admission_tx, processes) = self.into_parts();
-            let pre = pre_build_inner(configured, session_tx, admission_tx, processes).await?;
+            let (mut pre, (cover_traffic, network, network_process)) = pre_build_inner(self.into_parts()).await?;
 
-            tracing::info!("starting transport for edge (entry) node");
+            tracing::info!("{}", starting_log);
             let (socket, transport_processes) = pre
                 .transport_api
                 .run_entry(
-                    pre.cover_traffic,
-                    pre.network,
-                    pre.network_process,
+                    cover_traffic,
+                    network,
+                    network_process,
                     ticket_factory,
                     Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
                 )
@@ -959,40 +1031,17 @@ macro_rules! impl_build_methods {
             // Drain unrelated packets to avoid missing blackhole
             spawn(drain_incoming_data(socket.reader()));
 
-            let mut processes = pre.processes;
+            let mut processes = std::mem::take(&mut pre.processes);
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
-            let hopr = Hopr {
-                chain_id: NodeOnchainIdentity {
-                    node_address: pre.chain_id.public().to_address(),
-                    safe_address: pre.cfg.safe_module.safe_address,
-                    module_address: pre.cfg.safe_module.module_address,
-                },
-                cfg: pre.cfg,
-                state: pre.state.clone(),
-                ticket_event_subscribers: pre.ticket_event_subscribers,
-                pix_event_subscribers: pre.pix_event_subscribers,
-                transport_id: pre.transport_id,
-                transport_api: pre.transport_api,
-                chain_api: pre.chain_api,
-                processes,
-                ticket_manager: (),
-            };
-
-            hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
-            tracing::info!(
-                id = %hopr.transport_id.public().to_peerid_str(),
-                hopr_lib_version = constants::APP_VERSION,
-                "EDGE NODE STARTED AND RUNNING"
-            );
-
-            Ok(hopr)
+            Ok(into_hopr(pre, processes, (), started_log))
         }
 
-        /// Builds an entry (source) [`Hopr`] node.
+        /// Builds an edge (source) [`Hopr`] node.
         ///
-        /// Entry nodes do not process tickets, do not have ticket manager state,
-        /// and do not accept incoming sessions.
+        /// The edge entity runs the transport's Entry role: it does not process tickets, has no
+        /// ticket manager state, and accepts no incoming sessions.
+        #[cfg(feature = "entry")]
         pub async fn build_entry<TFact>(
             self,
             ticket_factory: TFact,
@@ -1000,117 +1049,17 @@ macro_rules! impl_build_methods {
         where
             TFact: TicketFactory + Clone + Send + Sync + 'static,
         {
-            let (configured, session_tx, admission_tx, processes) = self.into_parts();
-            let pre = pre_build_inner(configured, session_tx, admission_tx, processes).await?;
-
-            tracing::info!("starting transport for entry node");
-            let (socket, transport_processes) = pre
-                .transport_api
-                .run_entry(
-                    pre.cover_traffic,
-                    pre.network,
-                    pre.network_process,
-                    ticket_factory,
-                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
-                )
-                .await?;
-
-            // Drain unrelated packets to avoid missing blackhole
-            spawn(drain_incoming_data(socket.reader()));
-
-            let mut processes = pre.processes;
-            processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
-
-            let hopr = Hopr {
-                chain_id: NodeOnchainIdentity {
-                    node_address: pre.chain_id.public().to_address(),
-                    safe_address: pre.cfg.safe_module.safe_address,
-                    module_address: pre.cfg.safe_module.module_address,
-                },
-                cfg: pre.cfg,
-                state: pre.state.clone(),
-                ticket_event_subscribers: pre.ticket_event_subscribers,
-                pix_event_subscribers: pre.pix_event_subscribers,
-                transport_id: pre.transport_id,
-                transport_api: pre.transport_api,
-                chain_api: pre.chain_api,
-                processes,
-                ticket_manager: (),
-            };
-
-            hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
-            tracing::info!(
-                id = %hopr.transport_id.public().to_peerid_str(),
-                hopr_lib_version = constants::APP_VERSION,
-                "ENTRY NODE STARTED AND RUNNING"
-            );
-
-            Ok(hopr)
+            self.build_source(
+                ticket_factory,
+                "starting transport for edge node",
+                "EDGE NODE STARTED AND RUNNING",
+            )
+            .await
         }
 
-        /// Builds an exit (destination) [`Hopr`] node.
-        ///
-        /// Exit nodes accept incoming sessions and process PIX acknowledgements,
-        /// but do not process tickets (no ticket manager state).
-        pub async fn build_exit<TFact>(
-            self,
-            ticket_factory: TFact,
-        ) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
-        where
-            TFact: TicketFactory + Clone + Send + Sync + 'static,
-        {
-            let (configured, session_tx, admission_tx, processes) = self.into_parts();
-            let pre = pre_build_inner(configured, session_tx, admission_tx, processes).await?;
-
-            tracing::info!("starting transport for exit node");
-            let (socket, transport_processes) = pre
-                .transport_api
-                .run_exit::<TFact, Ct, _>(
-                    pre.cover_traffic,
-                    pre.network,
-                    pre.network_process,
-                    ticket_factory,
-                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
-                    pre.session_tx,
-                    pre.admission_tx,
-                )
-                .await?;
-
-            // Drain unrelated packets to avoid missing blackhole
-            spawn(drain_incoming_data(socket.reader()));
-
-            let mut processes = pre.processes;
-            processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
-
-            let hopr = Hopr {
-                chain_id: NodeOnchainIdentity {
-                    node_address: pre.chain_id.public().to_address(),
-                    safe_address: pre.cfg.safe_module.safe_address,
-                    module_address: pre.cfg.safe_module.module_address,
-                },
-                cfg: pre.cfg,
-                state: pre.state.clone(),
-                ticket_event_subscribers: pre.ticket_event_subscribers,
-                pix_event_subscribers: pre.pix_event_subscribers,
-                transport_id: pre.transport_id,
-                transport_api: pre.transport_api,
-                chain_api: pre.chain_api,
-                processes,
-                ticket_manager: (),
-            };
-
-            hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
-            tracing::info!(
-                id = %hopr.transport_id.public().to_peerid_str(),
-                hopr_lib_version = constants::APP_VERSION,
-                "EXIT NODE STARTED AND RUNNING"
-            );
-
-            Ok(hopr)
-        }
-
-        /// Builds a full (relay) [`Hopr`] node.
-        pub async fn build_full<TMgr, TFact>(
+        /// Builds a relay [`Hopr`] node: ticket processing and forwarding, no PIX.
+        #[cfg(feature = "relay")]
+        pub async fn build_relay<TMgr, TFact>(
             self,
             ticket_manager: TMgr,
             ticket_factory: TFact,
@@ -1119,9 +1068,80 @@ macro_rules! impl_build_methods {
             TMgr: TicketManagement + Clone + Send + Sync + 'static,
             TFact: TicketFactory + Clone + Send + Sync + 'static,
         {
-            let (configured, session_tx, admission_tx, processes) = self.into_parts();
-            let pre = pre_build_inner(configured, session_tx, admission_tx, processes).await?;
-            let mut processes = pre.processes;
+            self.build_ticketing(ticket_manager, ticket_factory, false, "RELAY NODE STARTED AND RUNNING")
+                .await
+        }
+
+        /// Builds a relaying exit [`Hopr`] node (`relay` and `exit` together): a relay that also terminates
+        /// Sessions and resolves PIX shares.
+        #[cfg(all(feature = "relay", feature = "exit"))]
+        pub async fn build_relay_exit<TMgr, TFact>(
+            self,
+            ticket_manager: TMgr,
+            ticket_factory: TFact,
+        ) -> Result<Hopr<Chain, Graph, Net, TMgr>, HoprLibError>
+        where
+            TMgr: TicketManagement + Clone + Send + Sync + 'static,
+            TFact: TicketFactory + Clone + Send + Sync + 'static,
+        {
+            self.build_ticketing(ticket_manager, ticket_factory, true, "EXIT NODE STARTED AND RUNNING")
+                .await
+        }
+
+        /// Builds an exit [`Hopr`] node: terminates Sessions and resolves PIX shares but processes no
+        /// tickets, so it has no ticket manager.
+        #[cfg(feature = "exit")]
+        pub async fn build_exit<TFact>(
+            self,
+            ticket_factory: TFact,
+        ) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
+        where
+            TFact: TicketFactory + Clone + Send + Sync + 'static,
+        {
+            let (mut pre, (cover_traffic, network, network_process)) = pre_build_inner(self.into_parts()).await?;
+
+            tracing::info!("starting transport for raw exit node");
+            #[cfg(feature = "session-entry")]
+            let (session_tx, admission_tx) = (Some(pre.session_tx.clone()), pre.admission_tx.clone());
+            #[cfg(not(feature = "session-entry"))]
+            let (session_tx, admission_tx) = (None, None);
+            let (socket, transport_processes) = pre
+                .transport_api
+                .run_exit::<TFact, Ct, _>(
+                    cover_traffic,
+                    network,
+                    network_process,
+                    ticket_factory,
+                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
+                    session_tx,
+                    admission_tx,
+                )
+                .await?;
+
+            // Drain unrelated packets to avoid missing blackhole
+            spawn(drain_incoming_data(socket.reader()));
+
+            let mut processes = std::mem::take(&mut pre.processes);
+            processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
+
+            Ok(into_hopr(pre, processes, (), "RAW EXIT NODE STARTED AND RUNNING"))
+        }
+
+        /// Body of the relay and the exit build; `with_pix` is what separates them.
+        #[cfg(feature = "relay")]
+        async fn build_ticketing<TMgr, TFact>(
+            self,
+            ticket_manager: TMgr,
+            ticket_factory: TFact,
+            with_pix: bool,
+            started_log: &str,
+        ) -> Result<Hopr<Chain, Graph, Net, TMgr>, HoprLibError>
+        where
+            TMgr: TicketManagement + Clone + Send + Sync + 'static,
+            TFact: TicketFactory + Clone + Send + Sync + 'static,
+        {
+            let (mut pre, (cover_traffic, network, network_process)) = pre_build_inner(self.into_parts()).await?;
+            let mut processes = std::mem::take(&mut pre.processes);
 
             tracing::info!("starting ticket events processor");
             let (tickets_tx, tickets_rx) = bounded_sink_channel::<TicketEvent>(8192);
@@ -1204,7 +1224,7 @@ macro_rules! impl_build_methods {
                     tracing::warn!(
                         task = %HoprLibProcess::ChannelClosureNeglect,
                         "channel closure ticket neglect task finished"
-                    )
+                    );
                 });
                 spawn(hopr_utils::runtime::diagnostics::instrument(
                     neglect_task,
@@ -1216,48 +1236,38 @@ macro_rules! impl_build_methods {
                 processes.insert(HoprLibProcess::ChannelClosureNeglect, neglect_handle);
             }
 
-            tracing::info!("starting transport for full (relay) node");
+            tracing::info!(with_pix, "starting transport for relay node");
+            // Only the exit entity carries the PIX share resolution, so a pure relay has no sink to give.
+            #[cfg(all(feature = "relay", feature = "exit"))]
+            let exit_ack_share = with_pix.then(|| BroadcastSenderSink(pre.pix_event_subscribers.0.clone()));
+            #[cfg(not(all(feature = "relay", feature = "exit")))]
+            let exit_ack_share: Option<BroadcastSenderSink<PixEvent>> = {
+                let _ = with_pix;
+                None
+            };
+            #[cfg(feature = "session-entry")]
+            let (session_tx, admission_tx) = (Some(pre.session_tx.clone()), pre.admission_tx.clone());
+            // Without the session stack a relay admits no Sessions, so there is nothing to hand over.
+            #[cfg(not(feature = "session-entry"))]
+            let (session_tx, admission_tx) = (None, None);
             let (socket, transport_processes) = pre
                 .transport_api
                 .run_relay(
-                    pre.cover_traffic,
-                    pre.network,
-                    pre.network_process,
+                    cover_traffic,
+                    network,
+                    network_process,
                     tickets_tx,
                     ticket_factory,
-                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
-                    pre.session_tx,
-                    pre.admission_tx,
+                    exit_ack_share,
+                    session_tx,
+                    admission_tx,
                 )
                 .await?;
             // Drain unrelated packets to avoid missing blackhole
             spawn(drain_incoming_data(socket.reader()));
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
-            let hopr = Hopr {
-                chain_id: NodeOnchainIdentity {
-                    node_address: pre.chain_id.public().to_address(),
-                    safe_address: pre.cfg.safe_module.safe_address,
-                    module_address: pre.cfg.safe_module.module_address,
-                },
-                cfg: pre.cfg,
-                state: pre.state.clone(),
-                ticket_event_subscribers: pre.ticket_event_subscribers,
-                pix_event_subscribers: pre.pix_event_subscribers,
-                transport_id: pre.transport_id,
-                transport_api: pre.transport_api,
-                chain_api: pre.chain_api,
-                processes,
-                ticket_manager,
-            };
-
-            hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
-
-            tracing::info!(
-                id = %hopr.transport_id.public().to_peerid_str(),
-                hopr_lib_version = constants::APP_VERSION,
-                "FULL NODE STARTED AND RUNNING"
-            );
+            let hopr = into_hopr(pre, processes, ticket_manager, started_log);
 
             #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_HOPR_NODE_INFO.set(
@@ -1275,12 +1285,12 @@ macro_rules! impl_build_methods {
     };
 }
 
-// Generate the two session-server variants with a real reporter bound when enabled,
+// Generate the two session-exit variants with a real reporter bound when enabled,
 // and specialize both directly to `()` when disabled. There is no placeholder trait.
 macro_rules! impl_node_builders {
     ([$($dump:tt)*], [$($dump_arg:tt)*]) => {
-        // When session-server is ON: build methods only on HoprBuilderWithSession
-        #[cfg(feature = "session-server")]
+        // When session-exit is ON: build methods only on HoprBuilderWithSession
+        #[cfg(feature = "session-exit")]
         impl<Chain, Graph, Net, Ct $($dump)*> HoprBuilderWithSession<Chain, Graph, Net, Ct, Dump>
         where
             Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -1295,14 +1305,27 @@ macro_rules! impl_node_builders {
 
             fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct $($dump_arg)*> {
                 let mut processes = AbortableList::<HoprLibProcess>::default();
-                processes.insert(HoprLibProcess::SessionServer, self.session_handle);
+                processes.insert(HoprLibProcess::SessionExit, self.session_handle);
                 processes.insert(HoprLibProcess::SessionAdmission, self.admission_handle);
-                (self.inner, self.session_tx, Some(self.admission_tx), processes)
+                BuildParts {
+                    configured: self.inner,
+                    #[cfg(all(
+                        feature = "session-entry",
+                        any(feature = "relay", feature = "exit")
+                    ))]
+                    session_tx: self.session_tx,
+                    #[cfg(all(
+                        feature = "session-entry",
+                        any(feature = "relay", feature = "exit")
+                    ))]
+                    admission_tx: Some(self.admission_tx),
+                    processes,
+                }
             }
         }
 
-        // When session-server is OFF: build methods directly on HoprBuilderConfigured
-        #[cfg(not(feature = "session-server"))]
+        // When session-exit is OFF: build methods directly on HoprBuilderConfigured
+        #[cfg(not(feature = "session-exit"))]
         impl<Chain, Graph, Net, Ct $($dump)*> HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>
         where
             Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -1316,9 +1339,25 @@ macro_rules! impl_node_builders {
             impl_build_methods!();
 
             fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct $($dump_arg)*> {
-                let (tx, _rx) = futures::channel::mpsc::channel::<IncomingSession>(1);
-                let processes = AbortableList::<HoprLibProcess>::default();
-                (self, tx, None, processes)
+                BuildParts {
+                    configured: self,
+                    // No session server was attached, so nothing can ever arrive on this channel. The
+                    // receiver is dropped here, which the transport treats as "no incoming Sessions".
+                    #[cfg(all(
+                        feature = "session-entry",
+                        any(feature = "relay", feature = "exit")
+                    ))]
+                    session_tx: {
+                        let (tx, _rx) = futures::channel::mpsc::channel::<IncomingSession>(1);
+                        tx
+                    },
+                    #[cfg(all(
+                        feature = "session-entry",
+                        any(feature = "relay", feature = "exit")
+                    ))]
+                    admission_tx: None,
+                    processes: AbortableList::<HoprLibProcess>::default(),
+                }
             }
         }
 
@@ -1424,7 +1463,8 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "testing")]
+    // The setting under test is the relay's, so the test needs the relay entity compiled in.
+    #[cfg(all(feature = "testing", feature = "relay"))]
     #[test]
     /// Keep the startup record available even when configuration validation fails.
     fn startup_is_logged_before_invalid_configuration_is_rejected() -> anyhow::Result<()> {
@@ -1452,10 +1492,16 @@ mod tests {
             ct_factory: None,
             peer_discovery_tx: builder.peer_discovery_tx,
         };
-        let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
         let logs = capture_logs(|| {
-            let result =
-                futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()));
+            let result = futures::executor::block_on(pre_build_inner(BuildParts {
+                configured,
+                session_tx: {
+                    let (tx, _rx) = futures::channel::mpsc::channel(1);
+                    tx
+                },
+                admission_tx: None,
+                processes: AbortableList::default(),
+            }));
             assert!(matches!(
                 result,
                 Err(HoprLibError::ConfigurationError(errors))
@@ -1495,11 +1541,17 @@ mod tests {
             peer_discovery_tx: builder.peer_discovery_tx,
         }
         .with_state_dump(ReporterProbe::new(valid, false, None).0);
-        let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
-        let error =
-            futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()))
-                .err()
-                .context("startup should stop before constructing components")?;
+        let error = futures::executor::block_on(pre_build_inner(BuildParts {
+            configured,
+            session_tx: {
+                let (tx, _rx) = futures::channel::mpsc::channel(1);
+                tx
+            },
+            admission_tx: None,
+            processes: AbortableList::default(),
+        }))
+        .err()
+        .context("startup should stop before constructing components")?;
         if valid {
             assert!(
                 matches!(error, HoprLibError::BuilderError("missing chain factory")),

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "6.6.0"
+version = "6.7.0"
 description = "Contains implementation of the HOPR protocol as specified in RFC-0004 & RFC-0005"
 edition.workspace = true
 license.workspace = true
@@ -20,7 +20,10 @@ include = [
 ]
 
 [features]
-default = ["rayon"]
+default = ["rayon", "relaying"]
+# Relaying: the `Forwarded` packet, its ticket validation and replacement in the decoder. A node that
+# only sends and receives (an entry) builds without it.
+relaying = []
 all-benchmarks = []
 rayon = ["hopr-crypto-packet/rayon", "hopr-utils/parallelize-rayon"]
 serde = [
@@ -57,9 +60,9 @@ hopr-api = { workspace = true, features = ["chain", "types-random", "tickets"] }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-pix = { workspace = true }
 hopr-utils = { workspace = true, features = ["parallelize", "platform"] }
-hopr-ticket-manager = { workspace = true }
 
 [dev-dependencies]
+hopr-ticket-manager = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
