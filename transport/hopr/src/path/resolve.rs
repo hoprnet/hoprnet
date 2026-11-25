@@ -36,7 +36,8 @@ const MAX_WAITING_PER_PSEUDONYM: usize = 256;
 /// The most return packets that may wait for a SURB at the same time, over all pseudonyms.
 ///
 /// Bounds the memory and the retries however many counterparties stop sending SURBs. With no room
-/// left, a return packet gets one attempt and no wait.
+/// left, a return packet whose pseudonym has none waiting gets one attempt and no wait, and one
+/// whose pseudonym has a packet waiting is dropped at once.
 const MAX_WAITING: usize = 1024;
 
 /// Default for [`PacketPipelineConfig::surb_resolution_wait`][cfg], used when it is unset.
@@ -45,8 +46,8 @@ const MAX_WAITING: usize = 1024;
 /// on the first miss loses data on a session that was only waiting. That is why the retry exists.
 ///
 /// What it must not do is wait indefinitely. When the counterparty is gone no SURB is ever coming,
-/// and the packet would hold every later packet of its pseudonym, and its room among the waiting
-/// packets, for the life of the process.
+/// and the packet would hold the later packets of its pseudonym that queue behind it, and its room
+/// among the waiting packets, for the life of the process.
 ///
 /// Six seconds is deliberately generous, because this is a *library* default and the useful ceiling
 /// belongs to the caller. A packet held past the session's frame timeout — 3 s for the sessions
@@ -987,6 +988,7 @@ mod tests {
     /// Each waiting packet is dropped at its own deadline, not together with the packet before it.
     #[test_log::test(tokio::test)]
     async fn each_waiting_packet_should_keep_its_own_deadline() -> anyhow::Result<()> {
+        let wait = std::time::Duration::from_millis(400);
         let pseudonym = HoprPseudonym::random();
         let refunds = Arc::new(AtomicU64::new(0));
         let (tx, rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
@@ -994,35 +996,38 @@ mod tests {
             let refunds = refunds.clone();
             tokio::spawn(async move {
                 let _ = tx.unbounded_send((return_routing(pseudonym), counted(0, &refunds)));
-                sleep(std::time::Duration::from_millis(100)).await;
+                sleep(wait / 2).await;
+                let sent = std::time::Instant::now();
                 let _ = tx.unbounded_send((return_routing(pseudonym), counted(1, &refunds)));
+                sent
             })
         };
 
-        let started = std::time::Instant::now();
         let emitted = resolve_routing_stage(
             rx,
             pool_resolver(Arc::new(AtomicUsize::new(0)), pseudonym),
             TEST_DISTRESS_THRESHOLD,
             TEST_CONCURRENCY,
-            TEST_SURB_WAIT,
+            wait,
         )
         .collect::<Vec<_>>()
         .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
         .await
         .map_err(|_| anyhow::anyhow!("the stage did not end"))?;
-        let elapsed = started.elapsed();
-        feeder.await?;
+        let ended = std::time::Instant::now();
+        let sent = feeder.await?;
+        let waited = ended.duration_since(sent);
 
         assert!(emitted.is_empty());
         assert_eq!(2, refunds.load(Ordering::SeqCst));
+        // Dropped with the first packet it would have waited 200 ms, with a wait restarted behind it 600 ms.
         assert!(
-            elapsed >= std::time::Duration::from_millis(280),
-            "the stage ended after {elapsed:?}: the second packet was dropped before its own wait was over"
+            waited >= wait - std::time::Duration::from_millis(20),
+            "the second packet waited {waited:?}: it was dropped before its own wait was over"
         );
         assert!(
-            elapsed < std::time::Duration::from_secs(2),
-            "the stage ended only after {elapsed:?}"
+            waited < wait + std::time::Duration::from_millis(120),
+            "the second packet waited {waited:?}: queueing behind the first lengthened its wait"
         );
         Ok(())
     }
