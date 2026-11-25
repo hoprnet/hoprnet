@@ -997,7 +997,7 @@ async fn a_lost_session_established_is_recovered_by_repeating_the_start_session(
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation,
                     surb_management: None,

@@ -140,7 +140,9 @@ use tracing::{Instrument, debug, warn};
 #[cfg(any(feature = "entry", feature = "exit"))]
 use crate::config::PixGlobalConfig;
 #[cfg(feature = "session-entry")]
-use crate::constants::{SESSION_INITIATION_MAX_RESENDS, SESSION_INITIATION_RESEND_INTERVAL, SESSION_INITIATION_TIMEOUT_BASE};
+use crate::constants::{
+    SESSION_INITIATION_MAX_RESENDS, SESSION_INITIATION_RESEND_INTERVAL, SESSION_INITIATION_TIMEOUT_BASE,
+};
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
 pub use crate::{
@@ -691,8 +693,10 @@ where
         // The pending maps are bounded by the byte budget the operator sets, per map, so the pair's
         // worst case is twice it; see `SurbRoundTripRegistry::with_budget`.
         let surb_round_trips =
-            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes)
-                .with_forward_receipts(cfg.session.forward_receipts);
+            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes);
+        // Only a Session entry sends, and so judges, Session packets over forward paths.
+        #[cfg(feature = "session-entry")]
+        let surb_round_trips = surb_round_trips.with_forward_receipts(cfg.session.forward_receipts);
         let forward_receipts = surb_round_trips.forward().cloned();
         let path_planner = PathPlanner::new(
             me_offchain,
@@ -774,6 +778,7 @@ where
             round_trips: surb_round_trips.clone(),
         }));
 
+        #[cfg(feature = "session-entry")]
         if let Some(forward) = surb_round_trips.forward() {
             let _ = smgr.set_forward_receipt_sink(forward.clone());
         }

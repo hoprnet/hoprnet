@@ -242,7 +242,7 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
+        validator::Validate::validate(pcfg)?;
     }
 
     let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)

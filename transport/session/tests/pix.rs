@@ -1844,7 +1844,7 @@ async fn lost_opening_request_scenario(start_surbs: usize, keep_alive: bool) -> 
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
@@ -2140,7 +2140,7 @@ async fn a_lost_session_established_is_recovered_by_repeating_the_start_session(
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
@@ -2338,7 +2338,7 @@ async fn slow_pool_scenario(pool_delay: Duration, commit_delay: Duration) -> Res
             alice_mgr.new_session(
                 bob_peer,
                 SessionTarget::TcpStream(target),
-                SessionClientConfig {
+                SessionEntryConfig {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,

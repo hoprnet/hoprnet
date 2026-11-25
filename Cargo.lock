@@ -2823,7 +2823,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -4148,7 +4148,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "6.2.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=3794cecf182503b24f9de18188cf63856aadb573#3794cecf182503b24f9de18188cf63856aadb573"
+source = "git+https://github.com/hoprnet/hopr-api?rev=9d1902d306bfe68dc73bded165a1def8e87476ea#9d1902d306bfe68dc73bded165a1def8e87476ea"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4266,7 +4266,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "5.0.0-rc.6"
+version = "5.0.0-rc.7"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4364,7 +4364,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "6.6.0"
+version = "6.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4512,7 +4512,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.54.2"
+version = "0.55.0"
 dependencies = [
  "ahash",
  "anyhow",
