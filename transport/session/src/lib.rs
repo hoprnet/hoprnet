@@ -196,10 +196,13 @@ pub struct SessionClientConfig {
     /// target, counted down per packet within each balancer tick so bursts cannot overflow the
     /// counterparty's store. When SURB balancing is disabled (`surb_management` is `None` or has
     /// `target_surb_buffer_size == 0`), the explicit finite limit applies verbatim to each data
-    /// packet (bounded by remaining packet payload space). Setting this to `0` leaves all SURB
-    /// production to the SURB balancer (if configured). `usize::MAX` bypasses both the balancer
-    /// gate and per-packet cap: every packet carries as many SURBs as fit, whatever the balancer
-    /// estimates.
+    /// packet (bounded by remaining packet payload space); because [`SessionClientConfig::default`]
+    /// sets this field to `8`, callers disabling balancing via `..Default::default()` inherit up to
+    /// 8 SURBs per data packet with no balancer bound and should set `max_surbs_per_data_packet`
+    /// explicitly (for example, `1`) when a lower unbalanced cap is desired. Setting this to `0`
+    /// leaves all SURB production to the SURB balancer (if configured). `usize::MAX` bypasses both
+    /// the balancer gate and per-packet cap: every packet carries as many SURBs as fit, whatever
+    /// the balancer estimates.
     ///
     /// The maximum number is naturally limited by the remaining payload space of the HOPR packet
     /// beside the packet's own application data.
