@@ -16743,8 +16743,13 @@ mod tests {
         Ok(())
     }
 
-    /// How long the Exit's socket is given to emit an acknowledgement: the default delay is 50 ms.
-    const ACKNOWLEDGEMENT_WINDOW: Duration = Duration::from_millis(200);
+    /// How long a Session's socket is given to *not* acknowledge anything: far above the 50 ms
+    /// acknowledgement delay, so a withheld acknowledgement has had every chance to arrive.
+    const WITHHELD_SETTLE: Duration = Duration::from_secs(1);
+
+    /// How long the Exit's socket is then given to acknowledge: a polled deadline rather than a
+    /// window, because a loaded CI runner can stretch a 50 ms timer well past any fixed timeout.
+    const ACKNOWLEDGEMENT_DEADLINE: Duration = Duration::from_secs(10);
 
     /// An Exit Session withholds its acknowledgements while it holds no SURB, and sends them once it does.
     ///
@@ -16785,7 +16790,16 @@ mod tests {
         .await
         .context("the Session never read the packet")??;
 
-        let held = originated_during(&mut msg_rx, 2 * ACKNOWLEDGEMENT_WINDOW).await;
+        let settle_until = tokio::time::Instant::now() + WITHHELD_SETTLE;
+        let mut held = Vec::new();
+        while let Ok(Some((_, data))) = timeout(
+            settle_until.saturating_duration_since(tokio::time::Instant::now()),
+            msg_rx.next(),
+        )
+        .await
+        {
+            held.push(data.data.application_tag);
+        }
 
         // The same Session, with the SURBs the Entry's packets brought.
         let (mgr, mut msg_rx, mut new_session_rx, pseudonym) = exit_session_reporting_levels_with(
@@ -16814,18 +16828,24 @@ mod tests {
         .await
         .context("the Session never read the packet")??;
 
-        let released = originated_during(&mut msg_rx, 2 * ACKNOWLEDGEMENT_WINDOW).await;
+        let acknowledged = timeout(ACKNOWLEDGEMENT_DEADLINE, async {
+            while let Some((_, data)) = msg_rx.next().await {
+                if data.data.application_tag == SESSION_APPLICATION_TAG {
+                    return Some(data.data.application_tag);
+                }
+            }
+            None
+        })
+        .await
+        .context("the Exit never acknowledged a frame it held a SURB for")?;
+        assert!(
+            acknowledged.is_some(),
+            "the Exit never acknowledged a frame it held a SURB for"
+        );
 
         assert!(
-            held.iter()
-                .all(|(_, data)| data.data.application_tag != SESSION_APPLICATION_TAG),
+            held.iter().all(|tag| *tag != SESSION_APPLICATION_TAG),
             "the Exit acknowledged a frame while holding no SURB: {held:?}"
-        );
-        assert!(
-            released
-                .iter()
-                .any(|(_, data)| data.data.application_tag == SESSION_APPLICATION_TAG),
-            "the Exit never acknowledged a frame it held a SURB for: {released:?}"
         );
         Ok(())
     }

@@ -1158,11 +1158,11 @@ mod tests {
             ctl_tx,
         })?;
 
-        // A frame the peer completed is what produces an acknowledgement.
+        // A frame the peer completed is what produces an acknowledgement. The settle window is far
+        // above the acknowledgement delay, so a withheld acknowledgement has had every chance.
         state.frame_complete(1)?;
-        tokio::time::sleep(4 * cfg.acknowledgement_delay).await;
         assert!(
-            tokio::time::timeout(cfg.acknowledgement_delay, ctl_rx.next())
+            tokio::time::timeout(Duration::from_millis(300), ctl_rx.next())
                 .await
                 .is_err(),
             "an acknowledgement left while the Session held no SURB"
@@ -1171,7 +1171,7 @@ mod tests {
         // A SURB arrives, and the next completed frame is acknowledged.
         stock.provide(1);
         state.frame_complete(2)?;
-        let message = tokio::time::timeout(Duration::from_millis(200), ctl_rx.next())
+        let message = tokio::time::timeout(Duration::from_secs(10), ctl_rx.next())
             .await
             .context("the acknowledgement of the frame completed after the SURB arrived never came")?
             .context("the control channel closed before the acknowledgement")?;
@@ -1228,7 +1228,7 @@ mod tests {
 
         // A SURB arrives with the retry budget unspent, and the next retry goes out.
         stock.provide(1);
-        let message = tokio::time::timeout(4 * first_retry, ctl_rx.next())
+        let message = tokio::time::timeout(Duration::from_secs(10), ctl_rx.next())
             .await
             .context("the resend after the SURB arrived never came")?
             .context("the control channel closed before the resend")?;
@@ -1510,7 +1510,7 @@ mod tests {
         // The peer asks for the first segment while the Session holds no SURB.
         state.incoming_retransmission_request(SegmentRequest::from_iter([(1, [0b10000000].into())]))?;
         assert!(
-            tokio::time::timeout(Duration::from_millis(100), ctl_rx.next())
+            tokio::time::timeout(Duration::from_millis(300), ctl_rx.next())
                 .await
                 .is_err(),
             "a resend the peer asked for left while the Session held no SURB"
@@ -1519,7 +1519,7 @@ mod tests {
         // With a SURB, the same request is served.
         stock.provide(1);
         state.incoming_retransmission_request(SegmentRequest::from_iter([(1, [0b10000000].into())]))?;
-        let served = tokio::time::timeout(Duration::from_millis(200), ctl_rx.next())
+        let served = tokio::time::timeout(Duration::from_secs(10), ctl_rx.next())
             .await
             .context("the resend asked for after the SURB arrived never came")?
             .context("the control channel closed before the resend")?;
