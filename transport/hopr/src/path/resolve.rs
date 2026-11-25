@@ -1027,6 +1027,116 @@ mod tests {
         Ok(())
     }
 
+    /// A pseudonym that holds the most packets it may parks no more: the excess is dropped and counted.
+    ///
+    /// A parked packet has left the bounded channel that feeds the stage, so the hold's own bound is
+    /// what keeps a counterparty that never sends another SURB from pinning memory for good.
+    #[test_log::test(tokio::test)]
+    async fn a_full_lane_should_drop_the_excess_it_cannot_hold() -> anyhow::Result<()> {
+        let starved = HoprPseudonym::random();
+        let refunds = Arc::new(AtomicU64::new(0));
+        let mut counted = packet(0);
+        counted.surb_refund = SurbRefund::to(refunds.clone());
+        let dropped_before = hopr_transport_session::counters::routing_resolution_surb_timeout_count();
+
+        // One packet more than the lane holds, plus one that the stage must still be able to serve.
+        let mut input: Vec<(DestinationRouting, ApplicationDataOut)> = (0..=MAX_PARKED_PER_PSEUDONYM)
+            .map(|_| (return_routing(starved), counted.clone()))
+            .collect();
+        input.push((forward_routing(), packet(1)));
+
+        let emitted = stage(
+            futures::stream::iter(input),
+            |_size_hint, _max_surbs, routing: DestinationRouting| async move {
+                match routing {
+                    DestinationRouting::Return(_) => Err(no_surb(&routing)),
+                    DestinationRouting::Forward { .. } => Ok((resolved(), None, None)),
+                }
+            },
+        )
+        .take(1)
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+        .await
+        .map_err(|_| anyhow::anyhow!("a full lane withheld the packet behind it"))?;
+
+        assert_eq!(
+            vec![1],
+            emitted.iter().map(|(_, data)| marker_of(data)).collect::<Vec<_>>(),
+            "only the packet that finds a route goes on; the lane's excess is dropped"
+        );
+        assert!(
+            hopr_transport_session::counters::routing_resolution_surb_timeout_count() > dropped_before,
+            "the packet the full lane refused was dropped without being counted"
+        );
+        assert_eq!(
+            1,
+            refunds.load(Ordering::Relaxed),
+            "the dropped packet must give back the SURB its sender counted, and only that one"
+        );
+
+        Ok(())
+    }
+
+    /// A packet that a retry can no longer route is dropped and counted, and the stage carries on.
+    ///
+    /// The retry runs outside the ordered stage, so its failure path is its own: it must count the
+    /// failure and let the next packet through, as the stage's own path does.
+    #[test_log::test(tokio::test)]
+    async fn a_held_packet_that_cannot_be_routed_any_more_should_be_dropped_and_counted() -> anyhow::Result<()> {
+        let starved = HoprPseudonym::random();
+        let failed_before = hopr_transport_session::counters::routing_resolution_failure_count();
+        let attempts = Arc::new(AtomicUsize::new(0));
+
+        let emitted = {
+            let attempts = attempts.clone();
+            stage(
+                futures::stream::iter(vec![
+                    (return_routing(starved), packet(0)),
+                    (forward_routing(), packet(1)),
+                ]),
+                move |_size_hint, _max_surbs, routing: DestinationRouting| {
+                    let attempts = attempts.clone();
+                    async move {
+                        match routing {
+                            // Starved on the first attempt, unroutable on the retry.
+                            DestinationRouting::Return(_) => match attempts.fetch_add(1, Ordering::Relaxed) {
+                                0 => Err(no_surb(&routing)),
+                                _ => Err(PathPlannerError::Api("path is gone".into())),
+                            },
+                            DestinationRouting::Forward { .. } => Ok((resolved(), None, None)),
+                        }
+                    }
+                },
+            )
+            .take(1)
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+            .await
+            .map_err(|_| anyhow::anyhow!("the packet behind the held one was withheld"))?
+        };
+
+        assert_eq!(
+            vec![1],
+            emitted.iter().map(|(_, data)| marker_of(data)).collect::<Vec<_>>(),
+            "only the packet that finds a route goes on"
+        );
+
+        // The retry fires within a few `SURB_RETRY_INTERVAL`s; wait for the drop it produces.
+        let give_up = std::time::Instant::now() + 5 * TEST_SURB_WAIT;
+        while hopr_transport_session::counters::routing_resolution_failure_count() == failed_before
+            && std::time::Instant::now() < give_up
+        {
+            tokio::time::sleep(SURB_RETRY_INTERVAL).await;
+        }
+        assert!(
+            hopr_transport_session::counters::routing_resolution_failure_count() > failed_before,
+            "the held packet was dropped on its retry without being counted"
+        );
+
+        Ok(())
+    }
+
     /// A packet that waits out its deadline is dropped, counted, and gives back the SURB it took.
     ///
     /// The packet is parked rather than dropped on the first miss, which is what makes the counter
