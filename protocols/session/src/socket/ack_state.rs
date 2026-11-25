@@ -776,6 +776,15 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         // if it has this feature disabled in the config.
         tracing::trace!(count = request.len(), "segment retransmission requested");
 
+        // A resend the peer asks for is a return packet like the ones this state sends itself, and
+        // the gate must cover it too: answering while the Session holds no SURB would park one packet
+        // per answer in the resolve stage for a SURB that is not coming. Returning before the frames
+        // are admitted and marked served keeps them in our own retry pipeline, so a dropped request
+        // costs the peer a retry rather than the frame.
+        if !admits_control_message(self.surb_stock.as_ref()) {
+            return Ok(());
+        }
+
         let ctx = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -1464,6 +1473,62 @@ mod tests {
         let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
         assert_eq!(1, ctl_msgs.len());
         assert_eq!(ctl_msgs[0], SessionMessage::Segment(expected_segments[0].clone()));
+
+        Ok(())
+    }
+
+    /// Resends a peer asked for are withheld at zero stock too, and served once a SURB arrives.
+    ///
+    /// They leave through the request handler rather than the retry pipeline, so the gate has to be
+    /// there as well. A Session that answered a request while it held no SURB would park one packet in
+    /// the resolve stage per answer, for a SURB that is never coming.
+    #[test_log::test(tokio::test)]
+    async fn a_socket_should_withhold_the_resends_a_peer_requests_when_it_holds_no_surb() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            // Long enough that the sender's own full-frame retry cannot fire inside the test, so the
+            // only way a segment can reach the control stream is the request handled below.
+            expected_packet_latency: Duration::from_millis(200),
+            max_frame_retransmission_services: usize::MAX,
+            ..Default::default()
+        };
+
+        let stock = TestStock::default();
+        let (ctl_tx, mut ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg).with_surb_stock(Some(Arc::new(stock.clone())));
+        state.run(SocketComponents {
+            inspector: FrameInspector(FrameDashMap::with_capacity(10)).into(),
+            ctl_tx,
+        })?;
+
+        let expected = segment(hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+        for segment in &expected {
+            state.segment_sent(segment)?;
+        }
+
+        // The peer asks for the first segment while the Session holds no SURB.
+        state.incoming_retransmission_request(SegmentRequest::from_iter([(1, [0b10000000].into())]))?;
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), ctl_rx.next())
+                .await
+                .is_err(),
+            "a resend the peer asked for left while the Session held no SURB"
+        );
+
+        // With a SURB, the same request is served.
+        stock.provide(1);
+        state.incoming_retransmission_request(SegmentRequest::from_iter([(1, [0b10000000].into())]))?;
+        let served = tokio::time::timeout(Duration::from_millis(200), ctl_rx.next())
+            .await
+            .context("the resend asked for after the SURB arrived never came")?
+            .context("the control channel closed before the resend")?;
+        state.stop()?;
+
+        assert!(
+            matches!(&served, SessionMessage::Segment(segment) if segment.id() == expected[0].id()),
+            "the requested segment must be resent once the Session holds a SURB: {served:?}"
+        );
 
         Ok(())
     }
