@@ -144,6 +144,10 @@ pub struct SessionSocketConfig {
     /// after an idle gap flush immediately without waiting. `None` (default) writes each message
     /// immediately.
     ///
+    /// `AsyncWrite::poll_flush` preserves strict flush semantics and forces any buffered messages
+    /// out immediately; callers that want burst packing (such as datagram bridges) should flush
+    /// only when idle or on shutdown rather than after every individual datagram write.
+    ///
     /// Stateless sockets only: [`SessionSocket::new`] (the acknowledged socket) rejects it with
     /// [`SessionError::InvalidConfig`].
     #[default(None)]
@@ -2983,54 +2987,65 @@ mod tests {
         }
 
         const WIRE_MTU: usize = 1500;
-        let open = Arc::new(AtomicBool::new(false));
-        let waker = Arc::new(parking_lot::Mutex::new(None::<std::task::Waker>));
-        let written = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        // Cover both single-segment (64 B) and multi-segment (4,000 B -> 3 segments) datagrams:
+        // cancelling a backpressured write must never leave `WriteState::Draining(len)` parked so
+        // that a subsequent 1-byte write misreports the cancelled write's length.
+        for datagram_len in [64usize, 4_000usize] {
+            let open = Arc::new(AtomicBool::new(false));
+            let waker = Arc::new(parking_lot::Mutex::new(None::<std::task::Waker>));
+            let written = Arc::new(parking_lot::Mutex::new(Vec::new()));
 
-        let mut socket = SessionSocket::<WIRE_MTU, _>::stateless_builder(
-            "alice",
-            GatedSink {
-                open: open.clone(),
-                waker: waker.clone(),
-                written: written.clone(),
-            },
-            SessionSocketConfig {
-                flush_immediately: true,
-                datagram: true,
-                pack_delay: Some(Duration::from_millis(5)),
-                ..Default::default()
-            },
-        )
-        .build()?;
+            let mut socket = SessionSocket::<WIRE_MTU, _>::stateless_builder(
+                "alice",
+                GatedSink {
+                    open: open.clone(),
+                    waker: waker.clone(),
+                    written: written.clone(),
+                },
+                SessionSocketConfig {
+                    flush_immediately: true,
+                    datagram: true,
+                    pack_delay: Some(Duration::from_millis(5)),
+                    ..Default::default()
+                },
+            )
+            .build()?;
 
-        // Fill the packer's bounded queue with 64-byte single-segment writes until one parks in
-        // `Poll::Pending`, then cancel that pending 64-byte write.
-        let payload_64 = [0xAAu8; 64];
-        let mut parked = false;
-        for _ in 0..256 {
-            let poll =
-                futures::future::poll_fn(|cx| Poll::Ready(Pin::new(&mut socket).poll_write(cx, &payload_64))).await;
-            match poll {
-                Poll::Ready(Ok(n)) => assert_eq!(64, n),
-                Poll::Ready(Err(e)) => anyhow::bail!("unexpected write error: {e}"),
-                Poll::Pending => {
-                    parked = true;
-                    break;
+            // Fill the packer's bounded queue until one write parks in `Poll::Pending`, then
+            // cancel that pending write.
+            let payload = vec![0xAAu8; datagram_len];
+            let mut parked = false;
+            for _ in 0..256 {
+                let poll =
+                    futures::future::poll_fn(|cx| Poll::Ready(Pin::new(&mut socket).poll_write(cx, &payload))).await;
+                match poll {
+                    Poll::Ready(Ok(n)) => assert_eq!(datagram_len, n),
+                    Poll::Ready(Err(e)) => anyhow::bail!("unexpected write error: {e}"),
+                    Poll::Pending => {
+                        parked = true;
+                        break;
+                    }
                 }
             }
-        }
-        assert!(parked, "bounded packer queue should backpressure 64-byte writes");
+            assert!(
+                parked,
+                "bounded packer queue should backpressure {datagram_len}-byte writes"
+            );
 
-        // Unblock the underlying writer so the packer drains, then issue a 1-byte write.
-        open.store(true, Ordering::Release);
-        if let Some(w) = waker.lock().take() {
-            w.wake();
-        }
+            // Unblock the underlying writer so the packer drains, then issue a 1-byte write.
+            open.store(true, Ordering::Release);
+            if let Some(w) = waker.lock().take() {
+                w.wake();
+            }
 
-        let n = socket.write(&[0x42]).await?;
-        assert_eq!(1, n, "1-byte write after cancelled 64-byte write must return Ok(1)");
-        socket.flush().await?;
-        assert!(!written.lock().is_empty());
+            let n = socket.write(&[0x42]).await?;
+            assert_eq!(
+                1, n,
+                "1-byte write after cancelled {datagram_len}-byte write must return Ok(1)"
+            );
+            socket.flush().await?;
+            assert!(!written.lock().is_empty());
+        }
         Ok(())
     }
 }

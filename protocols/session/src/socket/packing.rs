@@ -2,9 +2,12 @@
 //!
 //! Accumulates complete encoded [`SessionMessage`]s into a single transport write of at most `C`
 //! bytes (one HOPR packet payload) without ever splitting a message across transport writes.
-//! Because every transport write begins and ends on a [`SessionMessage`] boundary, an unmodified
-//! receiver using [`SessionCodec`] decodes all packed messages in order and isolates packet loss
-//! strictly to the messages contained in the dropped packet.
+//! The message-boundary and packet-loss isolation guarantees hold when the underlying `AsyncWrite`
+//! accepts each packed slice in a single `poll_write` call (as a packet-atomic transport does); a
+//! writer that returns short writes allows `write_all` to split a message across transport writes
+//! and invalidates strict single-packet loss isolation. Under a packet-atomic writer, an
+//! unmodified receiver using [`SessionCodec`] decodes all packed messages in order and isolates
+//! packet loss strictly to the messages contained in the dropped packet.
 
 use std::{
     pin::Pin,
@@ -95,6 +98,7 @@ fn broken_pipe(msg: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Sess
 
 enum PackerCommand {
     Message(Bytes),
+    Batch(Vec<Bytes>),
     Flush(oneshot::Sender<std::io::Result<()>>),
 }
 
@@ -125,9 +129,10 @@ impl FlushTimer {
 /// Outcome of pushing one encoded [`SessionMessage`] into [`PackBuffer`].
 #[derive(Debug, PartialEq, Eq)]
 struct PushOutcome {
-    /// Previously buffered packet evicted before appending the incoming message because adding it
-    /// would exceed the effective byte budget.
-    overflow: Option<Bytes>,
+    /// Previously buffered packet(s) evicted before appending the incoming message because adding
+    /// it would exceed the effective byte budget (regrouped along message boundaries if the budget
+    /// shrank while messages were buffered).
+    overflow: Vec<Bytes>,
     /// Packet flushed immediately after appending the incoming message (isolated datagram, zero
     /// `pack_delay`, or remaining budget too small for another message).
     immediate: Option<Bytes>,
@@ -137,6 +142,10 @@ struct PushOutcome {
 /// flush immediately.
 struct PackBuffer<const C: usize> {
     buf: BytesMut,
+    /// Encoded lengths of the whole messages currently stored in `buf`, preserving message
+    /// boundaries so buffered batches can be regrouped if the dynamic payload budget shrinks
+    /// before emission.
+    msg_lens: Vec<usize>,
     pack_delay: Duration,
     min_msg: usize,
     last_msg_at: Option<Instant>,
@@ -146,6 +155,7 @@ impl<const C: usize> PackBuffer<C> {
     fn new(pack_delay: Duration) -> Self {
         Self {
             buf: BytesMut::with_capacity(C),
+            msg_lens: Vec::new(),
             pack_delay,
             min_msg: SessionMessage::<C>::minimum_message_size(),
             last_msg_at: None,
@@ -161,18 +171,20 @@ impl<const C: usize> PackBuffer<C> {
 
         let effective_limit = budget_limit.min(C);
         let overflow = if !self.buf.is_empty() && self.buf.len().saturating_add(msg.len()) > effective_limit {
-            Some(self.buf.split().freeze())
+            self.take_chunks(effective_limit)
         } else {
-            None
+            Vec::new()
         };
 
         self.buf.extend_from_slice(msg);
+        self.msg_lens.push(msg.len());
 
         let isolated = !in_burst && self.buf.len() == msg.len();
         let remaining = effective_limit.saturating_sub(self.buf.len());
         let cannot_fit_another = remaining < msg.len().max(self.min_msg);
 
         let immediate = if self.pack_delay.is_zero() || isolated || cannot_fit_another {
+            self.msg_lens.clear();
             Some(self.buf.split().freeze())
         } else {
             None
@@ -181,13 +193,36 @@ impl<const C: usize> PackBuffer<C> {
         PushOutcome { overflow, immediate }
     }
 
-    /// Takes any currently buffered packet bytes, leaving the buffer empty.
-    fn take(&mut self) -> Option<Bytes> {
+    /// Takes any currently buffered packet bytes, regrouping along whole-message boundaries if
+    /// `budget_limit` (clamped to `C`) shrank below the currently buffered total.
+    ///
+    /// Preserves the combined batch without copying when the current budget still fits (or only a
+    /// single message is buffered, preserving single-message fallback).
+    fn take_chunks(&mut self, budget_limit: usize) -> Vec<Bytes> {
         if self.buf.is_empty() {
-            None
-        } else {
-            Some(self.buf.split().freeze())
+            return Vec::new();
         }
+
+        let effective_limit = budget_limit.min(C);
+        if self.buf.len() <= effective_limit || self.msg_lens.len() <= 1 {
+            self.msg_lens.clear();
+            return vec![self.buf.split().freeze()];
+        }
+
+        let mut chunks = Vec::new();
+        let mut chunk_len = 0usize;
+        for msg_len in self.msg_lens.drain(..) {
+            if chunk_len > 0 && chunk_len.saturating_add(msg_len) > effective_limit {
+                chunks.push(self.buf.split_to(chunk_len).freeze());
+                chunk_len = 0;
+            }
+            chunk_len = chunk_len.saturating_add(msg_len);
+        }
+        if chunk_len > 0 {
+            chunks.push(self.buf.split_to(chunk_len).freeze());
+        }
+        debug_assert!(self.buf.is_empty());
+        chunks
     }
 
     #[cfg(test)]
@@ -207,6 +242,9 @@ impl<const C: usize> PackBuffer<C> {
 #[must_use = "sinks do nothing unless polled"]
 pub(crate) struct WholeMessagePackingSink<const C: usize> {
     tx: Option<mpsc::Sender<PackerCommand>>,
+    /// Encoded segments of a multi-segment frame being collected so the entire frame submits into
+    /// a single reserved channel slot without ever parking mid-frame in `WriteState::Draining`.
+    pending_frame: Vec<Bytes>,
     pending_flush: Option<oneshot::Receiver<std::io::Result<()>>>,
     done: Option<oneshot::Receiver<std::io::Result<()>>>,
     /// Dropped when the sink is dropped without completing `poll_close`, arming the in-task
@@ -271,6 +309,7 @@ impl<const C: usize> WholeMessagePackingSink<C> {
 
         Self {
             tx: Some(tx),
+            pending_frame: Vec::new(),
             pending_flush: None,
             done: Some(done_rx),
             drop_guard: Some(drop_tx),
@@ -292,14 +331,71 @@ async fn flush_packet<W: AsyncWrite + Unpin>(writer: &mut W, pkt: &[u8]) -> std:
     writer.flush().await
 }
 
+async fn flush_chunks<W: AsyncWrite + Unpin>(writer: &mut W, chunks: Vec<Bytes>) -> std::io::Result<()> {
+    for pkt in chunks {
+        flush_packet(writer, &pkt).await?;
+    }
+    Ok(())
+}
+
 async fn flush_packet_and_writer<const C: usize, W: AsyncWrite + Unpin>(
     writer: &mut W,
     pack_buf: &mut PackBuffer<C>,
+    limit: usize,
 ) -> std::io::Result<()> {
-    if let Some(pkt) = pack_buf.take() {
-        writer.write_all(&pkt).await?;
+    let chunks = pack_buf.take_chunks(limit);
+    if chunks.is_empty() {
+        writer.flush().await
+    } else {
+        flush_chunks(writer, chunks).await
     }
-    writer.flush().await
+}
+
+async fn process_packed_message<const C: usize, W: AsyncWrite + Unpin>(
+    msg: Bytes,
+    writer: &mut W,
+    pack_buf: &mut PackBuffer<C>,
+    timer: &mut Option<FlushTimer>,
+    pack_delay: Duration,
+    budget: Option<&PackPayloadBudget>,
+) -> std::io::Result<()> {
+    let now = Instant::now();
+    if timer.as_ref().is_some_and(|t| t.is_expired(now)) {
+        *timer = None;
+        let limit = budget.map_or(C, PackPayloadBudget::current_limit);
+        flush_chunks(writer, pack_buf.take_chunks(limit)).await?;
+    }
+
+    let buffered_at = Instant::now();
+    let limit = budget.map_or(C, PackPayloadBudget::current_limit);
+    let outcome = pack_buf.push(&msg, buffered_at, limit);
+
+    if !outcome.overflow.is_empty() {
+        *timer = None;
+        flush_chunks(writer, outcome.overflow).await?;
+    }
+
+    if let Some(immediate) = outcome.immediate {
+        *timer = None;
+        flush_packet(writer, &immediate).await?;
+    } else if timer.is_none() {
+        // `pack_buf` holds `msg`, which was buffered at `buffered_at`. If writing an overflow packet
+        // already spent `>= pack_delay` (or `pack_delay` overflows `Instant`), emit the buffered
+        // packet right away rather than panicking or starting a fresh full window; otherwise arm
+        // for the remaining time until `buffered_at + pack_delay`.
+        let after_write = Instant::now();
+        match buffered_at.checked_add(pack_delay) {
+            Some(deadline) if after_write < deadline => {
+                *timer = Some(FlushTimer::arm_until(deadline, deadline - after_write));
+            }
+            _ => {
+                let current_limit = budget.map_or(C, PackPayloadBudget::current_limit);
+                flush_chunks(writer, pack_buf.take_chunks(current_limit)).await?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 async fn run_packer<const C: usize, W>(
@@ -334,23 +430,22 @@ async fn run_packer<const C: usize, W>(
         match event {
             PackerEvent::TimerExpired => {
                 timer = None;
-                if let Some(pkt) = pack_buf.take()
-                    && let Err(err) = flush_packet(&mut writer, &pkt).await
-                {
+                let limit = budget.as_ref().map_or(C, PackPayloadBudget::current_limit);
+                if let Err(err) = flush_chunks(&mut writer, pack_buf.take_chunks(limit)).await {
                     break Err(err);
                 }
             }
             PackerEvent::Closed => {
-                if let Some(pkt) = pack_buf.take()
-                    && let Err(err) = flush_packet(&mut writer, &pkt).await
-                {
+                let limit = budget.as_ref().map_or(C, PackPayloadBudget::current_limit);
+                if let Err(err) = flush_chunks(&mut writer, pack_buf.take_chunks(limit)).await {
                     break Err(err);
                 }
                 break writer.close().await;
             }
             PackerEvent::Command(PackerCommand::Flush(ack_tx)) => {
                 timer = None;
-                match flush_packet_and_writer(&mut writer, &mut pack_buf).await {
+                let limit = budget.as_ref().map_or(C, PackPayloadBudget::current_limit);
+                match flush_packet_and_writer(&mut writer, &mut pack_buf, limit).await {
                     Ok(()) => {
                         let _ = ack_tx.send(Ok(()));
                     }
@@ -362,51 +457,26 @@ async fn run_packer<const C: usize, W>(
                 }
             }
             PackerEvent::Command(PackerCommand::Message(msg)) => {
-                let now = Instant::now();
-                if timer.as_ref().is_some_and(|t| t.is_expired(now)) {
-                    timer = None;
-                    if let Some(pkt) = pack_buf.take()
-                        && let Err(err) = flush_packet(&mut writer, &pkt).await
+                if let Err(err) =
+                    process_packed_message(msg, &mut writer, &mut pack_buf, &mut timer, pack_delay, budget.as_ref())
+                        .await
+                {
+                    break Err(err);
+                }
+            }
+            PackerEvent::Command(PackerCommand::Batch(msgs)) => {
+                let mut batch_err = None;
+                for msg in msgs {
+                    if let Err(err) =
+                        process_packed_message(msg, &mut writer, &mut pack_buf, &mut timer, pack_delay, budget.as_ref())
+                            .await
                     {
-                        break Err(err);
+                        batch_err = Some(err);
+                        break;
                     }
                 }
-
-                let buffered_at = Instant::now();
-                let limit = budget.as_ref().map_or(C, PackPayloadBudget::current_limit);
-                let outcome = pack_buf.push(&msg, buffered_at, limit);
-
-                if let Some(overflow) = outcome.overflow {
-                    timer = None;
-                    if let Err(err) = flush_packet(&mut writer, &overflow).await {
-                        break Err(err);
-                    }
-                }
-
-                if let Some(immediate) = outcome.immediate {
-                    timer = None;
-                    if let Err(err) = flush_packet(&mut writer, &immediate).await {
-                        break Err(err);
-                    }
-                } else if timer.is_none() {
-                    // `pack_buf` holds `msg`, which was buffered at `buffered_at`. If writing an
-                    // overflow packet already spent `>= pack_delay` (or `pack_delay` overflows
-                    // `Instant`), emit the buffered packet right away rather than panicking or
-                    // starting a fresh full window; otherwise arm for the remaining time until
-                    // `buffered_at + pack_delay`.
-                    let after_write = Instant::now();
-                    match buffered_at.checked_add(pack_delay) {
-                        Some(deadline) if after_write < deadline => {
-                            timer = Some(FlushTimer::arm_until(deadline, deadline - after_write));
-                        }
-                        _ => {
-                            if let Some(pkt) = pack_buf.take()
-                                && let Err(err) = flush_packet(&mut writer, &pkt).await
-                            {
-                                break Err(err);
-                            }
-                        }
-                    }
+                if let Some(err) = batch_err {
+                    break Err(err);
                 }
             }
         }
@@ -425,35 +495,78 @@ impl<const C: usize> Sink<SessionMessage<C>> for WholeMessagePackingSink<C> {
         if let Some(err) = self.stored_error() {
             return Poll::Ready(Err(err));
         }
-        let Some(tx) = self.tx.as_mut() else {
+        let this = self.as_mut().get_mut();
+        let Some(tx) = this.tx.as_mut() else {
             return Poll::Ready(Err(broken_pipe("packer sink closed")));
         };
+        // Remaining segments of a multi-segment frame share the single channel slot reserved
+        // before segment 0, so `poll_drain_segments` never parks mid-frame.
+        if !this.pending_frame.is_empty() {
+            return Poll::Ready(Ok(()));
+        }
         tx.poll_ready(cx)
-            .map_err(|e| self.stored_error().unwrap_or_else(|| broken_pipe(e)))
+            .map_err(|e| this.stored_error().unwrap_or_else(|| broken_pipe(e)))
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: SessionMessage<C>) -> Result<(), Self::Error> {
         if let Some(err) = self.stored_error() {
             return Err(err);
         }
+        let multi_seg_state = match &item {
+            SessionMessage::Segment(seg) if seg.seq_flags.seq_len() > 1 => Some((seg.seq_idx, seg.seq_flags.seq_len())),
+            _ => None,
+        };
         let this = self.as_mut().get_mut();
         this.encode_buf.clear();
         SessionCodec::<C>.encode(item, &mut this.encode_buf)?;
         let encoded = this.encode_buf.split().freeze();
-        let Some(tx) = this.tx.as_mut() else {
-            return Err(broken_pipe("packer sink closed"));
-        };
-        tx.start_send(PackerCommand::Message(encoded))
-            .map_err(|e| this.stored_error().unwrap_or_else(|| broken_pipe(e)))?;
         // Any in-flight `PackerCommand::Flush` was queued before this message in the FIFO channel
         // and therefore cannot acknowledge it. Drop the stale receiver so the next `poll_flush`
         // enqueues a fresh flush after this message.
         this.pending_flush = None;
+
+        if let Some((seq_idx, seq_len)) = multi_seg_state {
+            this.pending_frame.push(encoded);
+            if seq_idx.saturating_add(1) < seq_len {
+                return Ok(());
+            }
+            let batch = std::mem::take(&mut this.pending_frame);
+            let Some(tx) = this.tx.as_mut() else {
+                return Err(broken_pipe("packer sink closed"));
+            };
+            tx.start_send(PackerCommand::Batch(batch))
+                .map_err(|e| this.stored_error().unwrap_or_else(|| broken_pipe(e)))?;
+            return Ok(());
+        }
+
+        let Some(tx) = this.tx.as_mut() else {
+            return Err(broken_pipe("packer sink closed"));
+        };
+        let cmd = if this.pending_frame.is_empty() {
+            PackerCommand::Message(encoded)
+        } else {
+            let mut batch = std::mem::take(&mut this.pending_frame);
+            batch.push(encoded);
+            PackerCommand::Batch(batch)
+        };
+        tx.start_send(cmd)
+            .map_err(|e| this.stored_error().unwrap_or_else(|| broken_pipe(e)))?;
         Ok(())
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.as_mut().get_mut();
+        if !this.pending_frame.is_empty() {
+            let Some(tx) = this.tx.as_mut() else {
+                this.pending_frame.clear();
+                return Poll::Ready(Err(broken_pipe("packer sink closed")));
+            };
+            let batch = std::mem::take(&mut this.pending_frame);
+            if let Err(e) = tx.start_send(PackerCommand::Batch(batch)) {
+                return Poll::Ready(Err(this.stored_error().unwrap_or_else(|| broken_pipe(e))));
+            }
+            this.pending_flush = None;
+        }
         let ack_rx = match this.pending_flush.as_mut() {
             Some(rx) => rx,
             None => {
@@ -495,6 +608,12 @@ impl<const C: usize> Sink<SessionMessage<C>> for WholeMessagePackingSink<C> {
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.as_mut().get_mut();
+        if !this.pending_frame.is_empty()
+            && let Some(tx) = this.tx.as_mut()
+        {
+            let batch = std::mem::take(&mut this.pending_frame);
+            let _ = tx.start_send(PackerCommand::Batch(batch));
+        }
         // Drop the sender to signal EOF so the background task flushes any buffered messages and
         // closes the underlying writer.
         this.tx.take();
@@ -513,9 +632,13 @@ impl<const C: usize> Sink<SessionMessage<C>> for WholeMessagePackingSink<C> {
                     if let Some(guard) = this.drop_guard.take() {
                         let _ = guard.send(());
                     }
-                    return Poll::Ready(Err(this
-                        .stored_error()
-                        .unwrap_or_else(|| broken_pipe("packer task terminated unexpectedly"))));
+                    let err = this.stored_error().unwrap_or_else(|| {
+                        let io_err =
+                            std::io::Error::new(std::io::ErrorKind::BrokenPipe, "packer task terminated unexpectedly");
+                        *this.error.lock() = Some(StoredError::from_io(&io_err));
+                        SessionError::IoError(io_err)
+                    });
+                    return Poll::Ready(Err(err));
                 }
                 Poll::Pending => return Poll::Pending,
             }
@@ -637,7 +760,7 @@ mod tests {
 
         // First message after idle is isolated and flushes immediately.
         let out = buf.push(&[1u8; 50], t0, 200);
-        assert_eq!(None, out.overflow);
+        assert!(out.overflow.is_empty());
         assert_eq!(Some(Bytes::from(vec![1u8; 50])), out.immediate);
         assert_eq!(0, buf.buffered_len());
 
@@ -646,7 +769,7 @@ mod tests {
         let out = buf.push(&[2u8; 50], t1, 200);
         assert_eq!(
             PushOutcome {
-                overflow: None,
+                overflow: Vec::new(),
                 immediate: None
             },
             out
@@ -658,7 +781,7 @@ mod tests {
         let out = buf.push(&[3u8; 50], t2, 200);
         assert_eq!(
             PushOutcome {
-                overflow: None,
+                overflow: Vec::new(),
                 immediate: None
             },
             out
@@ -668,7 +791,7 @@ mod tests {
         // Fourth message (80 B) brings total to 180 B; only 20 B left (< 80 B), so flushes immediately.
         let t3 = t2 + Duration::from_millis(5);
         let out = buf.push(&[4u8; 80], t3, 200);
-        assert_eq!(None, out.overflow);
+        assert!(out.overflow.is_empty());
         let pkt = out.immediate.context("near-full buffer must flush immediately")?;
         assert_eq!(180, pkt.len());
         assert_eq!(0, buf.buffered_len());
@@ -679,14 +802,14 @@ mod tests {
         let t4 = t3 + Duration::from_millis(5);
         assert_eq!(
             PushOutcome {
-                overflow: None,
+                overflow: Vec::new(),
                 immediate: None
             },
             buf.push(&[5u8; 60], t4, 200)
         );
         let t5 = t4 + Duration::from_millis(5);
         let out = buf.push(&[6u8; 80], t5, 100);
-        assert_eq!(Some(Bytes::from(vec![5u8; 60])), out.overflow);
+        assert_eq!(vec![Bytes::from(vec![5u8; 60])], out.overflow);
         assert_eq!(Some(Bytes::from(vec![6u8; 80])), out.immediate);
         assert_eq!(0, buf.buffered_len());
 
@@ -694,13 +817,13 @@ mod tests {
         let t6 = t5 + Duration::from_millis(5);
         let out = buf.push(&[7u8; 120], t6, 500);
         // 200 - 120 = 80 < 120 -> flushes immediately because budget is clamped to C=200.
-        assert_eq!(None, out.overflow);
+        assert!(out.overflow.is_empty());
         assert_eq!(Some(Bytes::from(vec![7u8; 120])), out.immediate);
 
         // After an idle gap > pack_delay, the next message is isolated again.
         let t7 = t6 + Duration::from_millis(25);
         let out = buf.push(&[8u8; 40], t7, 200);
-        assert_eq!(None, out.overflow);
+        assert!(out.overflow.is_empty());
         assert_eq!(Some(Bytes::from(vec![8u8; 40])), out.immediate);
         Ok(())
     }
@@ -711,10 +834,79 @@ mod tests {
         let mut buf = PackBuffer::<200>::new(Duration::ZERO);
         for i in 0..3u8 {
             let out = buf.push(&[i; 30], t0, 200);
-            assert_eq!(None, out.overflow);
+            assert!(out.overflow.is_empty());
             assert_eq!(Some(Bytes::from(vec![i; 30])), out.immediate);
         }
-        assert_eq!(None, buf.take());
+        assert!(buf.take_chunks(200).is_empty());
+    }
+
+    #[test]
+    fn pack_buffer_regroups_buffered_messages_when_budget_shrinks() {
+        let t0 = Instant::now();
+        let mut buf = PackBuffer::<1_000>::new(Duration::from_millis(20));
+        // Seed burst state with an isolated write.
+        let _ = buf.push(&[0x00; 100], t0, 1_000);
+        // Buffer two 300 B messages under a full 1000 B budget (total 600 B).
+        assert_eq!(
+            PushOutcome {
+                overflow: Vec::new(),
+                immediate: None
+            },
+            buf.push(&[0x11; 300], t0 + Duration::from_millis(1), 1_000)
+        );
+        assert_eq!(
+            PushOutcome {
+                overflow: Vec::new(),
+                immediate: None
+            },
+            buf.push(&[0x22; 300], t0 + Duration::from_millis(2), 1_000)
+        );
+        // Unchanged budget emits a single combined 600 B batch.
+        let combined = buf.take_chunks(1_000);
+        assert_eq!(1, combined.len());
+        assert_eq!(600, combined[0].len());
+
+        // Buffer two 300 B messages again, then shrink budget to 473 B before emission:
+        // take_chunks must regroup along whole-message boundaries into [300, 300].
+        assert!(
+            buf.push(&[0x11; 300], t0 + Duration::from_millis(3), 1_000)
+                .immediate
+                .is_none()
+        );
+        assert!(
+            buf.push(&[0x22; 300], t0 + Duration::from_millis(4), 1_000)
+                .immediate
+                .is_none()
+        );
+        let split = buf.take_chunks(473);
+        assert_eq!(vec![Bytes::from(vec![0x11; 300]), Bytes::from(vec![0x22; 300])], split);
+
+        // Overflow under a shrunken budget also regroups the evicted batch.
+        assert!(
+            buf.push(&[0x33; 300], t0 + Duration::from_millis(5), 1_000)
+                .immediate
+                .is_none()
+        );
+        assert!(
+            buf.push(&[0x44; 300], t0 + Duration::from_millis(6), 1_000)
+                .immediate
+                .is_none()
+        );
+        let out = buf.push(&[0x55; 100], t0 + Duration::from_millis(7), 473);
+        assert_eq!(
+            vec![Bytes::from(vec![0x33; 300]), Bytes::from(vec![0x44; 300])],
+            out.overflow
+        );
+        assert_eq!(None, out.immediate);
+        assert_eq!(vec![Bytes::from(vec![0x55; 100])], buf.take_chunks(473));
+
+        // Single-message fallback: a lone message larger than the shrunk budget still emits intact.
+        assert!(
+            buf.push(&[0x66; 500], t0 + Duration::from_millis(8), 1_000)
+                .immediate
+                .is_none()
+        );
+        assert_eq!(vec![Bytes::from(vec![0x66; 500])], buf.take_chunks(400));
     }
 
     #[tokio::test]
@@ -862,7 +1054,7 @@ mod tests {
     #[tokio::test]
     async fn dropping_one_packed_packet_loses_only_its_datagrams() -> anyhow::Result<()> {
         // Drop packet index 1 (holding burst datagrams 1 and 2, after isolated datagram 0).
-        let (sender_pipe, receiver_pipe, _writes) = RecordingPacketPipe::pair(vec![1]);
+        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(vec![1]);
 
         let sender_cfg = SessionSocketConfig {
             frame_size: MAX_SESSION_MTU,
@@ -902,6 +1094,26 @@ mod tests {
         }
         sender.close().await?;
 
+        // Verify the dropped write (write #1) held exactly the two expected datagrams (0x21 and 0x22).
+        let dropped_write = writes
+            .lock()
+            .get(1)
+            .cloned()
+            .context("expected dropped packet write at index 1")?;
+        let mut decode_buf = BytesMut::from(dropped_write.as_ref());
+        let mut dropped_payloads = Vec::new();
+        while let Some(msg) = asynchronous_codec::Decoder::decode(&mut SessionCodec::<WIRE_MTU>, &mut decode_buf)? {
+            if let SessionMessage::Segment(seg) = msg {
+                dropped_payloads.push(seg.data.to_vec());
+            }
+        }
+        assert!(decode_buf.is_empty(), "dropped write must end on a message boundary");
+        assert_eq!(
+            vec![vec![0x21; MAX_SESSION_MTU], vec![0x22; MAX_SESSION_MTU]],
+            dropped_payloads,
+            "dropped packet 1 must contain exactly datagrams 0x21 and 0x22"
+        );
+
         let mut received = Vec::new();
         let mut buf = vec![0u8; MAX_SESSION_MTU + 64];
         loop {
@@ -909,16 +1121,16 @@ mod tests {
             if n == 0 {
                 break;
             }
-            received.push(buf[0]);
+            received.push(buf[..n].to_vec());
         }
 
-        // Only the 2 datagrams in dropped packet 1 are lost; all others survive intact.
-        assert_eq!(5, received.len(), "received: {received:?}");
-        assert_eq!(0x20, received[0]);
-        assert_eq!(
-            0x26,
-            *received.last().context("expected at least one received datagram")?
-        );
+        // Only the 2 datagrams in dropped packet 1 (0x21, 0x22) are lost; all 5 others survive
+        // with their full payloads intact and in order.
+        let expected: Vec<Vec<u8>> = [0x20u8, 0x23, 0x24, 0x25, 0x26]
+            .into_iter()
+            .map(|b| vec![b; MAX_SESSION_MTU])
+            .collect();
+        assert_eq!(expected, received);
         Ok(())
     }
 
@@ -1441,6 +1653,7 @@ mod tests {
 
         let mut sink = WholeMessagePackingSink::<WIRE_MTU> {
             tx: Some(tx),
+            pending_frame: Vec::new(),
             pending_flush: None,
             done: Some(done_rx),
             drop_guard: Some(drop_tx),
@@ -1448,10 +1661,27 @@ mod tests {
             encode_buf: BytesMut::with_capacity(WIRE_MTU),
         };
 
-        match sink.close().await {
-            Err(SessionError::IoError(io_err)) => assert_eq!(std::io::ErrorKind::BrokenPipe, io_err.kind()),
-            other => anyhow::bail!("expected BrokenPipe when packer task cancels unexpectedly, got {other:?}"),
+        // Both the first and subsequent close() calls must report BrokenPipe (sticky error).
+        for attempt in 0..2 {
+            match sink.close().await {
+                Err(SessionError::IoError(io_err)) => assert_eq!(
+                    std::io::ErrorKind::BrokenPipe,
+                    io_err.kind(),
+                    "close attempt {attempt} must return BrokenPipe"
+                ),
+                other => anyhow::bail!(
+                    "expected BrokenPipe on close attempt {attempt} when packer task cancels unexpectedly, got \
+                     {other:?}"
+                ),
+            }
         }
+
+        // By contrast, a cleanly completed sink must succeed on repeated close() calls.
+        let (clean_pipe, _rx_pipe, _writes) = RecordingPacketPipe::pair(vec![]);
+        let mut clean_sink =
+            WholeMessagePackingSink::<WIRE_MTU>::new(clean_pipe, Duration::from_millis(5), None, tracing::Span::none());
+        clean_sink.close().await?;
+        clean_sink.close().await?;
         Ok(())
     }
 
@@ -1845,6 +2075,94 @@ mod tests {
             timer_err_sink.flush().await,
             Err(SessionError::IoError(e)) if e.kind() == std::io::ErrorKind::ConnectionReset
         ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn sink_regroups_buffered_messages_when_budget_shrinks_before_timer_flush_or_close() -> anyhow::Result<()> {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        // Case 1: explicit flush after budget shrinks while two 300 B messages are buffered.
+        for emit_kind in ["flush", "timer", "close"] {
+            let (sender_pipe, _receiver_pipe, writes) = RecordingPacketPipe::pair(vec![]);
+            let budget_bytes = Arc::new(AtomicUsize::new(2_000));
+            let budget_clone = budget_bytes.clone();
+
+            let pack_delay = if emit_kind == "timer" {
+                Duration::from_millis(25)
+            } else {
+                Duration::from_secs(5)
+            };
+            let mut sink = WholeMessagePackingSink::<WIRE_MTU>::new(
+                sender_pipe,
+                pack_delay,
+                Some(PackPayloadBudget::new(move || budget_clone.load(Ordering::Acquire))),
+                tracing::Span::none(),
+            );
+
+            let msg_300 = |frame_id: u32, byte: u8| {
+                // Encoded segment = 300 B total (`WIRE_MTU` header overhead is 10 B).
+                let probe = SessionMessage::<WIRE_MTU>::Segment(crate::Segment {
+                    frame_id,
+                    seq_idx: 0,
+                    seq_flags: crate::SeqIndicator::new(1),
+                    data: vec![byte; 290].into_boxed_slice(),
+                });
+                let mut enc = BytesMut::new();
+                SessionCodec::<WIRE_MTU>.encode(probe.clone(), &mut enc).unwrap();
+                let target_payload = 290usize + 300 - enc.len();
+                SessionMessage::<WIRE_MTU>::Segment(crate::Segment {
+                    frame_id,
+                    seq_idx: 0,
+                    seq_flags: crate::SeqIndicator::new(1),
+                    data: vec![byte; target_payload].into_boxed_slice(),
+                })
+            };
+
+            // Seed burst state with an isolated 300 B message (flushes immediately as write #0).
+            sink.feed(msg_300(1, 0x01)).await?;
+            // Buffer two 300 B messages under the 2000 B budget (total 600 B buffered).
+            sink.feed(msg_300(2, 0x02)).await?;
+            sink.feed(msg_300(3, 0x03)).await?;
+
+            // Wait until the isolated write #0 lands so messages #2 and #3 are buffered in the worker.
+            let deadline = Instant::now() + Duration::from_secs(1);
+            while writes.lock().is_empty() && Instant::now() < deadline {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            assert_eq!(
+                1,
+                writes.lock().len(),
+                "{emit_kind}: only isolated write #0 should be emitted"
+            );
+
+            // Shrink budget to 473 B before emission.
+            budget_bytes.store(473, Ordering::Release);
+
+            match emit_kind {
+                "flush" => {
+                    sink.flush().await?;
+                }
+                "timer" => {
+                    let deadline = Instant::now() + Duration::from_secs(1);
+                    while writes.lock().len() < 3 && Instant::now() < deadline {
+                        tokio::time::sleep(Duration::from_millis(5)).await;
+                    }
+                }
+                "close" => {
+                    sink.close().await?;
+                }
+                _ => unreachable!(),
+            }
+
+            let lens: Vec<usize> = writes.lock().iter().map(Bytes::len).collect();
+            assert_eq!(
+                vec![300, 300, 300],
+                lens,
+                "{emit_kind}: shrinking budget to 473 B must split buffered 600 B batch into two 300 B writes"
+            );
+        }
         Ok(())
     }
 }

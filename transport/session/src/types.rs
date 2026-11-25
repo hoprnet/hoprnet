@@ -615,6 +615,10 @@ pub struct HoprSessionConfig {
     /// `ApplicationData::PAYLOAD_SIZE`) without splitting messages across packets, while isolated
     /// datagrams flush immediately. Skipped on [`Capability::UsePIX`] sessions. `None` (default)
     /// disables packing.
+    ///
+    /// Note that `AsyncWrite::poll_flush` forces an immediate packet flush, so callers that flush
+    /// after every individual datagram (including `transfer_session_datagram` while it flushes per
+    /// datagram) bypass burst packing until the caller flushes only when idle or on shutdown.
     #[default(None)]
     #[serde(with = "humantime_serde")]
     pub datagram_pack_delay: Option<Duration>,
@@ -739,19 +743,26 @@ fn forward_pack_budget(
     if max_data_surbs == 0 {
         return None;
     }
+    let bypass_balancer = max_surbs_per_data_packet == usize::MAX;
 
     Some(hopr_protocol_session::PackPayloadBudget::new(move || {
-        let reserved_surbs = match surb_mgmt.as_ref().and_then(|state| {
-            state
-                .organic_surbs_deficit()
-                .map(|deficit| deficit.max(usize::from(state.silence_sustain())))
-        }) {
-            Some(needed) => needed.min(max_data_surbs),
-            // Unbalanced session or disabled balancer (`target == 0`): preserve the caller's
-            // configured per-packet SURB allowance (bounded by `max_data_surbs`) so packing does
-            // not shrink SURB headroom when no balancer is refilling. Single-message fallback in
-            // `PackBuffer` still sends datagrams larger than the reserved budget on their own.
-            None => max_data_surbs,
+        let reserved_surbs = if bypass_balancer {
+            // `usize::MAX` bypasses the balancer gate in `SessionManager` and attaches as many
+            // SURBs as fit on every data packet regardless of estimated deficit.
+            max_data_surbs
+        } else {
+            match surb_mgmt.as_ref().and_then(|state| {
+                state
+                    .organic_surbs_deficit()
+                    .map(|deficit| deficit.max(usize::from(state.silence_sustain())))
+            }) {
+                Some(needed) => needed.min(max_data_surbs),
+                // Unbalanced session or disabled balancer (`target == 0`): preserve the caller's
+                // configured per-packet SURB allowance (bounded by `max_data_surbs`) so packing does
+                // not shrink SURB headroom when no balancer is refilling. Single-message fallback in
+                // `PackBuffer` still sends datagrams larger than the reserved budget on their own.
+                None => max_data_surbs,
+            }
         };
         HoprPacket::max_message_with_surbs(reserved_surbs).saturating_sub(Tag::SIZE)
     }))
@@ -2215,7 +2226,7 @@ mod tests {
         for i in 0..6u8 {
             session.write_all(&[i; 148]).await?;
         }
-        tokio::time::sleep(Duration::from_millis(40)).await;
+        session.flush().await?;
         let mut ack_pkts = Vec::new();
         while let Ok((_, out)) = rx.try_recv() {
             ack_pkts.push(out.data.total_len());
@@ -2231,7 +2242,7 @@ mod tests {
         for i in 0..4u8 {
             session.write_all(&[0x10 + i; SESSION_MTU]).await?;
         }
-        tokio::time::sleep(Duration::from_millis(40)).await;
+        session.flush().await?;
         let mut mtu_deficit_pkts = Vec::new();
         while let Ok((_, out)) = rx.try_recv() {
             mtu_deficit_pkts.push(out.data.total_len());
@@ -2413,6 +2424,58 @@ mod tests {
         assert!(
             total_lens.iter().any(|&len| len > 1000),
             "max_surbs_per_data_packet=2 must allow packing beyond the 7-SURB ceiling, got {total_lens:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn forward_packing_honors_usize_max_surb_bypass_at_full_buffer() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering;
+
+        let id = SessionId::random();
+        let dst = *OffchainKeypair::random().public();
+        let surb_state = Arc::new(BalancerStateValues::default());
+        // Counterparty buffer is full (deficit == 0, no silence sustain), yet `usize::MAX` bypasses
+        // the balancer gate and must keep preserving SURB headroom instead of packing 2/pkt.
+        surb_state.target_surb_buffer_size.store(100, Ordering::Relaxed);
+        surb_state.buffer_level.store(100, Ordering::Relaxed);
+
+        let (tx, mut rx) = futures::channel::mpsc::unbounded();
+        let mut session = HoprSession::new_with_surb_state(
+            id,
+            DestinationRouting::forward_only(dst, RoutingOptions::Hops(1.try_into()?)),
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation | Capability::NoDelay,
+                datagram_pack_delay: Some(Duration::from_millis(20)),
+                max_surbs_per_data_packet: usize::MAX,
+                ..Default::default()
+            },
+            (tx, futures::stream::pending()),
+            None,
+            Some(surb_state),
+            None,
+            None,
+        )?;
+
+        for i in 0..4u8 {
+            session.write_all(&[0x70 + i; SESSION_MTU]).await?;
+        }
+        session.flush().await?;
+
+        let mut total_lens = Vec::new();
+        while let Ok((_, out)) = rx.try_recv() {
+            total_lens.push(out.data.total_len());
+        }
+        assert_eq!(
+            4,
+            total_lens.len(),
+            "usize::MAX bypass must keep full-MTU packets 1/pkt even when deficit==0, got {total_lens:?}"
+        );
+        assert!(
+            total_lens
+                .iter()
+                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 4),
+            "every full-MTU packet must leave room for >=4 SURBs under usize::MAX bypass, got {total_lens:?}"
         );
         Ok(())
     }
