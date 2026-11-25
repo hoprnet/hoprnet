@@ -8,12 +8,12 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossfire::mpsc;
 use futures::{
-    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, Sink, StreamExt,
+    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, Sink, SinkExt, Stream, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
 use futures_timer::Delay;
@@ -96,7 +96,7 @@ impl<E: std::fmt::Display> std::fmt::Display for EgressWriteError<E> {
 
 /// A [`Sink`] adapter that fails the per-peer write pump once the inner sink stops making progress.
 ///
-/// The write pump is `rx.forward(frame_writer)`, where `frame_writer` writes to the peer's quinn
+/// The write pump is [`pump_coalesced_writes`], where `frame_writer` writes to the peer's quinn
 /// substream. When a remote stops reading, quinn's `poll_write` parks (`Pending`) indefinitely
 /// under flow control, so the framed writer's `poll_ready`/`poll_flush` never resolve and the pump
 /// task parks forever — never completing, so the cache-eviction closure attached to it never runs.
@@ -190,24 +190,144 @@ where
     }
 }
 
+enum WritePumpEvent<T> {
+    FlushTimer,
+    Item(T),
+    Closed,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum BatchState {
+    Idle,
+    Pending { bytes: usize, deadline: Instant },
+}
+
+/// Drains `stream` into `frame_writer`, coalescing bursting per-peer HOPR packets up to
+/// `coalesce_target_bytes` or `coalesce_delay` before flushing into the underlying QUIC stream
+/// so Quinn fills full 1,452 B UDP datagrams instead of flushing one 3,669 B packet
+/// (2 × 1,452 + 863 B + reverse QUIC ACK) at a time.
+///
+/// Coalescing only activates when a previous packet for the same peer arrived within
+/// `coalesce_delay` (burst detection). Isolated packets — including network probes and sparse
+/// interactive traffic — flush immediately with zero added latency, and `coalesce_delay == 0`
+/// disables coalescing unconditionally.
+async fn pump_coalesced_writes<St, T, S>(
+    mut stream: St,
+    mut frame_writer: S,
+    coalesce_target_bytes: usize,
+    coalesce_delay: Duration,
+) -> Result<(), S::Error>
+where
+    St: Stream<Item = T> + Unpin,
+    T: AsRef<[u8]>,
+    S: Sink<T> + Unpin,
+{
+    let mut batch = BatchState::Idle;
+    let mut timer = Delay::new(Duration::ZERO);
+    let mut last_arrival: Option<Instant> = None;
+
+    loop {
+        let event = match batch {
+            BatchState::Pending { deadline, .. } => {
+                if Instant::now() >= deadline {
+                    WritePumpEvent::FlushTimer
+                } else {
+                    futures::select_biased! {
+                        () = (&mut timer).fuse() => WritePumpEvent::FlushTimer,
+                        item = stream.next().fuse() => match item {
+                            Some(item) => WritePumpEvent::Item(item),
+                            None => WritePumpEvent::Closed,
+                        },
+                    }
+                }
+            }
+            BatchState::Idle => match stream.next().await {
+                Some(item) => WritePumpEvent::Item(item),
+                None => WritePumpEvent::Closed,
+            },
+        };
+
+        match event {
+            WritePumpEvent::FlushTimer => {
+                frame_writer.flush().await?;
+                batch = BatchState::Idle;
+            }
+            WritePumpEvent::Closed => {
+                if matches!(batch, BatchState::Pending { .. }) {
+                    frame_writer.flush().await?;
+                }
+                return frame_writer.close().await;
+            }
+            WritePumpEvent::Item(item) => {
+                let now = Instant::now();
+                if let BatchState::Pending { deadline, .. } = batch
+                    && now >= deadline
+                {
+                    frame_writer.flush().await?;
+                    batch = BatchState::Idle;
+                }
+
+                let in_burst = last_arrival.is_some_and(|t| now.saturating_duration_since(t) <= coalesce_delay);
+                last_arrival = Some(now);
+
+                let len = item.as_ref().len();
+                let was_idle = matches!(batch, BatchState::Idle);
+                let prev_bytes = match batch {
+                    BatchState::Idle => 0,
+                    BatchState::Pending { bytes, .. } => bytes,
+                };
+                let next_bytes = prev_bytes.saturating_add(len);
+
+                frame_writer.feed(item).await?;
+
+                let isolated = !in_burst && was_idle;
+                if coalesce_delay.is_zero() || isolated || next_bytes >= coalesce_target_bytes {
+                    frame_writer.flush().await?;
+                    batch = BatchState::Idle;
+                } else {
+                    batch = match batch {
+                        BatchState::Idle => {
+                            timer.reset(coalesce_delay);
+                            BatchState::Pending {
+                                bytes: next_bytes,
+                                deadline: Instant::now() + coalesce_delay,
+                            }
+                        }
+                        BatchState::Pending { deadline, .. } => BatchState::Pending {
+                            bytes: next_bytes,
+                            deadline,
+                        },
+                    };
+                }
+            }
+        }
+    }
+}
+
+/// Shared state passed to [`spawn_stream_pumps`] for every opened or accepted peer stream.
+struct StreamPumpContext<C: Decoder>
+where
+    C::Item: Send + 'static,
+{
+    cache: PeerStreamCache<C::Item>,
+    codec: C,
+    ingress_from_peers: Sender<(PeerId, C::Item)>,
+}
+
 /// Spawn the write and read pump tasks for an open peer stream.
 ///
 /// The write pump drains `rx` into the framed stream writer; the read pump
-/// forwards decoded frames to `ingress_from_peers`. Both tasks invalidate
-/// `cache[peer]` when they complete, but only if the cache entry still holds
+/// forwards decoded frames to `ctx.ingress_from_peers`. Both tasks invalidate
+/// `ctx.cache[peer]` when they complete, but only if the cache entry still holds
 /// the same `token` — this prevents a stale task from wiping a newer sink.
-#[allow(clippy::too_many_arguments)]
 fn spawn_stream_pumps<S, C>(
     peer: PeerId,
     stream: S,
     rx: crossfire::AsyncRx<mpsc::Array<<C as Decoder>::Item>>,
-    cache: PeerStreamCache<<C as Decoder>::Item>,
     token: Arc<()>,
-    codec: C,
-    ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
-    frame_writer_backpressure_bytes: usize,
-    write_stall_timeout: Duration,
     ready: Arc<AtomicBool>,
+    ctx: &StreamPumpContext<C>,
+    stream_cfg: crate::config::StreamProtocolConfig,
 ) where
     S: AsyncRead + AsyncWrite + Send + 'static,
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
@@ -216,9 +336,11 @@ fn spawn_stream_pumps<S, C>(
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
 {
     let (stream_rx, stream_tx) = stream.split();
-    let cache_for_write = cache.clone();
-    let cache_for_read = cache.clone();
+    let cache_for_write = ctx.cache.clone();
+    let cache_for_read = ctx.cache.clone();
     let token_write = token.clone();
+    let codec = ctx.codec.clone();
+    let ingress_from_peers = ctx.ingress_from_peers.clone();
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
 
@@ -227,14 +349,18 @@ fn spawn_stream_pumps<S, C>(
     // `poll_ready` call will issue a flush. A larger value lets adjacent small frames
     // coalesce into a single quinn write, significantly reducing the number of
     // connection-mutex acquisitions and driver wake-ups on the hot path.
-    frame_writer.set_backpressure_boundary(frame_writer_backpressure_bytes);
+    frame_writer.set_backpressure_boundary(stream_cfg.frame_writer_backpressure_bytes);
 
     // Guard the framed writer so a remote that stops reading (quinn `poll_write` parked forever)
-    // fails the pump after `write_stall_timeout` instead of parking it indefinitely. On failure the
-    // pump completes and the eviction closure below removes the cache entry, so the next send reopens.
-    let frame_writer = StallGuardSink::new(frame_writer, write_stall_timeout);
+    // fails the pump after `egress_backpressure_timeout` instead of parking it indefinitely. On
+    // failure the pump completes and the eviction closure below removes the cache entry, so the
+    // next send reopens.
+    let frame_writer = StallGuardSink::new(frame_writer, stream_cfg.egress_backpressure_timeout);
 
-    // Write pump: drain the per-peer channel into the framed stream writer.
+    let coalesce_target_bytes = stream_cfg.egress_coalesce_target_bytes(crate::protocol::HOPR_PACKET_SIZE);
+
+    // Write pump: drain the per-peer channel into the framed stream writer, coalescing closely
+    // spaced HOPR packets to pack full 1,452 B QUIC datagrams and reduce reverse QUIC ACKs.
     hopr_utils::runtime::prelude::spawn(
         futures::future::lazy(move |_| {
             // Flip `ready` only once this task is actually running and about to drain the
@@ -242,7 +368,14 @@ fn spawn_stream_pumps<S, C>(
             // write pump has not started draining yet.
             ready.store(true, Ordering::Relaxed);
         })
-        .then(move |_| rx.into_stream().map(Ok).forward(frame_writer))
+        .then(move |_| {
+            pump_coalesced_writes(
+                rx.into_stream(),
+                frame_writer,
+                coalesce_target_bytes,
+                stream_cfg.egress_coalesce_delay,
+            )
+        })
         .inspect(move |res| {
             tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
         })
@@ -324,43 +457,28 @@ where
         .accept()
         .map_err(|e| super::errors::ProtocolError::Logic(format!("failed to listen on protocol: {e}")))?;
 
-    let stream_open_timeout = stream_cfg.stream_open_timeout;
-    let frame_writer_backpressure_bytes = stream_cfg.frame_writer_backpressure_bytes;
-    let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
-    let egress_backpressure_timeout = stream_cfg.egress_backpressure_timeout;
+    let pump_ctx = Arc::new(StreamPumpContext {
+        cache: cache_out.clone(),
+        codec,
+        ingress_from_peers: tx_in,
+    });
 
-    let open_ctx = Arc::new((control, codec, tx_in));
-
-    let cache_ingress = cache_out.clone();
-    let open_ctx_ingress = open_ctx.clone();
+    let pump_ctx_ingress = pump_ctx.clone();
 
     // terminated when the incoming is dropped
     let _ingress_process = hopr_utils::runtime::prelude::spawn(
         incoming
             .for_each(move |(peer, stream)| {
-                let cache = cache_ingress.clone();
-                let open_ctx = open_ctx_ingress.clone();
+                let pump_ctx = pump_ctx_ingress.clone();
 
                 tracing::debug!(%peer, "received incoming peer-to-peer stream");
-                let (_control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
 
-                let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(per_peer_channel_capacity);
+                let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(stream_cfg.per_peer_channel_capacity);
                 let sink = PeerSink::new(tx);
                 let token = sink.token.clone();
                 let ready = sink.ready.clone();
-                spawn_stream_pumps(
-                    peer,
-                    stream,
-                    rx,
-                    cache.clone(),
-                    token,
-                    codec.clone(),
-                    tx_in.clone(),
-                    frame_writer_backpressure_bytes,
-                    egress_backpressure_timeout,
-                    ready,
-                );
-                cache.insert(peer, sink);
+                spawn_stream_pumps(peer, stream, rx, token, ready, &pump_ctx, stream_cfg);
+                pump_ctx.cache.insert(peer, sink);
 
                 futures::future::ready(())
             })
@@ -392,11 +510,11 @@ where
             let sink = if let Some(s) = cache_out.get(&peer) {
                 s
             } else {
-                let cache2 = cache_out.clone();
-                let open_ctx2 = open_ctx.clone();
+                let pump_ctx2 = pump_ctx.clone();
+                let control2 = control.clone();
                 let open_count2 = open_task_count.clone();
                 cache_out.get_with(peer, move || {
-                    let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(per_peer_channel_capacity);
+                    let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(stream_cfg.per_peer_channel_capacity);
                     let sink = PeerSink::new(tx);
                     let token = sink.token.clone();
                     let ready = sink.ready.clone();
@@ -405,12 +523,10 @@ where
                         hopr_utils::runtime::prelude::spawn(async move {
                             tracing::trace!(%peer, "peer is not in cache, opening new stream");
                             use futures_time::future::FutureExt as TimeExt;
-                            let (control, codec, tx_in) = (&open_ctx2.0, &open_ctx2.1, &open_ctx2.2);
 
-                            let stream = control
-                                .clone()
+                            let stream = control2
                                 .open(peer)
-                                .timeout(futures_time::time::Duration::from(stream_open_timeout))
+                                .timeout(futures_time::time::Duration::from(stream_cfg.stream_open_timeout))
                                 .await
                                 .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
                                 .and_then(|s| {
@@ -422,26 +538,19 @@ where
                             match stream {
                                 Ok(stream) => {
                                     tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
-                                    spawn_stream_pumps(
-                                        peer,
-                                        stream,
-                                        rx,
-                                        cache2.clone(),
-                                        token,
-                                        codec.clone(),
-                                        tx_in.clone(),
-                                        frame_writer_backpressure_bytes,
-                                        egress_backpressure_timeout,
-                                        ready,
-                                    );
+                                    spawn_stream_pumps(peer, stream, rx, token, ready, &pump_ctx2, stream_cfg);
                                 }
                                 Err(error) => {
                                     tracing::debug!(
                                         %peer, %error,
                                         "stream open failed/timed out; dropping buffered packets"
                                     );
-                                    if cache2.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &token)) {
-                                        cache2.invalidate(&peer);
+                                    if pump_ctx2
+                                        .cache
+                                        .get(&peer)
+                                        .is_some_and(|s| Arc::ptr_eq(&s.token, &token))
+                                    {
+                                        pump_ctx2.cache.invalidate(&peer);
                                     }
                                 }
                             }
@@ -450,8 +559,12 @@ where
                         open_count2.fetch_sub(1, Ordering::Relaxed);
                         tracing::debug!(%peer, "stream-open concurrency limit reached; dropping buffered packets");
                         hopr_utils::runtime::prelude::spawn(async move {
-                            if cache2.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &token)) {
-                                cache2.invalidate(&peer);
+                            if pump_ctx2
+                                .cache
+                                .get(&peer)
+                                .is_some_and(|s| Arc::ptr_eq(&s.token, &token))
+                            {
+                                pump_ctx2.cache.invalidate(&peer);
                             }
                         });
                     }
@@ -1627,6 +1740,391 @@ mod tests {
             io.written()
         );
 
+        Ok(())
+    }
+
+    struct RecordingStream {
+        write_sizes: Arc<Mutex<Vec<usize>>>,
+    }
+
+    impl AsyncRead for RecordingStream {
+        fn poll_read(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>, _buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+            Poll::Pending
+        }
+    }
+
+    impl AsyncWrite for RecordingStream {
+        fn poll_write(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            self.write_sizes.lock().push(buf.len());
+            Poll::Ready(Ok(buf.len()))
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct RecordingControl {
+        write_sizes: Arc<Mutex<Vec<usize>>>,
+    }
+
+    #[async_trait]
+    impl NetworkStreamControl for RecordingControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::pending::<(PeerId, RecordingStream)>())
+        }
+
+        async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            Ok::<_, std::io::Error>(RecordingStream {
+                write_sizes: self.write_sizes,
+            })
+        }
+    }
+
+    struct RecordingSink {
+        flushed_batches: Arc<Mutex<Vec<usize>>>,
+        pending: usize,
+        closed: Arc<AtomicBool>,
+        on_flush: Option<Arc<tokio::sync::Notify>>,
+    }
+
+    impl RecordingSink {
+        fn new(
+            flushed_batches: Arc<Mutex<Vec<usize>>>,
+            closed: Arc<AtomicBool>,
+            on_flush: Option<Arc<tokio::sync::Notify>>,
+        ) -> Self {
+            Self {
+                flushed_batches,
+                pending: 0,
+                closed,
+                on_flush,
+            }
+        }
+    }
+
+    impl Sink<bytes::Bytes> for RecordingSink {
+        type Error = std::io::Error;
+
+        fn poll_ready(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn start_send(mut self: Pin<&mut Self>, item: bytes::Bytes) -> Result<(), Self::Error> {
+            self.pending += item.len();
+            Ok(())
+        }
+
+        fn poll_flush(mut self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            if self.pending > 0 {
+                self.flushed_batches.lock().push(self.pending);
+                self.pending = 0;
+                if let Some(notify) = &self.on_flush {
+                    notify.notify_one();
+                }
+            }
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            let _ = self.as_mut().poll_flush(cx);
+            self.closed.store(true, Ordering::Relaxed);
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    #[tokio::test]
+    async fn egress_write_pump_coalesces_adjacent_spaced_packets_into_one_wire_write() -> anyhow::Result<()> {
+        let write_sizes = Arc::new(Mutex::new(Vec::new()));
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            crate::protocol::HoprBinaryCodec {},
+            RecordingControl {
+                write_sizes: write_sizes.clone(),
+            },
+            crate::config::StreamProtocolConfig::default(),
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let pkt = bytes::Bytes::from(vec![0xABu8; crate::protocol::HOPR_PACKET_SIZE]);
+
+        // Warm up stream open with 1 packet and wait for it to flush.
+        tx_out
+            .send((peer, pkt.clone()))
+            .await
+            .context("warm-up send should succeed")?;
+        assert!(
+            wait_for(2, || !write_sizes.lock().is_empty()).await,
+            "initial packet never flushed"
+        );
+        write_sizes.lock().clear();
+
+        // Send 5 HOPR packets spaced 1 ms apart (simulating mixer spacing): packet 0 activates the
+        // burst (flushing immediately for 0 ms TTFB), and packets 1..=4 coalesce into one
+        // multi-packet write rather than 4 separate single-packet writes.
+        for _ in 0..5 {
+            tx_out
+                .send((peer, pkt.clone()))
+                .await
+                .context("burst send should succeed")?;
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+
+        assert!(
+            wait_for(2, || {
+                write_sizes.lock().iter().sum::<usize>() >= 5 * crate::protocol::HOPR_PACKET_SIZE
+            })
+            .await,
+            "coalesced packets did not reach wire"
+        );
+        let sizes = write_sizes.lock().clone();
+        assert!(
+            sizes.len() <= 3 && sizes.iter().any(|&s| s >= 2 * crate::protocol::HOPR_PACKET_SIZE),
+            "expected burst packets 1 ms apart to coalesce into multi-packet writes, got {} writes: {sizes:?}",
+            sizes.len()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn isolated_egress_packet_flushes_immediately_without_waiting_for_coalesce_delay() -> anyhow::Result<()> {
+        let write_sizes = Arc::new(Mutex::new(Vec::new()));
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            crate::protocol::HoprBinaryCodec {},
+            RecordingControl {
+                write_sizes: write_sizes.clone(),
+            },
+            crate::config::StreamProtocolConfig {
+                // Huge delay: an isolated probe packet must NOT wait for it.
+                egress_coalesce_delay: Duration::from_secs(5),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let pkt = bytes::Bytes::from(vec![0xCDu8; crate::protocol::HOPR_PACKET_SIZE]);
+        let start = Instant::now();
+        tx_out.send((peer, pkt)).await.context("isolated send should succeed")?;
+
+        assert!(
+            wait_for(1, || !write_sizes.lock().is_empty()).await,
+            "isolated packet stalled on coalesce timer"
+        );
+        assert!(
+            start.elapsed() < Duration::from_millis(500),
+            "isolated packet waited {:?} instead of flushing immediately",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pump_coalesced_writes_flushes_pending_bytes_on_close() -> anyhow::Result<()> {
+        let flushed = Arc::new(Mutex::new(Vec::new()));
+        let closed = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = crossfire::mpsc::bounded_async::<bytes::Bytes>(8);
+        let sink = RecordingSink::new(flushed.clone(), closed.clone(), None);
+
+        let pump = tokio::spawn(pump_coalesced_writes(
+            rx.into_stream(),
+            sink,
+            4 * crate::protocol::HOPR_PACKET_SIZE,
+            Duration::from_secs(5),
+        ));
+        tx.send(bytes::Bytes::from(vec![1u8; crate::protocol::HOPR_PACKET_SIZE]))
+            .await
+            .context("first send should succeed")?;
+        tx.send(bytes::Bytes::from(vec![2u8; crate::protocol::HOPR_PACKET_SIZE]))
+            .await
+            .context("second send should succeed")?;
+        drop(tx);
+
+        tokio::time::timeout(Duration::from_millis(200), pump)
+            .await
+            .context("pump did not finish within timeout")?
+            .context("pump task panicked")?
+            .context("pump returned sink error")?;
+        assert!(closed.load(Ordering::Relaxed));
+        assert_eq!(
+            2 * crate::protocol::HOPR_PACKET_SIZE,
+            flushed.lock().iter().sum::<usize>()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pump_coalesced_writes_disables_coalescing_when_delay_is_zero() -> anyhow::Result<()> {
+        let flushed = Arc::new(Mutex::new(Vec::new()));
+        let closed = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = crossfire::mpsc::bounded_async::<bytes::Bytes>(8);
+        let sink = RecordingSink::new(flushed.clone(), closed, None);
+
+        let pump = tokio::spawn(pump_coalesced_writes(
+            rx.into_stream(),
+            sink,
+            4 * crate::protocol::HOPR_PACKET_SIZE,
+            Duration::ZERO,
+        ));
+        for _ in 0..3 {
+            tx.send(bytes::Bytes::from(vec![3u8; crate::protocol::HOPR_PACKET_SIZE]))
+                .await
+                .context("zero-delay send should succeed")?;
+        }
+        drop(tx);
+
+        tokio::time::timeout(Duration::from_millis(200), pump)
+            .await
+            .context("pump did not finish within timeout")?
+            .context("pump task panicked")?
+            .context("pump returned sink error")?;
+        assert_eq!(vec![crate::protocol::HOPR_PACKET_SIZE; 3], *flushed.lock());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pump_coalesced_writes_flushes_spaced_packets_immediately() -> anyhow::Result<()> {
+        // Packets spaced > coalesce_delay (but < 2 * coalesce_delay) flush immediately without
+        // waiting for the coalesce timer.
+        let flushed = Arc::new(Mutex::new(Vec::new()));
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let (tx, rx) = crossfire::mpsc::bounded_async::<bytes::Bytes>(8);
+        let sink = RecordingSink::new(flushed, Arc::new(AtomicBool::new(false)), Some(notify.clone()));
+
+        let pump = tokio::spawn(pump_coalesced_writes(
+            rx.into_stream(),
+            sink,
+            4 * crate::protocol::HOPR_PACKET_SIZE,
+            Duration::from_millis(40),
+        ));
+        for i in 0..3 {
+            if i > 0 {
+                tokio::time::sleep(Duration::from_millis(55)).await;
+            }
+            let start = Instant::now();
+            tx.send(bytes::Bytes::from(vec![4u8; crate::protocol::HOPR_PACKET_SIZE]))
+                .await
+                .with_context(|| format!("spaced send {i} should succeed"))?;
+            tokio::time::timeout(Duration::from_millis(200), notify.notified())
+                .await
+                .with_context(|| format!("packet {i} did not flush"))?;
+            assert!(
+                start.elapsed() < Duration::from_millis(35),
+                "packet {i} waited {:?} despite inter-arrival > coalesce_delay",
+                start.elapsed()
+            );
+        }
+        drop(tx);
+
+        tokio::time::timeout(Duration::from_millis(200), pump)
+            .await
+            .context("pump did not finish within timeout")?
+            .context("pump task panicked")?
+            .context("pump returned sink error")?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pump_coalesced_writes_flushes_expired_batch_before_consuming_queued_items() -> anyhow::Result<()> {
+        struct ControlledStream {
+            items: Arc<Mutex<std::collections::VecDeque<bytes::Bytes>>>,
+            closed: Arc<AtomicBool>,
+            flushed_batches: Arc<Mutex<Vec<usize>>>,
+            flushes_before_consume: Arc<Mutex<Vec<usize>>>,
+        }
+
+        impl Stream for ControlledStream {
+            type Item = bytes::Bytes;
+
+            fn poll_next(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<Option<Self::Item>> {
+                if let Some(item) = self.items.lock().pop_front() {
+                    self.flushes_before_consume
+                        .lock()
+                        .push(self.flushed_batches.lock().len());
+                    Poll::Ready(Some(item))
+                } else if self.closed.load(Ordering::Relaxed) {
+                    Poll::Ready(None)
+                } else {
+                    Poll::Pending
+                }
+            }
+        }
+
+        const COALESCE_DELAY: Duration = Duration::from_millis(25);
+        let pkt = bytes::Bytes::from(vec![0xEFu8; crate::protocol::HOPR_PACKET_SIZE]);
+
+        let items = Arc::new(Mutex::new(std::collections::VecDeque::from([pkt.clone(), pkt.clone()])));
+        let stream_closed = Arc::new(AtomicBool::new(false));
+        let flushed = Arc::new(Mutex::new(Vec::new()));
+        let flushes_before_consume = Arc::new(Mutex::new(Vec::new()));
+        let sink_closed = Arc::new(AtomicBool::new(false));
+
+        let stream = ControlledStream {
+            items: items.clone(),
+            closed: stream_closed.clone(),
+            flushed_batches: flushed.clone(),
+            flushes_before_consume: flushes_before_consume.clone(),
+        };
+        let sink = RecordingSink::new(flushed.clone(), sink_closed.clone(), None);
+
+        let mut pump = std::pin::pin!(pump_coalesced_writes(
+            stream,
+            sink,
+            4 * crate::protocol::HOPR_PACKET_SIZE,
+            COALESCE_DELAY,
+        ));
+
+        // Drive until packet 0 flushes (isolated) and packet 1 is buffered as a below-target burst
+        // item, parking the pump inside `select_biased!` waiting on the coalescing timer or stream.
+        let mut cx = TaskContext::from_waker(futures::task::noop_waker_ref());
+        assert!(
+            pump.as_mut().poll(&mut cx).is_pending(),
+            "pump must park while packet 1 awaits its coalescing timer"
+        );
+        assert_eq!(vec![crate::protocol::HOPR_PACKET_SIZE], *flushed.lock());
+        assert_eq!(vec![0, 1], *flushes_before_consume.lock());
+
+        // Let the coalescing timer expire while the pump is parked, then queue late items so both
+        // the expired timer and the stream are ready simultaneously on the next poll.
+        tokio::time::sleep(COALESCE_DELAY + Duration::from_millis(50)).await;
+        {
+            let mut queue = items.lock();
+            queue.push_back(pkt.clone());
+            queue.push_back(pkt);
+        }
+        stream_closed.store(true, Ordering::Relaxed);
+
+        tokio::time::timeout(Duration::from_millis(200), pump)
+            .await
+            .context("pump did not finish within timeout")?
+            .context("pump returned sink error")?;
+
+        assert!(sink_closed.load(Ordering::Relaxed));
+        let flushes_at_consume = flushes_before_consume.lock().clone();
+        assert_eq!(
+            flushes_at_consume[2], 2,
+            "expired burst batch (packet 1) must flush BEFORE the late queued packet (packet 2) is consumed (flushes \
+             observed before each consume: {flushes_at_consume:?})"
+        );
+        let batches = flushed.lock().clone();
+        assert_eq!(
+            batches[..2],
+            [crate::protocol::HOPR_PACKET_SIZE, crate::protocol::HOPR_PACKET_SIZE],
+            "packet 1's expired batch must flush on its own without merging late items, got {batches:?}"
+        );
+        assert_eq!(
+            4 * crate::protocol::HOPR_PACKET_SIZE,
+            batches.iter().sum::<usize>(),
+            "all 4 packets must reach the sink"
+        );
         Ok(())
     }
 }

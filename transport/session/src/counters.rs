@@ -122,6 +122,12 @@ pub fn session_stale_start_message_count() -> usize {
     SESSION_STALE_START_MESSAGES.load(Ordering::Relaxed)
 }
 
+/// Cumulative count of `StartSession` repeats this node sent as an Entry.
+pub static START_SESSION_RESENDS: AtomicUsize = AtomicUsize::new(0);
+
+/// Cumulative count of repeated `StartSession`s this node received as an Exit, answered or dropped.
+pub static START_SESSION_REPEATS_RECEIVED: AtomicUsize = AtomicUsize::new(0);
+
 /// Cumulative count of Start-tagged packets that failed to decode.
 ///
 /// Anyone can send these for free, so each drop logs only a `trace!` and the volume is read here.
@@ -189,3 +195,9 @@ pub static START_REFUSALS: AtomicUsize = AtomicUsize::new(0);
 pub fn start_refusal_count() -> usize {
     START_REFUSALS.load(Ordering::Relaxed)
 }
+
+/// Cumulative count of forward receipts sent by Exits.
+pub static FORWARD_RECEIPTS_SENT: AtomicUsize = AtomicUsize::new(0);
+
+/// Cumulative count of forward receipts received by Entries.
+pub static FORWARD_RECEIPTS_RECEIVED: AtomicUsize = AtomicUsize::new(0);

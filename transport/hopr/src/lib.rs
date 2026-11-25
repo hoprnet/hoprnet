@@ -127,7 +127,7 @@ pub use crate::{
 };
 use crate::{
     config::PixGlobalConfig,
-    constants::SESSION_INITIATION_TIMEOUT_BASE,
+    constants::{SESSION_INITIATION_MAX_RESENDS, SESSION_INITIATION_RESEND_INTERVAL, SESSION_INITIATION_TIMEOUT_BASE},
     errors::HoprTransportError,
     multiaddrs::strip_p2p_protocol,
     path::{HoprGraphPathSelector, PathPlanner},
@@ -197,6 +197,8 @@ const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
 /// adapter adds no policy of its own.
 struct StoreSurbAdmission {
     store: MemorySurbStore,
+    /// Its pending SURBs are written off when a new generation wipes the counterparty's stock.
+    round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
 }
 
 impl SurbAdmissionControl for StoreSurbAdmission {
@@ -211,6 +213,24 @@ impl SurbAdmissionControl for StoreSurbAdmission {
     fn raise_target(&self, pseudonym: &SessionId, token: AdmissionToken, expected_surbs: usize) {
         self.store
             .raise_admitted_capacity(pseudonym, token.into_raw(), expected_surbs);
+    }
+
+    fn advance_generation(&self, pseudonym: &SessionId) {
+        // Taken first: only SURBs minted before it are stale, the repeat's own are not.
+        let cutoff = std::time::Instant::now();
+        self.store.bump_generation(pseudonym);
+        // The registry walk is too long for a runtime worker.
+        let (registry, pseudonym) = (self.round_trips.clone(), *pseudonym);
+        hopr_utils::runtime::prelude::spawn(async move {
+            if let Err(error) = hopr_utils::parallelize::cpu::spawn_blocking(
+                move || registry.write_off_pending(&pseudonym, cutoff),
+                "surb_write_off_pending",
+            )
+            .await
+            {
+                tracing::warn!(%error, "pending SURBs were not written off after a new SURB generation");
+            }
+        });
     }
 }
 
@@ -318,8 +338,9 @@ async fn dispatch_incoming_messages<G, In, Out>(
             let _entered = span.enter();
             let _dispatch = tracing::debug_span!("session.dispatch").entered();
             hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
-            // try_send); it never blocks. However, the crossfire stream that feeds
+            // `dispatch_message` is synchronous (moka::sync + crossfire try_send) and
+            // never yields; the locks it takes, the forward receipts' among them, are
+            // held briefly. However, the crossfire stream that feeds
             // this loop does not participate in tokio's cooperative budget, so
             // `future::ready` — which is always Poll::Ready — would let this task
             // monopolize its worker thread under a saturated inbound queue (Processed
@@ -590,7 +611,9 @@ where
         // The pending maps are bounded by the byte budget the operator sets, per map, so the pair's
         // worst case is twice it; see `SurbRoundTripRegistry::with_budget`.
         let surb_round_trips =
-            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes);
+            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes)
+                .with_forward_receipts(cfg.session.forward_receipts);
+        let forward_receipts = surb_round_trips.forward().cloned();
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
@@ -598,6 +621,12 @@ where
             selector,
             planner_config,
         );
+        let path_planner = match forward_receipts {
+            Some(forward) => {
+                path_planner.with_forward_exclusions(Arc::new(move |exit| forward.excluded_relayers(exit)))
+            }
+            None => path_planner,
+        };
 
         // Bound before the struct literal rather than inside it so `set_surb_admission` below can
         // reach the manager: the seam depends on `path_planner`, which does not exist inside the
@@ -619,6 +648,8 @@ where
                 .and_then(|s| s.parse::<usize>().ok())
                 .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
             initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+            initiation_resend_interval: SESSION_INITIATION_RESEND_INTERVAL,
+            max_initiation_resends: SESSION_INITIATION_MAX_RESENDS,
             idle_timeout: cfg.session.idle_timeout,
             balancer_sampling_interval: cfg.session.balancer_sampling_interval,
             initial_return_session_egress_rate: 10,
@@ -646,6 +677,7 @@ where
             // Session's SURB admission has to wait out this window, and it is the operator's own
             // pipeline setting here that decides how long that is.
             surb_resolution_wait: crate::path::resolve::surb_resolution_wait(cfg.packet.pipeline.surb_resolution_wait),
+            forward_receipts: cfg.session.forward_receipts,
             ..Default::default()
         }));
 
@@ -655,7 +687,12 @@ where
         // manager is freshly constructed here, so nothing can have set it yet.
         let _ = smgr.set_surb_admission(Arc::new(StoreSurbAdmission {
             store: path_planner.surb_store.clone(),
+            round_trips: surb_round_trips.clone(),
         }));
+
+        if let Some(forward) = surb_round_trips.forward() {
+            let _ = smgr.set_forward_receipt_sink(forward.clone());
+        }
 
         // The store's admitted class cannot see the session config, so the invariant that it must
         // hold every Session that can be managed at once is checked here, where both figures are in
@@ -2317,6 +2354,28 @@ mod tests {
         assert_eq!(expected, surb_degraded_notify_period_override(raw, configured));
     }
 
+    /// `advance_generation` starts a new SURB generation in the store, once per call.
+    #[tokio::test]
+    async fn surb_admission_advance_generation_bumps_the_stores_generation() -> anyhow::Result<()> {
+        use hopr_api::types::{crypto::crypto_traits::Randomizable, internal::prelude::HoprPseudonym};
+        use hopr_protocol_hopr::SurbStoreConfig;
+
+        use super::{MemorySurbStore, StoreSurbAdmission, SurbAdmissionControl, SurbStore};
+
+        let admission = StoreSurbAdmission {
+            store: MemorySurbStore::new(SurbStoreConfig::default()),
+            round_trips: Default::default(),
+        };
+        let pseudonym: super::SessionId = HoprPseudonym::random();
+        let before = admission.store.current_generation(&pseudonym);
+
+        admission.advance_generation(&pseudonym);
+        assert_eq!(before.wrapping_add(1), admission.store.current_generation(&pseudonym));
+        admission.advance_generation(&pseudonym);
+        assert_eq!(before.wrapping_add(2), admission.store.current_generation(&pseudonym));
+        Ok(())
+    }
+
     /// The admission seam's `raise_target` must reach the store, and only for the admission it names.
     ///
     /// `StoreSurbAdmission` is pure delegation, so this pins the wiring the SessionManager relies on:
@@ -2332,6 +2391,7 @@ mod tests {
 
         let admission = StoreSurbAdmission {
             store: MemorySurbStore::new(SurbStoreConfig::default()),
+            round_trips: Default::default(),
         };
         let pseudonym: super::SessionId = HoprPseudonym::random();
 
@@ -2400,6 +2460,7 @@ mod tests {
                 rb_capacity,
                 ..Default::default()
             }),
+            round_trips: Default::default(),
         };
         let pseudonym: super::SessionId = HoprPseudonym::random();
 

@@ -31,6 +31,7 @@
 //! | `hopr_pix_cycle_bytes_released_total` | SimpleCounter | bytes | reservation release | — |
 //! | `hopr_pix_cycles_total` | MultiCounter | cycles | supervisor transition (event-counted) | `event` = `requested\|committed\|funded\|recovered\|failed` |
 //! | `hopr_pix_ssa_requests_resent_total` | SimpleCounter | requests | supervisor re-send of an unanswered successor `SsaRequest` | — |
+//! | `hopr_pix_opening_ssa_requests_resent_total` | SimpleCounter | requests | supervisor re-send of an unanswered opening `SsaRequest` | — |
 //! | `hopr_pix_admission_rejections_total` | MultiCounter | refusals | incoming Start path | `reason` — see [`PixAdmissionRejection`] |
 //! | `hopr_pix_egress_packets_total` | MultiCounter | packets | supervisor turn (delta-counted from the gate) | `mode` = `predeposit\|funded` |
 //! | `hopr_pix_gate_blocks_total` | MultiCounter | episodes | first refusal of an episode | `reason` = `predeposit_exhausted\|share_lag\|closed` |
@@ -313,6 +314,10 @@ lazy_static::lazy_static! {
         "hopr_pix_ssa_requests_resent_total",
         "Successor SsaRequests the PIX supervisor asked to have sent again because the Entry had not answered them"
     ).unwrap();
+    static ref METRIC_PIX_OPENING_SSA_REQUESTS_RESENT: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_pix_opening_ssa_requests_resent_total",
+        "Opening SsaRequests the PIX supervisor asked to have sent again because the Entry had not answered them"
+    ).unwrap();
     static ref METRIC_PIX_ADMISSION_REJECTIONS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_pix_admission_rejections_total",
         "Incoming PIX sessions refused before establishment, by reason",
@@ -424,6 +429,14 @@ pub(crate) fn add_cycles_total(event: PixCycleEvent, count: u64) {
 /// re-send moves no cycle through any of them.
 pub(crate) fn add_ssa_requests_resent(count: u64) {
     METRIC_PIX_SSA_REQUESTS_RESENT.increment_by(count);
+}
+
+/// Counts `count` re-sends of an unanswered opening `SsaRequest`.
+///
+/// Apart from [`add_ssa_requests_resent`]: a lost first request is a different fault from a successor
+/// the Entry has not yet admitted.
+pub(crate) fn add_opening_ssa_requests_resent(count: u64) {
+    METRIC_PIX_OPENING_SSA_REQUESTS_RESENT.increment_by(count);
 }
 
 /// Counts one incoming PIX Session refused before establishment.
@@ -659,6 +672,7 @@ mod tests {
         add_cycles_active(PixCyclePhase::Recovering, 2);
         add_cycles_total(PixCycleEvent::Requested, 5);
         add_ssa_requests_resent(2);
+        add_opening_ssa_requests_resent(1);
         set_held_shares(3);
         record_admission_rejection(PixAdmissionRejection::LiveCycleCapacity);
         record_cycle_bytes_reserved(1024);
@@ -685,6 +699,7 @@ mod tests {
             "hopr_pix_cycles_active{phase=\"recovering\"}",
             "hopr_pix_cycles_total{event=\"requested\"}",
             "hopr_pix_ssa_requests_resent_total",
+            "hopr_pix_opening_ssa_requests_resent_total",
             "hopr_pix_held_shares",
             "hopr_pix_admission_rejections_total{reason=\"live_cycle_capacity\"}",
             "hopr_pix_live_cycle_bytes",

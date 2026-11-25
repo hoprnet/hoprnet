@@ -389,6 +389,15 @@ pub fn answering_deposit_pool(
     events: impl futures::Stream<Item = crate::types::HoprSessionOutPixEvent> + Send + 'static,
     answer: impl Fn(&hopr_api::node::PixAddressId) -> Vec<u8> + Send + 'static,
 ) -> impl futures::Stream<Item = crate::types::HoprSessionOutPixEvent> + Send + 'static {
+    answering_deposit_pool_after(events, std::time::Duration::ZERO, answer)
+}
+
+/// As [`answering_deposit_pool`], but each request is answered only after `delay`, as a slow pool does.
+pub fn answering_deposit_pool_after(
+    events: impl futures::Stream<Item = crate::types::HoprSessionOutPixEvent> + Send + 'static,
+    delay: std::time::Duration,
+    answer: impl Fn(&hopr_api::node::PixAddressId) -> Vec<u8> + Send + 'static,
+) -> impl futures::Stream<Item = crate::types::HoprSessionOutPixEvent> + Send + 'static {
     let (forwarded_tx, forwarded_rx) = futures::channel::mpsc::unbounded();
 
     tokio::task::spawn(async move {
@@ -396,6 +405,9 @@ pub fn answering_deposit_pool(
         while let Some(event) = events.next().await {
             match event {
                 crate::types::HoprSessionOutPixEvent::DepositDataRequest(request) => {
+                    if !delay.is_zero() {
+                        tokio::time::sleep(delay).await;
+                    }
                     let mut created = request.deposit_data_created;
                     for id in request.deposit_ids {
                         let data = answer(&id);
