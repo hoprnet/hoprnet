@@ -148,8 +148,8 @@ pub struct SessionSocketConfig {
     /// out immediately; callers that want burst packing (such as datagram bridges) should flush
     /// only when idle or on shutdown rather than after every individual datagram write.
     ///
-    /// Stateless sockets only: [`SessionSocket::new`] (the acknowledged socket) rejects it with
-    /// [`SessionError::InvalidConfig`].
+    /// Stateless datagram sockets only: [`SessionSocket::new`] (the acknowledged socket) and
+    /// stateless sockets with `datagram: false` reject it with [`SessionError::InvalidConfig`].
     #[default(None)]
     pub pack_delay: Option<Duration>,
     /// The first frame id of the stream, for a socket that succeeds an earlier stream under the
@@ -557,6 +557,11 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
         let (packets_out, packets_in) = if let Some(pack_delay) = cfg.pack_delay {
+            if !cfg.datagram {
+                return Err(SessionError::InvalidConfig(
+                    "datagram packing requires datagram mode".into(),
+                ));
+            }
             if std::time::Instant::now().checked_add(pack_delay).is_none() {
                 return Err(SessionError::InvalidConfig(
                     "pack_delay exceeds representable Instant deadline".into(),
@@ -2964,7 +2969,26 @@ mod tests {
             "alice",
             alice,
             SessionSocketConfig {
+                datagram: true,
                 pack_delay: Some(Duration::MAX),
+                ..Default::default()
+            },
+        )
+        .build();
+        assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_stateless_socket_should_reject_pack_delay_without_datagram_mode() -> anyhow::Result<()> {
+        let (alice, _bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let result = SessionSocket::<MTU, _>::stateless_builder(
+            "alice",
+            alice,
+            SessionSocketConfig {
+                datagram: false,
+                flush_immediately: true,
+                pack_delay: Some(Duration::from_millis(10)),
                 ..Default::default()
             },
         )

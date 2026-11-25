@@ -2125,11 +2125,51 @@ mod tests {
 
         let mut pix_pkts = Vec::new();
         while let Some((_, out)) = rx_pix.next().await {
-            pix_pkts.push(out.data.plain_text.len());
+            pix_pkts.push(out.data.plain_text);
         }
         assert!(
-            pix_pkts.iter().all(|&len| len < 2 * SESSION_MTU),
-            "UsePIX session must not pack multiple datagrams into one reply packet, got {pix_pkts:?}"
+            pix_pkts.iter().all(|pkt| pkt.len() < 2 * SESSION_MTU),
+            "UsePIX session must not pack multiple datagrams into one reply packet, got {:?}",
+            pix_pkts.iter().map(|pkt| pkt.len()).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            5,
+            pix_pkts.len(),
+            "UsePIX session must emit 4 individual datagram packets plus 1 terminating segment"
+        );
+        for (i, pkt) in pix_pkts[..4].iter().enumerate() {
+            let msg = hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
+                pkt.as_ref(),
+            )?;
+            let expected = vec![i as u8; SESSION_MTU];
+            match &msg {
+                hopr_protocol_session::types::SessionMessage::Segment(seg) => {
+                    assert!(!seg.is_terminating(), "packet {i} must carry application data");
+                    assert_eq!(expected.as_slice(), seg.data.as_ref(), "packet {i} payload mismatch");
+                }
+                other => anyhow::bail!("expected data segment in packet {i}, got {other:?}"),
+            }
+            assert_eq!(
+                pkt.len(),
+                msg.into_encoded().len(),
+                "packet {i} must contain exactly one SessionMessage"
+            );
+        }
+        let fin_pkt = &pix_pkts[4];
+        let fin_msg = hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
+            fin_pkt.as_ref(),
+        )?;
+        assert!(
+            matches!(
+                &fin_msg,
+                hopr_protocol_session::types::SessionMessage::Segment(seg) if seg.is_terminating()
+            ),
+            "final packet must be the terminating segment, got {fin_msg:?}"
+        );
+        assert_eq!(
+            fin_pkt.len(),
+            fin_msg.into_encoded().len(),
+            "final packet must contain only the terminating segment"
         );
         Ok(())
     }
