@@ -29,12 +29,17 @@ const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
 const DEFAULT_STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 131_072;
 const DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_secs(2);
+const DEFAULT_EGRESS_COALESCE_DELAY: Duration = Duration::from_millis(8);
+const DEFAULT_EGRESS_COALESCE_MAX_PACKETS: usize = 4;
 
 /// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
 pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
 
 /// Minimum accepted value for [`StreamProtocolConfig::egress_backpressure_timeout`].
 pub const MIN_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_millis(1);
+
+/// Maximum accepted value for [`StreamProtocolConfig::egress_coalesce_delay`].
+pub const MAX_EGRESS_COALESCE_DELAY: Duration = Duration::from_millis(100);
 
 fn default_per_peer_channel_capacity() -> usize {
     DEFAULT_PER_PEER_CHANNEL_CAPACITY
@@ -51,6 +56,16 @@ fn default_frame_writer_backpressure_bytes() -> usize {
 #[inline]
 fn default_egress_backpressure_timeout() -> Duration {
     DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT
+}
+
+#[inline]
+fn default_egress_coalesce_delay() -> Duration {
+    DEFAULT_EGRESS_COALESCE_DELAY
+}
+
+#[inline]
+fn default_egress_coalesce_max_packets() -> usize {
+    DEFAULT_EGRESS_COALESCE_MAX_PACKETS
 }
 
 fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError> {
@@ -70,6 +85,14 @@ fn validate_egress_backpressure_timeout(value: &Duration) -> Result<(), Validati
         Err(ValidationError::new(
             "egress backpressure timeout must be at least 1 ms",
         ))
+    }
+}
+
+fn validate_egress_coalesce_delay(value: &Duration) -> Result<(), ValidationError> {
+    if *value <= MAX_EGRESS_COALESCE_DELAY {
+        Ok(())
+    } else {
+        Err(ValidationError::new("egress coalesce delay must be at most 100 ms"))
     }
 }
 
@@ -128,11 +151,12 @@ pub struct StreamProtocolConfig {
 
     /// Pending-write-buffer byte threshold on the framed writer before a flush is forced.
     ///
-    /// A value of `1` flushes on every encoded frame (one syscall per message).
-    /// Larger values coalesce adjacent small frames into a single quinn write call,
-    /// reducing connection-mutex acquisitions and driver wake-ups on the hot path.
-    /// A HOPR packet is ~1 440 bytes; at the default 128 KiB threshold roughly 91
-    /// packets are coalesced per write, cutting driver wake frequency ~30×.
+    /// A value of `1` flushes on every encoded frame (one syscall per message) and also caps the
+    /// per-peer egress coalescing target byte threshold (`min(frame_writer_backpressure_bytes,
+    /// egress_coalesce_max_packets × HOPR_PACKET_SIZE)`).
+    /// Larger values coalesce adjacent frames into a single quinn write call,
+    /// reducing connection-mutex acquisitions, driver wake-ups, and reverse QUIC ACKs on the hot
+    /// path.
     ///
     /// Defaults to 131 072 bytes (128 KiB).
     #[validate(range(min = 1))]
@@ -155,6 +179,42 @@ pub struct StreamProtocolConfig {
     #[default(default_egress_backpressure_timeout())]
     #[cfg_attr(feature = "serde", serde(default = "default_egress_backpressure_timeout"))]
     pub egress_backpressure_timeout: Duration,
+
+    /// Maximum coalesce wait for bursting per-peer egress HOPR packets before flushing into QUIC.
+    ///
+    /// Only engages when a peer is actively bursting (a previous packet arrived within
+    /// `egress_coalesce_delay`), so probes and sparse traffic flush immediately with zero
+    /// added latency. Set to `Duration::ZERO` to disable coalescing completely. Must be at most
+    /// [`MAX_EGRESS_COALESCE_DELAY`] (100 ms).
+    ///
+    /// Defaults to 8 ms.
+    #[validate(custom(function = "validate_egress_coalesce_delay"))]
+    #[default(default_egress_coalesce_delay())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_egress_coalesce_delay", with = "humantime_serde")
+    )]
+    pub egress_coalesce_delay: Duration,
+
+    /// Maximum number of HOPR packets coalesced into a single QUIC write batch before flushing.
+    ///
+    /// Caps the byte threshold for per-peer egress coalescing to
+    /// `min(frame_writer_backpressure_bytes, egress_coalesce_max_packets × HOPR_PACKET_SIZE)`.
+    /// Setting this to `1` flushes every packet immediately. Must be at least `1`.
+    ///
+    /// Defaults to `4` (4 × 3,669 B ≈ 10 full 1,452 B QUIC 1-RTT datagrams).
+    #[validate(range(min = 1))]
+    #[default(default_egress_coalesce_max_packets())]
+    #[cfg_attr(feature = "serde", serde(default = "default_egress_coalesce_max_packets"))]
+    pub egress_coalesce_max_packets: usize,
+}
+
+impl StreamProtocolConfig {
+    /// Byte threshold for per-peer egress coalescing, capped by `frame_writer_backpressure_bytes`.
+    pub(crate) fn egress_coalesce_target_bytes(&self, packet_size: usize) -> usize {
+        self.frame_writer_backpressure_bytes
+            .min(self.egress_coalesce_max_packets.saturating_mul(packet_size))
+    }
 }
 
 fn default_counter_flush_interval() -> Duration {
@@ -920,6 +980,10 @@ fn default_session_max_frames_behind_gap() -> Option<usize> {
     Some(256)
 }
 
+fn default_session_forward_receipts() -> bool {
+    true
+}
+
 fn default_session_surb_target_notify() -> bool {
     true
 }
@@ -1166,6 +1230,14 @@ pub struct SessionGlobalConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_session_surb_target_notify"))]
     pub surb_target_notify: bool,
 
+    /// Whether Exits report the Session packets they received, and this node judges forward relayers
+    /// from those receipts. Off, no receipts are asked for, sent or recorded.
+    ///
+    /// Default is true.
+    #[default(default_session_forward_receipts())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_forward_receipts"))]
+    pub forward_receipts: bool,
+
     /// How many later frames may queue behind a missing one before the reassembler gives up on it
     /// and releases what it already has.
     ///
@@ -1270,6 +1342,23 @@ mod tests {
             ..Default::default()
         };
         assert!(accepted.validate().is_ok());
+    }
+
+    #[test]
+    fn forward_receipts_should_be_on_by_default() {
+        assert!(SessionGlobalConfig::default().forward_receipts);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn forward_receipts_should_be_optional_in_the_config() -> anyhow::Result<()> {
+        let omitted: SessionGlobalConfig =
+            serde_saphyr::from_str("idle_timeout: 3m\n").context("config without the setting must parse")?;
+        assert!(omitted.forward_receipts);
+        let off: SessionGlobalConfig =
+            serde_saphyr::from_str("forward_receipts: false\n").context("config turning it off must parse")?;
+        assert!(!off.forward_receipts);
+        Ok(())
     }
 
     #[test]
@@ -2137,6 +2226,9 @@ mod tests {
         // configuration whose declared memory cannot hold the batch it asks for. Leaving the default
         // 2 GiB here would make every case below fail on memory rather than on the batch range this
         // test is about.
+        //
+        // The delivery time is lowered for the same reason: the batch-scaled window has to stay shorter
+        // than the reconstructor's registration lifetime, and 20 s x the ceiling does not.
         let with_supervision = |supervision: SupervisorConfig| HoprProtocolConfig {
             incoming_session_pix_config: IncomingSessionPixConfig {
                 max_live_cycle_bytes: u64::MAX,
@@ -2150,6 +2242,7 @@ mod tests {
             assert!(
                 with_supervision(SupervisorConfig {
                     ssas_per_request,
+                    max_ssa_delivery_time: Duration::from_secs(4),
                     ..Default::default()
                 })
                 .validate()
@@ -2161,6 +2254,7 @@ mod tests {
         assert!(
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
+                max_ssa_delivery_time: Duration::from_secs(4),
                 ..Default::default()
             })
             .validate()
@@ -2181,6 +2275,7 @@ mod tests {
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
                 max_deposit_wait: per_cycle,
+                max_ssa_delivery_time: Duration::from_secs(4),
                 ..Default::default()
             })
             .validate()
@@ -2639,6 +2734,20 @@ mod tests {
             cfg.frame_writer_backpressure_bytes,
             DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
         );
+        assert_eq!(cfg.egress_coalesce_delay, DEFAULT_EGRESS_COALESCE_DELAY);
+        assert_eq!(cfg.egress_coalesce_max_packets, DEFAULT_EGRESS_COALESCE_MAX_PACKETS);
+        assert_eq!(
+            cfg.egress_coalesce_target_bytes(1000),
+            DEFAULT_EGRESS_COALESCE_MAX_PACKETS * 1000
+        );
+        assert_eq!(
+            StreamProtocolConfig {
+                frame_writer_backpressure_bytes: 500,
+                ..cfg
+            }
+            .egress_coalesce_target_bytes(1000),
+            500
+        );
         cfg.validate().expect("default StreamProtocolConfig must be valid");
     }
 
@@ -2679,5 +2788,81 @@ mod tests {
             ..Default::default()
         };
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_coalesce_bounds_are_enforced() {
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_delay: Duration::ZERO,
+                ..Default::default()
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_delay: MAX_EGRESS_COALESCE_DELAY,
+                ..Default::default()
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_delay: MAX_EGRESS_COALESCE_DELAY + Duration::from_millis(1),
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_max_packets: 0,
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            StreamProtocolConfig {
+                egress_coalesce_max_packets: 1,
+                ..Default::default()
+            }
+            .validate()
+            .is_ok()
+        );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn stream_protocol_config_coalesce_fields_parse_from_yaml() -> anyhow::Result<()> {
+        let configured: StreamProtocolConfig =
+            serde_saphyr::from_str("egress_coalesce_delay: 12ms\negress_coalesce_max_packets: 8\n")
+                .context("configured coalesce fields must parse")?;
+        assert_eq!(Duration::from_millis(12), configured.egress_coalesce_delay);
+        assert_eq!(8, configured.egress_coalesce_max_packets);
+        configured
+            .validate()
+            .context("configured coalesce fields must validate")?;
+
+        let disabled: StreamProtocolConfig =
+            serde_saphyr::from_str("egress_coalesce_delay: 0s\n").context("zero coalesce delay must parse")?;
+        assert_eq!(Duration::ZERO, disabled.egress_coalesce_delay);
+        assert_eq!(
+            DEFAULT_EGRESS_COALESCE_MAX_PACKETS,
+            disabled.egress_coalesce_max_packets
+        );
+        disabled.validate().context("disabled coalescing must validate")?;
+
+        let omitted: StreamProtocolConfig = serde_saphyr::from_str("per_peer_channel_capacity: 1024\n")
+            .context("omitted coalesce fields must parse")?;
+        assert_eq!(DEFAULT_EGRESS_COALESCE_DELAY, omitted.egress_coalesce_delay);
+        assert_eq!(DEFAULT_EGRESS_COALESCE_MAX_PACKETS, omitted.egress_coalesce_max_packets);
+        omitted
+            .validate()
+            .context("config with omitted coalesce fields must validate")?;
+
+        Ok(())
     }
 }

@@ -149,6 +149,8 @@ pub(crate) enum ExitControlKind {
     PixFill,
     /// The `SessionEstablished` answering an admitted `StartSession`.
     SessionEstablished,
+    /// The `SessionEstablished` answering a repeated `StartSession`.
+    SessionEstablishedReplay,
     /// The request for the Entry's SSA commitments.
     SsaRequest,
     /// The SSA request, re-sent for want of an answer.
@@ -206,6 +208,8 @@ pub(crate) enum ExitControlOutcome {
     DroppedBudget,
     /// The transport refused it or timed out.
     SendFailed,
+    /// Not sent: the Session held no SURB to send it over.
+    SkippedNoSurb,
 }
 
 /// Counts one packet the Exit sent, or declined to send, on a peer's behalf.

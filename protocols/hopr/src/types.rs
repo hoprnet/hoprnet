@@ -19,6 +19,9 @@ pub struct OutgoingPacket {
     /// only inside packet construction, and the routing that produced them only outside it, so this
     /// is the single point where the two can be associated. Empty for packets carrying no SURBs.
     pub minted_surbs: Vec<HoprSurbId>,
+    /// First 4 bytes (big-endian) of the tag the final hop derives for this packet, if it was built from a forward
+    /// path.
+    pub forward_receipt_tag: Option<u32>,
 }
 
 impl std::fmt::Debug for OutgoingPacket {
@@ -79,6 +82,8 @@ pub struct AuxiliaryPacketInfo {
     /// `Some(0)` means at least one SURB routes the reply straight back to its creator, with no first
     /// relayer to acknowledge it — and that acknowledgement is what a PIX share is decrypted with.
     pub min_return_path_hops: Option<u8>,
+    /// First 4 bytes (big-endian) of the packet tag, set only for a packet that is not a reply on a SURB.
+    pub forward_receipt_tag: Option<u32>,
 }
 
 /// An incoming packet with a payload intended for us.

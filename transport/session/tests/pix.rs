@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use hopr_api::{
     node::PixAddressId,
@@ -26,7 +26,7 @@ use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixParams, PixToolbox, SessionClientConfig,
     SessionManager, SessionManagerConfig, SessionTarget, SupervisorConfig, SurbBalancerConfig,
-    testing::{answering_deposit_pool, mock_packet_planning, msg_type},
+    testing::{answering_deposit_pool, answering_deposit_pool_after, mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
@@ -1274,13 +1274,14 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
             let bob_mgr = bob_mgr_relay.clone();
             Box::pin(async move {
                 // Session data segments are unrelated here and are simply dropped by the dispatcher.
-                let _ = bob_mgr.dispatch_message(
-                    alice_pseudonym,
-                    ApplicationDataIn {
-                        data: data.data,
-                        packet_info: Default::default(),
-                    },
-                );
+                // Alice's packets carry SURBs, as they do on the wire: Bob re-sends only over a SURB he holds.
+                let saved = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(data.data.total_len());
+                let mut incoming = ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                };
+                incoming.packet_info.num_saved_surbs = saved;
+                let _ = bob_mgr.dispatch_message(alice_pseudonym, incoming);
                 Ok(())
             })
         });
@@ -1377,6 +1378,24 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     .map_err(|e| anyhow::anyhow!("timeout establishing the session: {e}"))?;
     let mut alice_session = alice_session?;
     let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+
+    // Every re-send takes a SURB, which Bob counts and skips the re-send without, and Alice sends few
+    // packets here. Keep-alives carrying SURBs, as hers do on the wire, keep him supplied for the wait.
+    for _ in 0..64 {
+        let keep_alive: ApplicationData = HoprStartProtocol::KeepAlive(KeepAliveMessage {
+            session_id: alice_pseudonym,
+            flags: KeepAliveFlag::BalancerState.into(),
+            additional_data: 0,
+        })
+        .try_into()?;
+        let saved = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(keep_alive.total_len());
+        let mut incoming = ApplicationDataIn {
+            data: keep_alive,
+            packet_info: Default::default(),
+        };
+        incoming.packet_info.num_saved_surbs = saved;
+        bob_mgr.dispatch_message(alice_pseudonym, incoming)?;
+    }
 
     pin_mut!(pix_alice_rx);
     pin_mut!(pix_bob_rx);
@@ -1628,6 +1647,777 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     alice_handle.await??;
     bob_handle.await??;
 
+    Ok(())
+}
+
+/// The Exit's first `SsaRequest` is lost on the way to the Entry, and the Session still commits. The acceptance test
+/// of #8709.
+///
+/// The Exit sent the opening request once, over a SURB. A packet lost on that return path — through an announced
+/// relayer that is offline, say — left the Entry with nothing to answer, and the Exit closed the Session on
+/// `CommitmentTimeout` after `max_ssa_delivery_time`. The opening request is now sent again, with doubling gaps, until
+/// the Entry has answered it.
+///
+/// ## Steps
+/// 1. Bob's transport drops the first opening request, and every later one reaches Alice. Bob's resend interval is 200
+///    ms and his delivery time 1.5 s, which the first re-send at 200 ms is well inside and the unrepaired Session would
+///    not survive. The re-send cap is the shipping default of 2, so the gaps are 200 and 400 ms (re-sends at 200 and
+///    600 ms).
+/// 2. Alice receives the re-send, commits and announces one deposit: exactly one burst of commitments and one
+///    `ReadyToDeposit`, and Bob verifies it and gets `DepositNeeded` with the same deposit address.
+/// 3. The re-send is the dropped request byte for byte, and once Alice has answered, Bob stops asking.
+/// 4. Nobody sent a `SessionError`, and both Sessions are alive past the delivery time the unrepaired Session would
+///    have closed at.
+///
+/// Waits are on conditions with a generous deadline, like the successor test above; the assertions that something did
+/// *not* happen come after the positive condition they depend on.
+#[test(tokio::test)]
+async fn a_lost_opening_request_is_resent_and_the_session_commits() -> Result<()> {
+    lost_opening_request_scenario(2, true).await
+}
+
+/// The same loss, but the `StartSession` brought exactly the two SURBs that `SessionEstablished` and the first
+/// `SsaRequest` then used, and nothing since has brought any: Bob counts his own control sends as consumed, so he sees
+/// no SURB left. A re-send would hold up everything else his node originates while the return packet looks for
+/// one, so it is skipped, and the Session ends on the deadline it was given.
+#[test(tokio::test)]
+async fn a_lost_opening_request_is_not_resent_once_the_handshake_spent_its_surbs() -> Result<()> {
+    lost_opening_request_scenario(2, false).await
+}
+
+/// The body of the two tests above. `start_surbs` is the number of SURBs Alice's `StartSession` carries, and
+/// `keep_alive` whether a keep-alive carrying more reaches Bob after establishment, as Alice's do on the wire; the
+/// mock relays otherwise carry none.
+async fn lost_opening_request_scenario(start_surbs: usize, keep_alive: bool) -> Result<()> {
+    use std::{
+        sync::{
+            Mutex,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Instant,
+    };
+
+    use futures::FutureExt;
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let ssa_gen_config = SsaGeneratorConfig {
+        polynomials_per_ssa: 64,
+        threshold: 16,
+        surplus_shares: 4,
+    };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+    let commits_per_burst = (ssa_gen_config.polynomials_per_ssa as usize)
+        .div_ceil(HoprStartProtocol::ssa_commit_chunking(&alice_pseudonym)?.max_constant_terms_per_message);
+
+    let delivery_time = Duration::from_millis(1500);
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=cycle_quota(&params),
+            supervision: SupervisorConfig {
+                ssa_request_resend_interval: RESEND_INTERVAL,
+                max_ssa_delivery_time: delivery_time,
+                commitment_recommit_interval: Duration::from_millis(500),
+                // The cap is left at its shipping default: that default is what the test is about.
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    // Every opening request Bob's transport was asked to send, dropped or not, and how many of them Alice got.
+    let opening_requests: Arc<Mutex<Vec<(Instant, ApplicationData)>>> = Arc::new(Mutex::new(Vec::new()));
+    let commit_count = Arc::new(AtomicUsize::new(0));
+    let session_errors = Arc::new(AtomicUsize::new(0));
+
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    let commit_count_relay = commit_count.clone();
+    let session_errors_alice = session_errors.clone();
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            match HoprStartProtocol::try_from(data.data.clone()) {
+                Ok(HoprStartProtocol::SsaCommit(commit)) if commit.ssa_index.get() == 1 => {
+                    commit_count_relay.fetch_add(1, Ordering::Relaxed);
+                }
+                Ok(HoprStartProtocol::SessionError(_)) => {
+                    session_errors_alice.fetch_add(1, Ordering::Relaxed);
+                }
+                _ => {}
+            }
+            let bob_mgr = bob_mgr_relay.clone();
+            let saved = if matches!(
+                HoprStartProtocol::try_from(data.data.clone()),
+                Ok(HoprStartProtocol::StartSession(_))
+            ) {
+                start_surbs
+            } else {
+                0
+            };
+            Box::pin(async move {
+                let mut incoming = ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                };
+                incoming.packet_info.num_saved_surbs = saved;
+                let _ = bob_mgr.dispatch_message(alice_pseudonym, incoming);
+                Ok(())
+            })
+        });
+
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    let opening_requests_relay = opening_requests.clone();
+    let session_errors_bob = session_errors.clone();
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let mut dropped = false;
+            match HoprStartProtocol::try_from(data.data.clone()) {
+                // The request for new SSAs, which the Exit sends and re-sends; a scoped retransmission
+                // request carries a `missing` map instead and is not one. The first of them is lost.
+                Ok(HoprStartProtocol::SsaRequest(request))
+                    if request.missing.is_empty()
+                        && request.commitments.keys().next().is_some_and(|i| i.get() == 1) =>
+                {
+                    let mut requests = opening_requests_relay.lock().unwrap();
+                    dropped = requests.is_empty();
+                    requests.push((Instant::now(), data.data.clone()));
+                }
+                Ok(HoprStartProtocol::SessionError(_)) => {
+                    session_errors_bob.fetch_add(1, Ordering::Relaxed);
+                }
+                _ => {}
+            }
+            let alice_mgr = alice_mgr_relay.clone();
+            Box::pin(async move {
+                if !dropped {
+                    let _ = alice_mgr.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    );
+                }
+                Ok(())
+            })
+        });
+
+    let ssa_rec_config = SsaReconstructorConfig::default();
+    let (pix_toolbox_alice, pix_alice_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let pix_bob_rx = answering_deposit_pool(pix_bob_rx, |_| Vec::new());
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
+
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
+
+    let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio_time::timeout(
+        DEADLINE,
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                    surb_management: None,
+                    return_path_options: RoutingOptions::Hops(1.try_into()?),
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout establishing the session: {e}"))?;
+    let mut alice_session = alice_session?;
+    let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+
+    pin_mut!(pix_alice_rx);
+    pin_mut!(pix_bob_rx);
+
+    // Bob re-sends only over a SURB he holds. The handshake used the two the `StartSession` brought, so a
+    // keep-alive carrying more, as Alice's do on the wire, is what leaves him a positive estimate.
+    if keep_alive {
+        let keep_alive: ApplicationData = HoprStartProtocol::KeepAlive(hopr_protocol_start::KeepAliveMessage {
+            session_id: alice_pseudonym,
+            flags: hopr_protocol_start::KeepAliveFlag::BalancerState.into(),
+            additional_data: 0,
+        })
+        .try_into()?;
+        let saved = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(keep_alive.total_len());
+        let mut incoming = ApplicationDataIn {
+            data: keep_alive,
+            packet_info: Default::default(),
+        };
+        incoming.packet_info.num_saved_surbs = saved;
+        bob_mgr.dispatch_message(alice_pseudonym, incoming)?;
+    }
+
+    // Without a SURB Bob skips the re-sends, so the dropped request is the only one and the Session ends
+    // on the commitment deadline it was given.
+    if !keep_alive {
+        eventually("bob to close the Session on its commitment deadline", || {
+            !bob_mgr.active_sessions().contains(&alice_pseudonym)
+        })
+        .await?;
+        assert_eq!(
+            1,
+            opening_requests.lock().unwrap().len(),
+            "bob holds no SURB, so the opening request is not re-sent"
+        );
+        assert!(
+            pix_alice_rx.next().now_or_never().is_none(),
+            "alice was never asked, so announced nothing"
+        );
+        for ah in ahs {
+            ah.abort();
+        }
+        alice_sender.close_channel();
+        bob_sender.close_channel();
+        return Ok(());
+    }
+
+    // Step 2 — the re-send is admitted: one announcement on each side, naming one deposit address.
+    let HoprSessionOutPixEvent::ReadyToDeposit(alice_ready) = tokio_time::timeout(DEADLINE, pix_alice_rx.next())
+        .await
+        .map_err(|e| anyhow::anyhow!("timeout waiting for alice's ReadyToDeposit: {e}"))?
+        .ok_or(anyhow::anyhow!("alice must get a pix event"))?
+    else {
+        anyhow::bail!("expected ReadyToDeposit for the opening cycle");
+    };
+    // The observer is held to the end: dropping it reports `DepositObserverClosed`, which the supervisor
+    // counts as a lost cycle, and that is not what this test is about.
+    let HoprSessionOutPixEvent::DepositNeeded(bob_needs, _observer) = tokio_time::timeout(DEADLINE, pix_bob_rx.next())
+        .await
+        .map_err(|e| anyhow::anyhow!("timeout waiting for bob's DepositNeeded: {e}"))?
+        .ok_or(anyhow::anyhow!("bob must get a pix event"))?
+    else {
+        anyhow::bail!("expected DepositNeeded for the opening cycle");
+    };
+    // Re-sends stop on the first `CommitmentProgress`, which precedes the verification that produced
+    // `DepositNeeded`, so at most one re-send already handed to the driver can still turn up after this.
+    let answered_at_count = opening_requests.lock().unwrap().len();
+    assert_eq!(1, alice_ready.ssa_id.ssa_index().get());
+    assert_eq!(alice_ready.ssa_id, bob_needs.ssa_id);
+    assert_eq!(
+        alice_ready.deposit_address, bob_needs.deposit_address,
+        "both sides must derive the one deposit address"
+    );
+
+    eventually("the whole burst of commitments to have gone out", || {
+        commit_count.load(Ordering::Relaxed) >= commits_per_burst
+    })
+    .await?;
+
+    // Step 3 — the re-send is the dropped request again, and Bob stops once Alice has answered. A re-send
+    // that was already on its way when the answer landed may still turn up, so what is waited for is
+    // quiet: the last request is many intervals old.
+    eventually("bob to stop re-sending the opening request", || {
+        let requests = opening_requests.lock().unwrap();
+        requests.len() >= 2
+            && requests
+                .last()
+                .is_some_and(|(at, _)| at.elapsed() > RESEND_INTERVAL * 10)
+    })
+    .await?;
+    let requests = opening_requests.lock().unwrap().clone();
+    for (_, request) in &requests {
+        assert_eq!(
+            (&requests[0].1.application_tag, &requests[0].1.plain_text),
+            (&request.application_tag, &request.plain_text),
+            "every re-send is the dropped request again, byte for byte"
+        );
+    }
+    // The dropped one and at least one re-send; no more than one past what Bob had sent when the Entry's
+    // answer reached him; and never more than the cap allows. No assumption is made about how fast the
+    // answer arrives.
+    assert!(requests.len() >= 2, "bob must have re-sent the dropped request");
+    assert!(
+        requests.len() <= answered_at_count + 1,
+        "bob kept asking after the Entry answered: {answered_at_count} requests when it did, {} after the quiet",
+        requests.len()
+    );
+    assert!(
+        requests.len() <= 1 + SupervisorConfig::default().max_opening_ssa_request_resends as usize,
+        "bob sent more requests than the cap allows: {}",
+        requests.len()
+    );
+
+    // Step 4 — nothing more was announced or sent, and the Session outlived the delivery time at which the
+    // unrepaired one closes.
+    assert!(
+        requests[0].0.elapsed() > delivery_time,
+        "the quiet above outlasts the delivery time the first request was given"
+    );
+    assert!(
+        pix_alice_rx.next().now_or_never().is_none(),
+        "a repeat of the request must not announce a second deposit"
+    );
+    assert_eq!(
+        commits_per_burst,
+        commit_count.load(Ordering::Relaxed),
+        "the opening cycle is committed exactly once"
+    );
+    assert_eq!(0, session_errors.load(Ordering::Relaxed));
+    assert!(alice_mgr.active_sessions().contains(&alice_pseudonym));
+    assert!(
+        bob_mgr.active_sessions().contains(&alice_pseudonym),
+        "bob's Session is still active"
+    );
+
+    alice_session.close().await?;
+    for ah in ahs {
+        ah.abort();
+    }
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+
+    Ok(())
+}
+
+/// The Exit's first `SessionEstablished` is lost on the way back, and the Entry's repeated `StartSession` recovers the
+/// Session instead of a new attempt under a new pseudonym (#8728).
+///
+/// ## Steps
+/// 1. Bob's transport drops the first `SessionEstablished`. Alice repeats her `StartSession` every 200 ms or so, and
+///    waits far longer than that.
+/// 2. `new_session` succeeds under the first pseudonym. Bob answered the repeat with `SessionEstablished` alone: he
+///    holds exactly one Session, Alice got one `ReadyToDeposit` and Bob one `DepositNeeded`, and no `SessionError` was
+///    sent.
+#[test(tokio::test)]
+async fn a_lost_session_established_is_recovered_by_repeating_the_start_session() -> Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let ssa_gen_config = SsaGeneratorConfig {
+        polynomials_per_ssa: 64,
+        threshold: 16,
+        surplus_shares: 4,
+    };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+
+    let alice_mgr = SessionManager::new(SessionManagerConfig {
+        initiation_timeout_base: Duration::from_secs(5),
+        initiation_resend_interval: Duration::from_millis(200),
+        ..Default::default()
+    });
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=cycle_quota(&params),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let established_sent = Arc::new(AtomicUsize::new(0));
+    let session_errors = Arc::new(AtomicUsize::new(0));
+
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    let session_errors_alice = session_errors.clone();
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let msg = HoprStartProtocol::try_from(data.data.clone());
+            if matches!(msg, Ok(HoprStartProtocol::SessionError(_))) {
+                session_errors_alice.fetch_add(1, Ordering::Relaxed);
+            }
+            // Each StartSession, repeats included, brings the SURBs the Exit answers over.
+            let saved = if matches!(msg, Ok(HoprStartProtocol::StartSession(_))) {
+                2
+            } else {
+                0
+            };
+            let bob_mgr = bob_mgr_relay.clone();
+            Box::pin(async move {
+                let mut incoming = ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                };
+                incoming.packet_info.num_saved_surbs = saved;
+                let _ = bob_mgr.dispatch_message(alice_pseudonym, incoming);
+                Ok(())
+            })
+        });
+
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    let established_relay = established_sent.clone();
+    let session_errors_bob = session_errors.clone();
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let mut dropped = false;
+            match HoprStartProtocol::try_from(data.data.clone()) {
+                // Only the first one is lost.
+                Ok(HoprStartProtocol::SessionEstablished(_)) => {
+                    dropped = established_relay.fetch_add(1, Ordering::Relaxed) == 0;
+                }
+                Ok(HoprStartProtocol::SessionError(_)) => {
+                    session_errors_bob.fetch_add(1, Ordering::Relaxed);
+                }
+                _ => {}
+            }
+            let alice_mgr = alice_mgr_relay.clone();
+            Box::pin(async move {
+                if !dropped {
+                    let _ = alice_mgr.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    );
+                }
+                Ok(())
+            })
+        });
+
+    let ssa_rec_config = SsaReconstructorConfig::default();
+    let (pix_toolbox_alice, pix_alice_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let pix_bob_rx = answering_deposit_pool(pix_bob_rx, |_| Vec::new());
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
+
+    let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio_time::timeout(
+        DEADLINE,
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                    surb_management: None,
+                    return_path_options: RoutingOptions::Hops(1.try_into()?),
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout establishing the session: {e}"))?;
+    let alice_session = alice_session.context("the repeated StartSession must recover the Session")?;
+    let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+
+    pin_mut!(pix_alice_rx);
+    pin_mut!(pix_bob_rx);
+    let HoprSessionOutPixEvent::ReadyToDeposit(_) = tokio_time::timeout(DEADLINE, pix_alice_rx.next())
+        .await
+        .context("timeout waiting for alice's ReadyToDeposit")?
+        .ok_or(anyhow::anyhow!("alice must get a pix event"))?
+    else {
+        anyhow::bail!("expected ReadyToDeposit for the opening cycle");
+    };
+    let HoprSessionOutPixEvent::DepositNeeded(_, _observer) = tokio_time::timeout(DEADLINE, pix_bob_rx.next())
+        .await
+        .context("timeout waiting for bob's DepositNeeded")?
+        .ok_or(anyhow::anyhow!("bob must get a pix event"))?
+    else {
+        anyhow::bail!("expected DepositNeeded for the opening cycle");
+    };
+
+    assert!(
+        established_sent.load(Ordering::Relaxed) >= 2,
+        "the first answer was lost and one more sent"
+    );
+    assert_eq!(
+        vec![alice_pseudonym],
+        bob_mgr.active_sessions(),
+        "bob holds the one Session"
+    );
+    assert!(alice_mgr.active_sessions().contains(&alice_pseudonym));
+    assert_eq!(0, session_errors.load(Ordering::Relaxed));
+
+    for ah in ahs {
+        ah.abort();
+    }
+    drop(alice_session);
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+    Ok(())
+}
+
+/// A deposit pool that answers late must not eat into the registration the Entry's answer is matched against.
+///
+/// The Exit registers its commitments, then waits for the pool, and only then sends the request and starts the
+/// commitment deadline. With a registration lifetime of 1.8 s, a delivery time of 1.5 s and a pool answering after 1.7
+/// s, the registration was nearly gone when the request went out; the Entry's commitment, 350 ms later and well inside
+/// the deadline, found nothing to match and the Exit closed the Session after the Entry was told to deposit. The Exit
+/// now refreshes the registration just before the send, so the answer has the whole lifetime. With a pool slower than
+/// the lifetime itself the registration is gone and nothing is sent at all.
+///
+/// `commit_delay` is how long Alice's commitments take to reach Bob. Returns whether Bob received `DepositNeeded`, how
+/// many requests went on the wire and whether any `SessionError` was sent.
+async fn slow_pool_scenario(pool_delay: Duration, commit_delay: Duration) -> Result<(bool, usize, usize)> {
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+    let ssa_gen_config = SsaGeneratorConfig {
+        polynomials_per_ssa: 64,
+        threshold: 16,
+        surplus_shares: 4,
+    };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=cycle_quota(&params),
+            supervision: SupervisorConfig {
+                ssa_request_resend_interval: RESEND_INTERVAL,
+                max_ssa_delivery_time: Duration::from_millis(1500),
+                commitment_recommit_interval: Duration::from_millis(500),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let requests = Arc::new(Mutex::new(0usize));
+    let session_errors = Arc::new(AtomicUsize::new(0));
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    let session_errors_alice = session_errors.clone();
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let decoded = HoprStartProtocol::try_from(data.data.clone());
+            let delay = match &decoded {
+                Ok(HoprStartProtocol::SsaCommit(_)) => commit_delay,
+                _ => Duration::ZERO,
+            };
+            if matches!(decoded, Ok(HoprStartProtocol::SessionError(_))) {
+                session_errors_alice.fetch_add(1, Ordering::Relaxed);
+            }
+            // The SURBs Bob needs for his control sends, which the mock relays do not bring.
+            let saved = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(data.data.total_len());
+            let bob_mgr = bob_mgr_relay.clone();
+            Box::pin(async move {
+                if !delay.is_zero() {
+                    tokio_time::sleep(delay).await;
+                }
+                let mut incoming = ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                };
+                incoming.packet_info.num_saved_surbs = saved;
+                let _ = bob_mgr.dispatch_message(alice_pseudonym, incoming);
+                Ok(())
+            })
+        });
+
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    let requests_relay = requests.clone();
+    let session_errors_bob = session_errors.clone();
+    bob_transport
+        .expect_send_message()
+        .times(0..)
+        .returning(move |_, data| {
+            match HoprStartProtocol::try_from(data.data.clone()) {
+                Ok(HoprStartProtocol::SsaRequest(request)) if request.missing.is_empty() => {
+                    *requests_relay.lock().unwrap() += 1;
+                }
+                Ok(HoprStartProtocol::SessionError(_)) => {
+                    session_errors_bob.fetch_add(1, Ordering::Relaxed);
+                }
+                _ => {}
+            }
+            let alice_mgr = alice_mgr_relay.clone();
+            Box::pin(async move {
+                let _ = alice_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+
+    // Bob's registrations idle out after 1.8 s, which his 1.5 s delivery window fits inside.
+    let bob_rec_config = SsaReconstructorConfig {
+        incomplete_commitment_lifetime: Duration::from_millis(1800),
+        ..Default::default()
+    };
+    let (pix_toolbox_alice, _pix_alice_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+    );
+    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(bob_rec_config).into(),
+    );
+    let pix_bob_rx = answering_deposit_pool_after(pix_bob_rx, pool_delay, |_| Vec::new());
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
+
+    let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio_time::timeout(
+        DEADLINE,
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                    surb_management: None,
+                    return_path_options: RoutingOptions::Hops(1.try_into()?),
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout establishing the session: {e}"))?;
+    let mut alice_session = alice_session?;
+    let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+    pin_mut!(pix_bob_rx);
+
+    // Either Bob is told to deposit, or his Session ends: both are well inside the deadline.
+    let needed = {
+        use futures::FutureExt;
+        let mut got = false;
+        let end = std::time::Instant::now() + Duration::from_secs(8);
+        while std::time::Instant::now() < end {
+            if let Some(Some(HoprSessionOutPixEvent::DepositNeeded(..))) = pix_bob_rx.next().now_or_never() {
+                got = true;
+                break;
+            }
+            if !bob_mgr.active_sessions().contains(&alice_pseudonym) {
+                break;
+            }
+            tokio_time::sleep(POLL).await;
+        }
+        got
+    };
+    let result = (
+        needed,
+        *requests.lock().unwrap(),
+        session_errors.load(Ordering::Relaxed),
+    );
+
+    let _ = alice_session.close().await;
+    for ah in ahs {
+        ah.abort();
+    }
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    let _ = alice_handle.await;
+    let _ = bob_handle.await;
+    Ok(result)
+}
+
+/// A pool answering at 1.7 s against a registration lifetime of 1.8 s, with the Entry's commitment arriving 350 ms
+/// after the request: the Session commits and nobody sends a `SessionError`.
+#[test(tokio::test)]
+async fn a_slow_deposit_pool_does_not_cost_the_request_its_registration() -> Result<()> {
+    let (needed, requests, session_errors) =
+        slow_pool_scenario(Duration::from_millis(1700), Duration::from_millis(350)).await?;
+    assert!(
+        needed,
+        "bob must be told to deposit once the Entry's commitment arrived"
+    );
+    assert!(requests >= 1, "the request went out");
+    assert_eq!(0, session_errors, "the Session is not lost to a lapsed registration");
+    Ok(())
+}
+
+/// A pool slower than the registration's lifetime itself: the registration lapsed while it answered, so nothing is
+/// sent, and the Session ends rather than inviting an answer it cannot match.
+#[test(tokio::test)]
+async fn a_deposit_pool_slower_than_the_registration_lifetime_sends_nothing() -> Result<()> {
+    let (needed, requests, session_errors) = slow_pool_scenario(Duration::from_millis(2500), Duration::ZERO).await?;
+    assert!(!needed, "no request went out, so there is nothing to deposit");
+    assert_eq!(
+        0, requests,
+        "no SsaRequest may go on the wire for a registration that lapsed"
+    );
+    assert_eq!(
+        1, session_errors,
+        "the Entry is told, as for any other failure of the Exit's own pool"
+    );
     Ok(())
 }
 

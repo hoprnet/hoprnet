@@ -153,8 +153,9 @@ pub struct PathPlannerConfig {
     /// a relayer on probation and an edge probes measured dead, and also a healthy path slow or thin
     /// enough to weigh less than a tenth. An exploring return draw takes one of those only within a
     /// node-wide allowance of one a second, while an ordinary return draw keeps it at its tempered
-    /// weight: a reply through a relayer on probation is what revives it. A forward draw, exploring or
-    /// not, never takes one, as a forward packet probes nothing.
+    /// weight: a reply through a relayer on probation is what revives it, and a relayer is on
+    /// probation only until that probe is out. A forward draw, exploring or not, never takes one, as
+    /// a forward packet probes nothing.
     ///
     /// Costs throughput in proportion: this share of draws, forward and return, deliberately ignores
     /// which plausible candidate looks best. Candidates have already passed the selector's gates
@@ -339,12 +340,12 @@ fn pick_uniform_index(len: usize) -> Option<usize> {
 /// The fraction of the best candidate's (tempered) weight below which a candidate is one the cost
 /// function all but rejects.
 ///
-/// A relayer on probation is published at a health of a thousandth and an edge probes measured dead
-/// is floored at a billionth: tempered, they sit at about 3 % and 0.003 % of a healthy candidate. A
+/// A relayer on probation is published at a health of a millionth and an edge probes measured dead
+/// is floored at a billionth: tempered, they sit at about 0.1 % and 0.003 % of a healthy candidate. A
 /// stalled relayer still delivering at a hundredth of its health is at 10 %, and stays explorable.
 ///
 /// Those figures are for the default `return_path_weight_temper` of 0.5. A weight tempered by `t`
-/// puts a relayer on probation at `0.001^t` of a healthy one, so a temper of 1/3 or less lifts it to
+/// puts a relayer on probation at `0.000001^t` of a healthy one, so a temper of 1/6 or less lifts it to
 /// this fraction or above: exploration then counts it as plausible, forward draws among them, and
 /// the probe budget no longer holds it back. Whoever lowers the temper that far trades this gate for
 /// the wider spread.
@@ -425,6 +426,20 @@ fn gate_implausible(weights: &mut [f64]) {
     let floor = weights.iter().copied().fold(0.0, f64::max) * PLAUSIBLE_WEIGHT_FRACTION;
     for weight in weights.iter_mut().filter(|weight| **weight < floor) {
         *weight = 0.0;
+    }
+}
+
+/// Zeroes the weights of the excluded candidates, and those the draw would not take anyway ([`gate_implausible`]),
+/// unless no plausible candidate is left, in which case the weights are kept as they are.
+fn apply_exclusions(weights: &mut [f64], is_excluded: impl Fn(usize) -> bool) {
+    let floor = weights.iter().copied().fold(0.0, f64::max) * PLAUSIBLE_WEIGHT_FRACTION;
+    if !(0..weights.len()).any(|i| !is_excluded(i) && weights[i] >= floor) {
+        return;
+    }
+    for (i, weight) in weights.iter_mut().enumerate() {
+        if is_excluded(i) || *weight < floor {
+            *weight = 0.0;
+        }
     }
 }
 
@@ -684,6 +699,8 @@ fn weights_moved(
 /// reports packet keys -- so a raw-`NodeId` key silently stores the same route twice. Resolving
 /// first makes lookup and insertion agree by construction.
 type PlannerCacheKey = (OffchainPublicKey, OffchainPublicKey, u32);
+/// The relayers excluded from forward draws to an Exit.
+pub type ForwardExclusions = Arc<dyn Fn(&OffchainPublicKey) -> Vec<OffchainPublicKey> + Send + Sync>;
 /// A dictionary key paired with the immutable collection it identifies. IDs do not order cache
 /// updates: pointer equality below remains the authority for rejecting stale refreshes.
 type CandidateSet = (u64, hopr_utils::statistics::WeightedCollection<ValidatedPath>);
@@ -805,6 +822,7 @@ where
 #[derive(Clone)]
 pub struct PathPlanner<Surb, R, S> {
     me: OffchainPublicKey,
+    forward_exclusions: Option<ForwardExclusions>,
     pub surb_store: Surb,
     paths: Arc<PathBuilder<R, S>>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
@@ -843,6 +861,7 @@ where
 
         Self {
             me,
+            forward_exclusions: None,
             surb_store,
             paths: Arc::new(PathBuilder {
                 resolver,
@@ -861,6 +880,13 @@ where
             probe_budget: Arc::default(),
             observer: None,
         }
+    }
+
+    /// Keeps forward draws from this node off the relayers `exclusions` names for the Exit. Attach it before the
+    /// planner is shared.
+    pub fn with_forward_exclusions(mut self, exclusions: ForwardExclusions) -> Self {
+        self.forward_exclusions = Some(exclusions);
+        self
     }
 
     /// Report path resolves to `observer`. Attach it before the planner is shared.
@@ -990,9 +1016,13 @@ where
                 // Over plausible candidates only, exploring or not: a forward packet through a relayer
                 // on probation, or over an edge probes measured dead, is data lost, PIX shares and
                 // SURBs with it, and it probes nothing (a probation ends on a reply through the
-                // relayer, which only a return path carries). Tempered, a relayer on probation keeps
-                // about 3 % of a healthy one's weight, so the ordinary draw is gated too.
+                // relayer, which only a return path carries). Tempered, such a candidate still has a
+                // weight, a thousandth of a healthy one's for a relayer on probation and up to a tenth
+                // for a stalled one, so the ordinary draw is gated too.
                 let mut weights = paths.1.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
+                if source == NodeId::Offchain(self.me) {
+                    self.exclude_judged_relayers(&paths.1, &mut weights);
+                }
                 let drawn = if should_explore(self.paths.weighting.return_path_exploration) {
                     pick_exploring_index(&weights, || false)
                 } else {
@@ -1021,6 +1051,38 @@ where
 
         tracing::trace!(%path, "validated resolved path");
         Ok(path)
+    }
+
+    /// Keeps the forward candidates through a relayer excluded for their Exit out of the draw, unless that leaves
+    /// no plausible candidate.
+    fn exclude_judged_relayers(
+        &self,
+        candidates: &hopr_utils::statistics::WeightedCollection<ValidatedPath>,
+        weights: &mut [f64],
+    ) {
+        let Some(exclusions) = &self.forward_exclusions else {
+            return;
+        };
+        // All candidates end at the same Exit
+        let Some(exit) = candidates
+            .iter()
+            .next()
+            .and_then(|(path, _)| path.transport_path().last().copied())
+        else {
+            return;
+        };
+        let excluded = exclusions(&exit);
+        if excluded.is_empty() {
+            return;
+        }
+        let through_excluded: Vec<bool> = candidates
+            .iter()
+            .map(|(path, _)| {
+                let path = path.transport_path();
+                path[..path.len() - 1].iter().any(|relayer| excluded.contains(relayer))
+            })
+            .collect();
+        apply_exclusions(weights, |i| through_excluded[i]);
     }
 
     /// Cached weighted collection of validated `hops`-hop paths from `source` to `destination`,
@@ -2904,6 +2966,145 @@ mod tests {
             "a relayer on probation draws no forward packet, got {via_b} of 4000"
         );
         Ok(())
+    }
+
+    /// Forward draws to the Exit avoid a relayer excluded for it, exploring or not.
+    #[tokio::test]
+    async fn forward_draws_should_avoid_an_excluded_relayer() -> anyhow::Result<()> {
+        let (me, b, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_B), pubkey(&SECRET_DEST));
+        for exploration in [0.0, 1.0] {
+            let (planner, _) = two_relayer_forward_planner();
+            let mut planner =
+                planner.with_forward_exclusions(Arc::new(move |exit| if *exit == dest { vec![b] } else { vec![] }));
+            Arc::get_mut(&mut planner.paths)
+                .context("the planner is not shared")?
+                .weighting
+                .return_path_exploration = exploration;
+            for _ in 0..500 {
+                let path = planner
+                    .resolve_path(
+                        NodeId::Offchain(me),
+                        NodeId::Offchain(dest),
+                        RoutingOptions::Hops(1.try_into()?),
+                    )
+                    .await?;
+                assert_ne!(Some(&b), path.first(), "exploration {exploration}");
+            }
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn forward_draws_should_fall_back_when_every_candidate_is_excluded() -> anyhow::Result<()> {
+        let (me, a, b, dest) = (
+            pubkey(&SECRET_ME),
+            pubkey(&SECRET_A),
+            pubkey(&SECRET_B),
+            pubkey(&SECRET_DEST),
+        );
+        let (planner, _) = two_relayer_forward_planner();
+        let planner = planner.with_forward_exclusions(Arc::new(move |_| vec![a, b]));
+        let mut seen = HashSet::new();
+        for _ in 0..200 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            seen.insert(*path.first().context("a path has a first hop")?);
+        }
+        assert_eq!(HashSet::from([a, b]), seen, "the unfiltered weights are used");
+        Ok(())
+    }
+
+    /// An excluded relayer is still used if the others are all implausible, which a forward draw would not take.
+    #[tokio::test]
+    async fn forward_draws_should_fall_back_when_only_implausible_candidates_remain() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (me, a, b, dest) = (
+            pubkey(&SECRET_ME),
+            pubkey(&SECRET_A),
+            pubkey(&SECRET_B),
+            pubkey(&SECRET_DEST),
+        );
+        let (planner, graph) = two_relayer_forward_planner();
+        graph.record_node_health(&b, 1e-3);
+        planner.refresh_cached_paths().await;
+        let mut planner = planner.with_forward_exclusions(Arc::new(move |_| vec![a]));
+        Arc::get_mut(&mut planner.paths)
+            .context("the planner is not shared")?
+            .weighting
+            .return_path_exploration = 0.0;
+        for _ in 0..200 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            assert_eq!(
+                Some(&a),
+                path.first(),
+                "the plausible relayer is kept despite the exclusion"
+            );
+        }
+        Ok(())
+    }
+
+    /// An exclusion is for one Exit and for forward draws only.
+    #[tokio::test]
+    async fn exclusions_should_not_touch_other_exits_or_return_draws() -> anyhow::Result<()> {
+        let (me, b, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_B), pubkey(&SECRET_DEST));
+        let other_exit = pubkey(&SECRET_A);
+
+        let (planner, _) = two_relayer_forward_planner();
+        let planner =
+            planner.with_forward_exclusions(Arc::new(move |exit| if *exit == other_exit { vec![b] } else { vec![] }));
+        let mut via_b = 0;
+        for _ in 0..500 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            via_b += usize::from(path.first() == Some(&b));
+        }
+        assert!(via_b > 0, "a draw to another Exit still goes through the relayer");
+
+        let (planner, _) = two_relayer_return_planner();
+        let planner = planner.with_forward_exclusions(Arc::new(move |_| vec![b]));
+        let mut via_b = 0;
+        for _ in 0..500 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(dest),
+                    NodeId::Offchain(me),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            via_b += usize::from(path.first() == Some(&b));
+        }
+        assert!(via_b > 0, "a return draw still goes through the relayer");
+        Ok(())
+    }
+
+    #[test]
+    fn exclusions_should_keep_the_implausible_candidates_out_too() {
+        // A is excluded, B is plausible and C is on probation
+        let mut weights = [1.0, 0.1, 0.03];
+        apply_exclusions(&mut weights, |i| i == 0);
+        assert_eq!([0.0, 0.1, 0.0], weights);
+
+        // Nothing plausible is left without A: the weights stay as they are
+        let mut weights = [1.0, 0.05, 0.03];
+        apply_exclusions(&mut weights, |i| i == 0);
+        assert_eq!([1.0, 0.05, 0.03], weights);
     }
 
     #[test]
