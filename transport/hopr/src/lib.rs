@@ -2181,6 +2181,7 @@ mod pix_recovery_event_tests {
 #[cfg(test)]
 mod tests {
     mod dispatch;
+    mod session_stall;
 
     pub(crate) mod support {
         //! Capture structured records and formatted ancestry using the same subscriber.
