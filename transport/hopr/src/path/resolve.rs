@@ -1081,14 +1081,15 @@ mod tests {
     /// A packet that a retry can no longer route is dropped and counted, and the stage carries on.
     ///
     /// The retry runs outside the ordered stage, so its failure path is its own: it must count the
-    /// failure and let the next packet through, as the stage's own path does.
+    /// failure and leave the stream able to serve the next packet. The stage has to stay polled for
+    /// the retry to run at all, which is what this test does while it waits for the count.
     #[test_log::test(tokio::test)]
     async fn a_held_packet_that_cannot_be_routed_any_more_should_be_dropped_and_counted() -> anyhow::Result<()> {
         let starved = HoprPseudonym::random();
         let failed_before = hopr_transport_session::counters::routing_resolution_failure_count();
         let attempts = Arc::new(AtomicUsize::new(0));
 
-        let emitted = {
+        let mut stage = Box::pin({
             let attempts = attempts.clone();
             stage(
                 futures::stream::iter(vec![
@@ -1109,30 +1110,32 @@ mod tests {
                     }
                 },
             )
-            .take(1)
-            .collect::<Vec<_>>()
+        });
+
+        let first = stage
+            .next()
             .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
             .await
             .map_err(|_| anyhow::anyhow!("the packet behind the held one was withheld"))?
-        };
+            .ok_or_else(|| anyhow::anyhow!("the stage emitted nothing"))?;
+        assert_eq!(1, marker_of(&first.1), "only the packet that finds a route goes on");
 
-        assert_eq!(
-            vec![1],
-            emitted.iter().map(|(_, data)| marker_of(data)).collect::<Vec<_>>(),
-            "only the packet that finds a route goes on"
-        );
-
-        // The retry fires within a few `SURB_RETRY_INTERVAL`s; wait for the drop it produces.
+        // The retry fires a `SURB_RETRY_INTERVAL` or two later, and only while the stage is polled.
         let give_up = std::time::Instant::now() + 5 * TEST_SURB_WAIT;
-        while hopr_transport_session::counters::routing_resolution_failure_count() == failed_before
-            && std::time::Instant::now() < give_up
-        {
-            tokio::time::sleep(SURB_RETRY_INTERVAL).await;
+        while hopr_transport_session::counters::routing_resolution_failure_count() == failed_before {
+            anyhow::ensure!(
+                std::time::Instant::now() < give_up,
+                "the held packet was dropped on its retry without being counted"
+            );
+            let polled = stage
+                .next()
+                .timeout(futures_time::time::Duration::from(4 * SURB_RETRY_INTERVAL))
+                .await;
+            anyhow::ensure!(
+                polled.is_err(),
+                "the packet whose retry cannot route must not be emitted"
+            );
         }
-        assert!(
-            hopr_transport_session::counters::routing_resolution_failure_count() > failed_before,
-            "the held packet was dropped on its retry without being counted"
-        );
 
         Ok(())
     }
