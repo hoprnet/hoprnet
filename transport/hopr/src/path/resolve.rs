@@ -1032,6 +1032,84 @@ mod tests {
         Ok(())
     }
 
+    /// The shape measured in the lab (hoprnet#8753): one session keeps sending while another waits for
+    /// a SURB, first for one that arrives late and then for one that never comes. No packet of the
+    /// first session is held for either wait.
+    #[test_log::test(tokio::test)]
+    async fn a_session_should_not_be_delayed_while_another_session_waits_for_surbs() -> anyhow::Result<()> {
+        const LIVE_PACKETS: u8 = 60;
+        const LATE: u8 = 200;
+        const STARVED: u8 = 201;
+        let wait = std::time::Duration::from_millis(400);
+        let interval = std::time::Duration::from_millis(20);
+        let (waiting, live) = (HoprPseudonym::random(), HoprPseudonym::random());
+        let pool = Arc::new(AtomicUsize::new(0));
+        let refunds = Arc::new(AtomicU64::new(0));
+        let (tx, rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let feeder = {
+            let (pool, refunds) = (pool.clone(), refunds.clone());
+            tokio::spawn(async move {
+                let mut sent = Vec::with_capacity(LIVE_PACKETS as usize);
+                for i in 0..LIVE_PACKETS {
+                    match i {
+                        // Waits for a SURB that arrives after half the wait.
+                        0 => drop(tx.unbounded_send((return_routing(waiting), counted(LATE, &refunds)))),
+                        10 => drop(pool.fetch_add(1, Ordering::SeqCst)),
+                        // Waits for a SURB that never comes.
+                        20 => drop(tx.unbounded_send((return_routing(waiting), counted(STARVED, &refunds)))),
+                        _ => {}
+                    }
+                    sent.push(std::time::Instant::now());
+                    let _ = tx.unbounded_send((return_routing(live), packet(i)));
+                    sleep(interval).await;
+                }
+                sent
+            })
+        };
+
+        let emitted = resolve_routing_stage(
+            rx,
+            pool_resolver(pool, waiting),
+            TEST_DISTRESS_THRESHOLD,
+            TEST_CONCURRENCY,
+            wait,
+        )
+        .map(|(_, data)| (marker_of(&data), std::time::Instant::now()))
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+        .await
+        .map_err(|_| anyhow::anyhow!("the stage did not end"))?;
+        let sent = feeder.await?;
+
+        let live_emitted = emitted
+            .iter()
+            .filter(|(marker, _)| *marker < LIVE_PACKETS)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            (0..LIVE_PACKETS).collect::<Vec<_>>(),
+            live_emitted.iter().map(|(marker, _)| *marker).collect::<Vec<_>>(),
+            "every packet of the live session must be emitted, in order"
+        );
+        for (marker, at) in live_emitted {
+            let held = at.duration_since(sent[*marker as usize]);
+            assert!(
+                held < wait / 4,
+                "packet {marker} of the live session was held for {held:?} while another session waited for a SURB"
+            );
+        }
+        assert_eq!(
+            1,
+            emitted.iter().filter(|(marker, _)| *marker == LATE).count(),
+            "the packet whose SURB arrived late must go out"
+        );
+        assert!(
+            emitted.iter().all(|(marker, _)| *marker != STARVED),
+            "the packet without a SURB must be dropped"
+        );
+        assert_eq!(1, refunds.load(Ordering::SeqCst), "only the dropped packet is refunded");
+        Ok(())
+    }
+
     /// Packets beyond the per-pseudonym cap, which counts those queued behind the waiting one, are
     /// dropped at once rather than waiting, and do not hold up a pseudonym that is served.
     #[test_log::test(tokio::test)]
