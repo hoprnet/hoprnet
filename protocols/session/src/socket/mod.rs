@@ -137,9 +137,9 @@ pub struct SessionSocketConfig {
     /// Optional coalesce window for packing multiple complete `SessionMessage`s into one
     /// transport write of at most `C` bytes on stateless sockets.
     ///
-    /// Unlike `max_buffered_segments` (which applies only when `pack_delay` is `None`), messages
-    /// are never split across transport writes: when the next message would overflow `C`, the
-    /// buffered whole messages are flushed first, so packet loss drops only the messages in the
+    /// Unlike [`Self::max_buffered_segments`] (which applies only when `pack_delay` is `None`),
+    /// messages are never split across transport writes: when the next message would overflow `C`,
+    /// the buffered whole messages are flushed first, so packet loss drops only the messages in the
     /// lost packet and unmodified receivers decode them unchanged. Isolated datagrams arriving
     /// after an idle gap flush immediately without waiting. `None` (default) writes each message
     /// immediately.
@@ -327,6 +327,30 @@ pub struct StatelessSocketBuilder<const C: usize, T, I> {
     loss_signal: Option<Arc<FrameLossSignal>>,
     stream_progress: Option<StreamProgress>,
     pack_budget: Option<PackPayloadBudget>,
+}
+
+#[cfg(feature = "telemetry")]
+impl<const C: usize, T, I, S> std::fmt::Debug for StatelessSocketBuilder<C, T, I, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StatelessSocketBuilder")
+            .field("cfg", &self.cfg)
+            .field("loss_signal", &self.loss_signal)
+            .field("stream_progress", &self.stream_progress)
+            .field("pack_budget", &self.pack_budget)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(not(feature = "telemetry"))]
+impl<const C: usize, T, I> std::fmt::Debug for StatelessSocketBuilder<C, T, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StatelessSocketBuilder")
+            .field("cfg", &self.cfg)
+            .field("loss_signal", &self.loss_signal)
+            .field("stream_progress", &self.stream_progress)
+            .field("pack_budget", &self.pack_budget)
+            .finish_non_exhaustive()
+    }
 }
 
 #[cfg(feature = "telemetry")]

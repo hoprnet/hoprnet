@@ -254,6 +254,13 @@ pub(crate) struct WholeMessagePackingSink<const C: usize> {
     encode_buf: BytesMut,
 }
 
+const _: () = {
+    const fn assert_send<T: Send>() {}
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send::<WholeMessagePackingSink<1500>>();
+    assert_send_sync::<PackPayloadBudget>();
+};
+
 impl<const C: usize> Drop for WholeMessagePackingSink<C> {
     fn drop(&mut self) {
         // Close the sender so the background task sees EOF and flushes queued messages into a
@@ -415,16 +422,10 @@ async fn run_packer<const C: usize, W>(
         let event = if let Some(t) = timer.as_mut() {
             futures::select_biased! {
                 _ = t.sleep.as_mut() => PackerEvent::TimerExpired,
-                cmd = rx.next() => match cmd {
-                    Some(cmd) => PackerEvent::Command(cmd),
-                    None => PackerEvent::Closed,
-                },
+                cmd = rx.next() => cmd.map_or(PackerEvent::Closed, PackerEvent::Command),
             }
         } else {
-            match rx.next().await {
-                Some(cmd) => PackerEvent::Command(cmd),
-                None => PackerEvent::Closed,
-            }
+            rx.next().await.map_or(PackerEvent::Closed, PackerEvent::Command)
         };
 
         match event {
@@ -559,7 +560,9 @@ impl<const C: usize> Sink<SessionMessage<C>> for WholeMessagePackingSink<C> {
         if !this.pending_frame.is_empty() {
             let Some(tx) = this.tx.as_mut() else {
                 this.pending_frame.clear();
-                return Poll::Ready(Err(broken_pipe("packer sink closed")));
+                return Poll::Ready(Err(this
+                    .stored_error()
+                    .unwrap_or_else(|| broken_pipe("packer sink closed"))));
             };
             let batch = std::mem::take(&mut this.pending_frame);
             if let Err(e) = tx.start_send(PackerCommand::Batch(batch)) {
@@ -660,11 +663,9 @@ mod tests {
     use parking_lot::Mutex;
 
     use super::*;
-    #[cfg(feature = "telemetry")]
-    use crate::socket::telemetry::NoopTracker;
     use crate::{
         MAX_SESSION_MTU,
-        socket::{SessionSocket, SessionSocketConfig},
+        socket::{SessionSocket, SessionSocketConfig, state::Stateless},
     };
 
     const WIRE_MTU: usize = ApplicationData::PAYLOAD_SIZE; // 3,238 B
@@ -745,11 +746,65 @@ mod tests {
         }
     }
 
+    type PackedSocketPair = (
+        SessionSocket<WIRE_MTU, Stateless<WIRE_MTU>>,
+        SessionSocket<WIRE_MTU, Stateless<WIRE_MTU>>,
+        Arc<Mutex<Vec<Bytes>>>,
+    );
+
+    fn datagram_socket_cfg(pack_delay: Option<Duration>) -> SessionSocketConfig {
+        SessionSocketConfig {
+            frame_size: MAX_SESSION_MTU,
+            flush_immediately: true,
+            datagram: true,
+            pack_delay,
+            ..Default::default()
+        }
+    }
+
+    /// Builds a packed sender and an unmodified (v5.0.4: `pack_delay: None`) receiver wired
+    /// through a [`RecordingPacketPipe`].
+    fn make_packed_socket_pair(
+        pack_delay: Duration,
+        drop_indices: Vec<usize>,
+        budget: Option<PackPayloadBudget>,
+        receiver_frame_timeout: Option<Duration>,
+    ) -> anyhow::Result<PackedSocketPair> {
+        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(drop_indices);
+        let sender = SessionSocket::<WIRE_MTU, _>::stateless_builder(
+            "sender",
+            sender_pipe,
+            datagram_socket_cfg(Some(pack_delay)),
+        )
+        .pack_budget(budget)
+        .build()?;
+
+        let mut receiver_cfg = datagram_socket_cfg(None);
+        if let Some(timeout) = receiver_frame_timeout {
+            receiver_cfg.frame_timeout = timeout;
+        }
+        let receiver =
+            SessionSocket::<WIRE_MTU, _>::stateless_builder("receiver", receiver_pipe, receiver_cfg).build()?;
+
+        Ok((sender, receiver, writes))
+    }
+
     #[test]
-    fn pack_payload_budget_debug_is_opaque() {
+    fn pack_payload_budget_and_stateless_builder_debug_are_opaque() {
         let budget = PackPayloadBudget::new(|| 1024);
         assert_eq!(1024, budget.current_limit());
         assert_eq!("PackPayloadBudget(\"..\")", format!("{budget:?}"));
+
+        let (pipe, _peer, _writes) = RecordingPacketPipe::pair(vec![]);
+        let builder = SessionSocket::<WIRE_MTU, _>::stateless_builder(
+            "debug-check",
+            pipe,
+            datagram_socket_cfg(Some(Duration::from_millis(10))),
+        )
+        .pack_budget(budget);
+        let dbg = format!("{builder:?}");
+        assert!(dbg.contains("StatelessSocketBuilder"), "unexpected Debug output: {dbg}");
+        assert!(dbg.contains("PackPayloadBudget"), "unexpected Debug output: {dbg}");
     }
 
     #[test]
@@ -911,40 +966,8 @@ mod tests {
 
     #[tokio::test]
     async fn packs_two_full_mtu_datagrams_per_packet_and_unmodified_receiver_decodes_all() -> anyhow::Result<()> {
-        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(vec![]);
-
-        let sender_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            pack_delay: Some(Duration::from_millis(20)),
-            ..Default::default()
-        };
-        // Unmodified receiver configuration (matches v5.0.4: pack_delay = None).
-        let receiver_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            pack_delay: None,
-            ..Default::default()
-        };
-
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "sender",
-            sender_pipe,
-            sender_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        let mut receiver = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "receiver",
-            receiver_pipe,
-            receiver_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
+        let (mut sender, mut receiver, writes) =
+            make_packed_socket_pair(Duration::from_millis(20), vec![], None, None)?;
 
         for i in 0..7u8 {
             let msg = vec![0x10 + i; MAX_SESSION_MTU];
@@ -983,39 +1006,8 @@ mod tests {
 
     #[tokio::test]
     async fn packs_small_datagrams_up_to_20_per_packet_without_splitting() -> anyhow::Result<()> {
-        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(vec![]);
-
-        let sender_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            pack_delay: Some(Duration::from_millis(20)),
-            ..Default::default()
-        };
-        let receiver_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            pack_delay: None,
-            ..Default::default()
-        };
-
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "sender",
-            sender_pipe,
-            sender_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        let mut receiver = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "receiver",
-            receiver_pipe,
-            receiver_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
+        let (mut sender, mut receiver, writes) =
+            make_packed_socket_pair(Duration::from_millis(20), vec![], None, None)?;
 
         for i in 0..26u8 {
             let msg = vec![i; 148];
@@ -1054,39 +1046,11 @@ mod tests {
     #[tokio::test]
     async fn dropping_one_packed_packet_loses_only_its_datagrams() -> anyhow::Result<()> {
         // Drop packet index 1 (holding burst datagrams 1 and 2, after isolated datagram 0).
-        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(vec![1]);
-
-        let sender_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            pack_delay: Some(Duration::from_millis(20)),
-            ..Default::default()
-        };
-        let receiver_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            frame_timeout: Duration::from_millis(50),
-            flush_immediately: true,
-            datagram: true,
-            pack_delay: None,
-            ..Default::default()
-        };
-
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "sender",
-            sender_pipe,
-            sender_cfg,
+        let (mut sender, mut receiver, writes) = make_packed_socket_pair(
+            Duration::from_millis(20),
+            vec![1],
             None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        let mut receiver = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "receiver",
-            receiver_pipe,
-            receiver_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
+            Some(Duration::from_millis(50)),
         )?;
 
         for i in 0..7u8 {
@@ -1136,40 +1100,8 @@ mod tests {
 
     #[tokio::test]
     async fn isolated_datagram_flushes_immediately_without_waiting_for_pack_delay() -> anyhow::Result<()> {
-        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(vec![]);
-
-        let sender_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            // Deliberately huge pack_delay: an isolated datagram must NOT wait for it.
-            pack_delay: Some(Duration::from_secs(5)),
-            ..Default::default()
-        };
-        let receiver_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            pack_delay: None,
-            ..Default::default()
-        };
-
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "sender",
-            sender_pipe,
-            sender_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        let mut receiver = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "receiver",
-            receiver_pipe,
-            receiver_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
+        // Deliberately huge pack_delay: an isolated datagram must NOT wait for it.
+        let (mut sender, mut receiver, writes) = make_packed_socket_pair(Duration::from_secs(5), vec![], None, None)?;
 
         let payload = b"single interactive ping datagram";
         sender.write_all(payload).await?;
@@ -1183,41 +1115,9 @@ mod tests {
 
     #[tokio::test]
     async fn nearly_full_packed_packet_flushes_immediately_without_timer_wait() -> anyhow::Result<()> {
-        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(vec![]);
-
-        let sender_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            // Huge pack_delay: once 2 × 1,462 B = 2,924 B are buffered (314 B left < 1,462 B),
-            // the packer must flush immediately instead of waiting 5 seconds.
-            pack_delay: Some(Duration::from_secs(5)),
-            ..Default::default()
-        };
-        let receiver_cfg = SessionSocketConfig {
-            frame_size: MAX_SESSION_MTU,
-            flush_immediately: true,
-            datagram: true,
-            pack_delay: None,
-            ..Default::default()
-        };
-
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "sender",
-            sender_pipe,
-            sender_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        let mut receiver = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "receiver",
-            receiver_pipe,
-            receiver_cfg,
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
+        // Huge pack_delay: once 2 × 1,462 B = 2,924 B are buffered (314 B left < 1,462 B),
+        // the packer must flush immediately instead of waiting 5 seconds.
+        let (mut sender, mut receiver, writes) = make_packed_socket_pair(Duration::from_secs(5), vec![], None, None)?;
 
         // Msg 0 is isolated (flushes immediately); msgs 1 and 2 form a full 2-segment packet
         // (2,924 B) that must flush immediately without waiting for the 5 s timer.
@@ -1388,20 +1288,12 @@ mod tests {
         }
 
         let (drop_tx, drop_rx) = oneshot::channel();
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
+        let mut sender = SessionSocket::<WIRE_MTU, _>::stateless_builder(
             "stalled",
             StalledWriter { _drop_signal: drop_tx },
-            SessionSocketConfig {
-                frame_size: MAX_SESSION_MTU,
-                flush_immediately: true,
-                datagram: true,
-                pack_delay: Some(Duration::from_millis(10)),
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
+            datagram_socket_cfg(Some(Duration::from_millis(10))),
+        )
+        .build()?;
 
         // Enqueue a datagram so the packer task is parked inside `writer.write_all`.
         sender.write_all(b"stuck").await?;
@@ -1419,37 +1311,8 @@ mod tests {
 
     #[tokio::test]
     async fn dropping_socket_with_healthy_writer_flushes_queued_messages() -> anyhow::Result<()> {
-        let (sender_pipe, receiver_pipe, _writes) = RecordingPacketPipe::pair(vec![]);
-
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "drop-flush",
-            sender_pipe,
-            SessionSocketConfig {
-                frame_size: MAX_SESSION_MTU,
-                flush_immediately: true,
-                datagram: true,
-                // Long pack_delay so msg 1 is still buffered in the packer when `sender` drops.
-                pack_delay: Some(Duration::from_secs(5)),
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        let mut receiver = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "receiver",
-            receiver_pipe,
-            SessionSocketConfig {
-                frame_size: MAX_SESSION_MTU,
-                flush_immediately: true,
-                datagram: true,
-                pack_delay: None,
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
+        // Long pack_delay so msg 1 is still buffered in the packer when `sender` drops.
+        let (mut sender, mut receiver, _writes) = make_packed_socket_pair(Duration::from_secs(5), vec![], None, None)?;
 
         sender.write_all(b"first").await?;
         sender.write_all(b"second-buffered").await?;
@@ -1471,37 +1334,8 @@ mod tests {
 
     #[tokio::test]
     async fn inter_arrival_above_pack_delay_flushes_each_datagram_immediately() -> anyhow::Result<()> {
-        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(vec![]);
-        let pack_delay = Duration::from_millis(40);
-
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "spaced",
-            sender_pipe,
-            SessionSocketConfig {
-                frame_size: MAX_SESSION_MTU,
-                flush_immediately: true,
-                datagram: true,
-                pack_delay: Some(pack_delay),
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
-        let mut receiver = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "receiver",
-            receiver_pipe,
-            SessionSocketConfig {
-                frame_size: MAX_SESSION_MTU,
-                flush_immediately: true,
-                datagram: true,
-                pack_delay: None,
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
+        let (mut sender, mut receiver, writes) =
+            make_packed_socket_pair(Duration::from_millis(40), vec![], None, None)?;
 
         let mut buf = vec![0u8; 64];
         // Spacing = 55 ms (> pack_delay = 40 ms, but < 2 × pack_delay = 80 ms): with a 1× burst
@@ -1549,20 +1383,12 @@ mod tests {
             }
         }
 
-        let mut sender = SessionSocket::<WIRE_MTU, _>::new_stateless(
+        let mut sender = SessionSocket::<WIRE_MTU, _>::stateless_builder(
             "blocked",
             BlockedWriter,
-            SessionSocketConfig {
-                frame_size: MAX_SESSION_MTU,
-                flush_immediately: true,
-                datagram: true,
-                pack_delay: Some(Duration::from_millis(10)),
-                ..Default::default()
-            },
-            None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
-        )?;
+            datagram_socket_cfg(Some(Duration::from_millis(10))),
+        )
+        .build()?;
 
         // With PACKER_CHANNEL_CAPACITY = 32, writing 64 datagrams must hit backpressure and block
         // rather than silently buffering hundreds of messages.
@@ -1615,12 +1441,8 @@ mod tests {
         };
 
         // First send triggers the failing write and flushes; wait for the error to propagate.
-        let err = sink
-            .send(SessionMessage::<WIRE_MTU>::Segment(seg.clone()))
-            .await
-            .expect_err("expected ConnectionReset error during send/flush");
-        match err {
-            SessionError::IoError(io_err) => assert_eq!(std::io::ErrorKind::ConnectionReset, io_err.kind()),
+        match sink.send(SessionMessage::<WIRE_MTU>::Segment(seg.clone())).await {
+            Err(SessionError::IoError(io_err)) => assert_eq!(std::io::ErrorKind::ConnectionReset, io_err.kind()),
             other => anyhow::bail!("expected SessionError::IoError(ConnectionReset), got {other:?}"),
         }
 
@@ -1689,36 +1511,14 @@ mod tests {
     async fn pack_budget_dynamically_limits_packet_size() -> anyhow::Result<()> {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
-        let (sender_pipe, receiver_pipe, writes) = RecordingPacketPipe::pair(vec![]);
         let budget_bytes = Arc::new(AtomicUsize::new(2000));
         let budget_clone = budget_bytes.clone();
 
-        let mut sender = SessionSocket::<WIRE_MTU, _>::stateless_builder(
-            "budgeted",
-            sender_pipe,
-            SessionSocketConfig {
-                frame_size: MAX_SESSION_MTU,
-                flush_immediately: true,
-                datagram: true,
-                pack_delay: Some(Duration::from_millis(20)),
-                ..Default::default()
-            },
-        )
-        .pack_budget(PackPayloadBudget::new(move || budget_clone.load(Ordering::Relaxed)))
-        .build()?;
-        let mut receiver = SessionSocket::<WIRE_MTU, _>::new_stateless(
-            "receiver",
-            receiver_pipe,
-            SessionSocketConfig {
-                frame_size: MAX_SESSION_MTU,
-                flush_immediately: true,
-                datagram: true,
-                pack_delay: None,
-                ..Default::default()
-            },
+        let (mut sender, mut receiver, writes) = make_packed_socket_pair(
+            Duration::from_millis(20),
+            vec![],
+            Some(PackPayloadBudget::new(move || budget_clone.load(Ordering::Relaxed))),
             None,
-            #[cfg(feature = "telemetry")]
-            NoopTracker,
         )?;
 
         // With budget = 2,000 B, two full-MTU segments (2,924 B) cannot be packed together.
@@ -2101,16 +1901,8 @@ mod tests {
             );
 
             let msg_300 = |frame_id: u32, byte: u8| {
-                // Encoded segment = 300 B total (`WIRE_MTU` header overhead is 10 B).
-                let probe = SessionMessage::<WIRE_MTU>::Segment(crate::Segment {
-                    frame_id,
-                    seq_idx: 0,
-                    seq_flags: crate::SeqIndicator::new(1),
-                    data: vec![byte; 290].into_boxed_slice(),
-                });
-                let mut enc = BytesMut::new();
-                SessionCodec::<WIRE_MTU>.encode(probe.clone(), &mut enc).unwrap();
-                let target_payload = 290usize + 300 - enc.len();
+                // Encoded segment = 300 B total (`SEGMENT_OVERHEAD` bytes of framing + payload).
+                let target_payload = 300usize - SessionMessage::<WIRE_MTU>::SEGMENT_OVERHEAD;
                 SessionMessage::<WIRE_MTU>::Segment(crate::Segment {
                     frame_id,
                     seq_idx: 0,

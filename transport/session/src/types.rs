@@ -18,15 +18,15 @@ use hopr_api::{
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
-    prelude::{HoprPixCommitmentProof, HoprPixGroupElement},
+    prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
 use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, FrameLossSignal, ReliableSocket,
-    SegmentRequest, SeqIndicator, SessionSocketConfig, StreamProgress, UnreliableSocket,
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, FrameLossSignal, PackPayloadBudget,
+    ReliableSocket, SegmentRequest, SeqIndicator, SessionSocketConfig, StreamProgress, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
@@ -619,7 +619,6 @@ pub struct HoprSessionConfig {
     /// Note that `AsyncWrite::poll_flush` forces an immediate packet flush, so callers that flush
     /// after every individual datagram (including `transfer_session_datagram` while it flushes per
     /// datagram) bypass burst packing until the caller flushes only when idle or on shutdown.
-    #[default(None)]
     #[serde(with = "humantime_serde")]
     pub datagram_pack_delay: Option<Duration>,
     /// First frame ID of the stream in both directions, set when this Session takes over a predecessor's;
@@ -736,16 +735,14 @@ where
 fn forward_pack_budget(
     surb_mgmt: Option<Arc<BalancerStateValues>>,
     max_surbs_per_data_packet: usize,
-) -> Option<hopr_protocol_session::PackPayloadBudget> {
-    use hopr_crypto_packet::prelude::HoprPacket;
-
+) -> Option<PackPayloadBudget> {
     let max_data_surbs = (HoprPacket::MAX_SURBS_IN_PACKET - 1).min(max_surbs_per_data_packet);
     if max_data_surbs == 0 {
         return None;
     }
     let bypass_balancer = max_surbs_per_data_packet == usize::MAX;
 
-    Some(hopr_protocol_session::PackPayloadBudget::new(move || {
+    Some(PackPayloadBudget::new(move || {
         let reserved_surbs = if bypass_balancer {
             // `usize::MAX` bypasses the balancer gate in `SessionManager` and attaches as many
             // SURBs as fit on every data packet regardless of estimated deficit.
@@ -2143,7 +2140,7 @@ mod tests {
         assert!(
             total_lens
                 .iter()
-                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 1),
+                .all(|&len| HoprPacket::max_surbs_with_message(len) >= 1),
             "forward session without surb_management must preserve room for >=1 SURB per packet, got lengths \
              {total_lens:?}"
         );
@@ -2188,7 +2185,7 @@ mod tests {
         assert!(
             total_lens
                 .iter()
-                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 4),
+                .all(|&len| HoprPacket::max_surbs_with_message(len) >= 4),
             "every packet must retain room for >=4 SURBs, got lengths {total_lens:?}"
         );
         Ok(())
@@ -2233,9 +2230,7 @@ mod tests {
         }
         assert!(!ack_pkts.is_empty());
         assert!(
-            ack_pkts
-                .iter()
-                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 7),
+            ack_pkts.iter().all(|&len| HoprPacket::max_surbs_with_message(len) >= 7),
             "forward ACK packets must preserve room for 7 SURBs while deficit>0, got lengths {ack_pkts:?}"
         );
 
@@ -2251,7 +2246,7 @@ mod tests {
         assert!(
             mtu_deficit_pkts
                 .iter()
-                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 4),
+                .all(|&len| HoprPacket::max_surbs_with_message(len) >= 4),
             "each forward full-MTU packet must leave room for 4 SURBs, got {mtu_deficit_pkts:?}"
         );
 
@@ -2322,7 +2317,7 @@ mod tests {
         assert!(
             total_lens
                 .iter()
-                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 1),
+                .all(|&len| HoprPacket::max_surbs_with_message(len) >= 1),
             "every forward packet during silence_sustain must preserve room for >=1 SURB, got {total_lens:?}"
         );
         Ok(())
@@ -2417,7 +2412,7 @@ mod tests {
         assert!(
             total_lens
                 .iter()
-                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 2),
+                .all(|&len| HoprPacket::max_surbs_with_message(len) >= 2),
             "every forward packet must preserve room for >=2 SURBs, got {total_lens:?}"
         );
         // With cap=2 SURBs (vs 7 SURBs which leaves only ~473 B), burst ACKs pack well above 1,000 B.
@@ -2474,7 +2469,7 @@ mod tests {
         assert!(
             total_lens
                 .iter()
-                .all(|&len| hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(len) >= 4),
+                .all(|&len| HoprPacket::max_surbs_with_message(len) >= 4),
             "every full-MTU packet must leave room for >=4 SURBs under usize::MAX bypass, got {total_lens:?}"
         );
         Ok(())

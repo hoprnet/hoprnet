@@ -136,7 +136,10 @@ where
                         );
 
                         *this.frame_id += 1;
-                        let first = this.ready_segments.pop_front().unwrap();
+                        let first = this
+                            .ready_segments
+                            .pop_front()
+                            .expect("non-empty datagram produces at least one segment");
                         this.inner.as_mut().start_send(first).map_err(std::io::Error::other)?;
                         if !this.ready_segments.is_empty() {
                             *this.state = State::WritingFrame;
@@ -277,7 +280,10 @@ where
             if !this.ready_segments.is_empty() {
                 futures::ready!(this.inner.as_mut().poll_ready(cx).map_err(std::io::Error::other))?;
 
-                let segment = this.ready_segments.pop_front().unwrap();
+                let segment = this
+                    .ready_segments
+                    .pop_front()
+                    .expect("ready_segments checked non-empty");
                 tracing::trace!(seg_id = %segment.id(), "segment draining out");
 
                 this.inner.as_mut().start_send(segment).map_err(std::io::Error::other)?;
