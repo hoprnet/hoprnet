@@ -840,10 +840,7 @@ fn cluster_fixture_inner(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
-                        Some(hopr_ct_full_network::EgressConfig {
-                            interval: std::time::Duration::from_secs(3),
-                            ..Default::default()
-                        }), // moderate setting to allow probing without saturating relay traffic
+                        Some(hopr_ct_full_network::EgressConfig::default()),
                         connector.clone(),
                         match echo_mode {
                             EchoMode::Echo => EchoServer::with_counter_and_echo(echo_counter),
@@ -1069,10 +1066,7 @@ where
                         cfg.establish_retry_timeout,
                     );
 
-                    let prober = Some(hopr_ct_full_network::EgressConfig {
-                        interval: std::time::Duration::from_secs(3),
-                        ..Default::default()
-                    });
+                    let prober = Some(hopr_ct_full_network::EgressConfig::default());
 
                     let node: anyhow::Result<RawRoleNode> = if is_entry {
                         let instance = crate::testing::wiring::build_entry_with_chain(

@@ -52,17 +52,20 @@ where
 {
     let path_cfg = config.protocol.path_planner;
     let graph: SharedChannelGraph = Arc::new(
-        ChannelGraph::with_edge_params(
+        ChannelGraph::with_config(
             *packet_key.public(),
-            path_cfg.edge_penalty,
-            path_cfg.min_ack_rate,
-            path_cfg.max_plausible_loopback_rtt,
+            hopr_network_graph::ChannelGraphConfig {
+                edge_penalty: path_cfg.edge_penalty,
+                min_ack_rate: path_cfg.min_ack_rate,
+                max_plausible_loopback_rtt: path_cfg.max_plausible_loopback_rtt,
+                starvation: hopr_network_graph::StarvationParams {
+                    min_loopbacks_for_rate: path_cfg.min_loopbacks_for_rate,
+                    min_return_rate: path_cfg.min_loopback_return_rate,
+                },
+                ..Default::default()
+            },
         )
-        .with_starvation(hopr_network_graph::StarvationParams {
-            min_loopbacks_for_rate: path_cfg.min_loopbacks_for_rate,
-            min_return_rate: path_cfg.min_loopback_return_rate,
-        })
-        .map_err(|e| anyhow::anyhow!("invalid loopback starvation config: {e}"))?,
+        .map_err(|e| anyhow::anyhow!("invalid channel graph config: {e}"))?,
     );
     let graph_for_ct = graph.clone();
     let safe_address = config.safe_module.safe_address;
@@ -119,7 +122,7 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
+        validator::Validate::validate(pcfg)?;
     }
 
     let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
@@ -159,7 +162,7 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
+        validator::Validate::validate(pcfg)?;
     }
 
     let (ticket_manager, ticket_factory) = ticket_manager_from_chain(&chain_connector, RedbStore::new_temp()?)
@@ -205,7 +208,7 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
+        validator::Validate::validate(pcfg)?;
     }
 
     let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
@@ -248,7 +251,7 @@ where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
+        validator::Validate::validate(pcfg)?;
     }
 
     let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
