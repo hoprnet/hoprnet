@@ -1127,15 +1127,21 @@ mod tests {
                 std::time::Instant::now() < give_up,
                 "the held packet was dropped on its retry without being counted"
             );
-            let polled = stage
+            match stage
                 .next()
                 .timeout(futures_time::time::Duration::from(4 * SURB_RETRY_INTERVAL))
-                .await;
-            anyhow::ensure!(
-                polled.is_err(),
-                "the packet whose retry cannot route must not be emitted"
-            );
+                .await
+            {
+                // Nothing is left once the dropped packet has left the hold.
+                Ok(None) => break,
+                Ok(Some(_)) => anyhow::bail!("the packet whose retry cannot route must not be emitted"),
+                Err(_) => {}
+            }
         }
+        anyhow::ensure!(
+            hopr_transport_session::counters::routing_resolution_failure_count() > failed_before,
+            "the held packet was dropped on its retry without being counted"
+        );
 
         Ok(())
     }
