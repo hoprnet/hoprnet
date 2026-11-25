@@ -36,8 +36,10 @@ const MAX_WAITING_PER_PSEUDONYM: usize = 256;
 /// The most return packets that may wait for a SURB at the same time, over all pseudonyms.
 ///
 /// Bounds the memory and the retries however many counterparties stop sending SURBs. With no room
-/// left, a return packet whose pseudonym has none waiting gets one attempt and no wait, and one
-/// whose pseudonym has a packet waiting is dropped at once.
+/// left, a packet takes the place of the last one queued by the pseudonym with the most queued, if
+/// that is more than its own pseudonym has waiting: queueing more never keeps another pseudonym from
+/// waiting. Failing that, a return packet whose pseudonym has none waiting gets one attempt and no
+/// wait, and one whose pseudonym has a packet waiting is dropped at once.
 const MAX_WAITING: usize = 1024;
 
 /// Default for [`PacketPipelineConfig::surb_resolution_wait`][cfg], used when it is unset.
@@ -270,6 +272,18 @@ where
                 Poll::Ready(None) if running.is_empty() => return Poll::Ready(None),
                 Poll::Ready(None) | Poll::Pending => return Poll::Pending,
             };
+            // No room: the pseudonym with the most packets queued gives up its last one, if it has more
+            // queued than this packet's pseudonym has waiting.
+            if running.len() + queued >= MAX_WAITING {
+                let own = queues.get(&pseudonym).map_or(0, |queue| queue.len() + 1);
+                if let Some((&most, queue)) = queues.iter_mut().max_by_key(|(_, queue)| queue.len())
+                    && queue.len() > own
+                    && let Some((given_up, _)) = queue.pop_back()
+                {
+                    queued -= 1;
+                    drop_unresolved(most, given_up);
+                }
+            }
             let room = running.len() + queued < MAX_WAITING;
             match queues.get_mut(&pseudonym) {
                 // Behind an earlier packet of its pseudonym, with no attempt of its own: it neither
@@ -324,7 +338,7 @@ where
 mod tests {
     use std::sync::{
         Arc,
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     };
 
     use futures_time::future::FutureExt as _;
@@ -1158,6 +1172,152 @@ mod tests {
             (1 + MAX_WAITING_PER_PSEUDONYM + OVERFLOW) as u64,
             refunds.load(Ordering::SeqCst)
         );
+        Ok(())
+    }
+
+    /// Pseudonyms that fill the room with their queues do not take the wait from another pseudonym: its
+    /// packets take the places of the last ones in the longest queues, and wait for their SURBs.
+    #[test_log::test(tokio::test)]
+    async fn pseudonyms_with_full_queues_should_not_take_the_wait_from_another_pseudonym() -> anyhow::Result<()> {
+        const LATE_PACKETS: usize = 8;
+        let full = MAX_WAITING / MAX_WAITING_PER_PSEUDONYM + 1;
+        let late = HoprPseudonym::random();
+        let refunds = Arc::new(AtomicU64::new(0));
+        let mut packets = Vec::new();
+        for _ in 0..full {
+            let pseudonym = HoprPseudonym::random();
+            for _ in 0..1 + MAX_WAITING_PER_PSEUDONYM {
+                packets.push((return_routing(pseudonym), counted(0, &refunds)));
+            }
+        }
+        let submitted = (packets.len() + LATE_PACKETS) as u64;
+        for marker in 1..=LATE_PACKETS as u8 {
+            packets.push((return_routing(late), packet(marker)));
+        }
+
+        let pool = Arc::new(AtomicUsize::new(0));
+        let arrival = pool.clone();
+        tokio::spawn(async move {
+            sleep(std::time::Duration::from_millis(100)).await;
+            arrival.fetch_add(LATE_PACKETS, Ordering::SeqCst);
+        });
+
+        let mut stream = std::pin::pin!(resolve_routing_stage(
+            futures::stream::iter(packets),
+            move |_size_hint, _max_surbs, routing: DestinationRouting| {
+                std::future::ready(match &routing {
+                    DestinationRouting::Return(matcher) if matcher.pseudonym() == late => {
+                        match pool.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1)) {
+                            Ok(before) => Ok((resolved(), Some(before - 1), None)),
+                            Err(_) => Err(no_surb(&routing)),
+                        }
+                    }
+                    _ => Err(no_surb(&routing)),
+                })
+            },
+            TEST_DISTRESS_THRESHOLD,
+            TEST_CONCURRENCY,
+            std::time::Duration::from_secs(2),
+        ));
+
+        let mut markers = Vec::new();
+        for _ in 0..LATE_PACKETS {
+            let item = stream
+                .next()
+                .timeout(futures_time::time::Duration::from_secs(1))
+                .await
+                .map_err(|_| anyhow::anyhow!("a packet of the late pseudonym was not allowed to wait for its SURB"))?
+                .map(|(_, data)| marker_of(&data));
+            markers.push(item);
+            if markers.len() == 1 {
+                assert_eq!(
+                    submitted - MAX_WAITING as u64,
+                    refunds.load(Ordering::SeqCst),
+                    "exactly the packets the room cannot hold are dropped, all of them from the full queues"
+                );
+            }
+        }
+        assert_eq!((1..=LATE_PACKETS as u8).map(Some).collect::<Vec<_>>(), markers);
+
+        let rest = stream
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from(
+                std::time::Duration::from_secs(2) + TEST_TIMEOUT,
+            ))
+            .await
+            .map_err(|_| anyhow::anyhow!("the stage did not end"))?;
+        assert!(rest.is_empty());
+        assert_eq!(
+            (full * (1 + MAX_WAITING_PER_PSEUDONYM)) as u64,
+            refunds.load(Ordering::SeqCst)
+        );
+        Ok(())
+    }
+
+    /// A pseudonym takes no room from one that has no more packets waiting than it has itself, however
+    /// many more it submits.
+    #[test_log::test(tokio::test)]
+    async fn a_pseudonym_should_not_take_room_from_one_that_has_no_more_waiting() -> anyhow::Result<()> {
+        const FLOOD: usize = 300;
+        let others = MAX_WAITING / MAX_WAITING_PER_PSEUDONYM - 1;
+        let flooder = HoprPseudonym::random();
+        let refunds = Arc::new(AtomicU64::new(0));
+        let mut packets = Vec::new();
+        for _ in 0..MAX_WAITING_PER_PSEUDONYM - 1 {
+            packets.push((return_routing(flooder), counted(0, &refunds)));
+        }
+        for _ in 0..others {
+            let pseudonym = HoprPseudonym::random();
+            for _ in 0..MAX_WAITING_PER_PSEUDONYM {
+                packets.push((return_routing(pseudonym), counted(1, &refunds)));
+            }
+        }
+        packets.push((return_routing(HoprPseudonym::random()), counted(1, &refunds)));
+        // The room is exactly full, and nothing has been dropped yet.
+        assert_eq!(MAX_WAITING, packets.len());
+        for _ in 0..FLOOD {
+            packets.push((return_routing(flooder), counted(0, &refunds)));
+        }
+        let submitted = packets.len() as u64;
+
+        let arrived = Arc::new(AtomicBool::new(false));
+        let arrival = arrived.clone();
+        tokio::spawn(async move {
+            sleep(std::time::Duration::from_millis(100)).await;
+            arrival.store(true, Ordering::SeqCst);
+        });
+
+        let stream = resolve_routing_stage(
+            futures::stream::iter(packets),
+            move |_size_hint, _max_surbs, routing: DestinationRouting| {
+                std::future::ready(match &routing {
+                    DestinationRouting::Return(matcher)
+                        if matcher.pseudonym() != flooder && arrived.load(Ordering::SeqCst) =>
+                    {
+                        Ok((resolved(), Some(5), None))
+                    }
+                    _ => Err(no_surb(&routing)),
+                })
+            },
+            TEST_DISTRESS_THRESHOLD,
+            TEST_CONCURRENCY,
+            std::time::Duration::from_secs(2),
+        );
+        let emitted = std::pin::pin!(stream)
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from(
+                std::time::Duration::from_secs(2) + TEST_TIMEOUT,
+            ))
+            .await
+            .map_err(|_| anyhow::anyhow!("the stage did not end"))?;
+
+        assert!(emitted.iter().all(|(_, data)| marker_of(data) == 1));
+        assert_eq!(
+            others * MAX_WAITING_PER_PSEUDONYM + 1,
+            emitted.len(),
+            "the flood took a place from a pseudonym that had no more waiting"
+        );
+        assert_eq!(submitted - emitted.len() as u64, refunds.load(Ordering::SeqCst));
         Ok(())
     }
 
