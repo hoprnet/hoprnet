@@ -174,12 +174,9 @@ pub struct PacketPipelineConfig {
     /// return packet the first time its SURBs are missing.
     ///
     /// The right value trades two failures against each other. Too short loses data on a session
-    /// whose SURB pool is only momentarily empty, which is why the wait exists at all. Too long
-    /// stalls **every** packet the node originates, not just this one: resolution preserves
-    /// submission order, so an unresolvable packet withholds everything behind it, and a
-    /// counterparty that has gone away never sends another SURB. An unbounded wait here took a
-    /// production exit's entire egress down for 1h44m while it still forwarded and acknowledged
-    /// normally.
+    /// whose SURB pool is only momentarily empty, which is why the wait exists at all. Too long holds
+    /// the later packets of the same pseudonym behind a packet whose counterparty has gone away and
+    /// never sends another SURB. Packets of other pseudonyms do not wait for it.
     ///
     /// **Set this if you know your session's frame timeout.** The default errs long, because a
     /// library cannot know it; a packet held past that timeout is discarded by the receiver anyway,
