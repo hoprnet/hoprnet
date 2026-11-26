@@ -1025,6 +1025,11 @@ impl HoprSession {
     /// `None` when the Session ended without a reason from the Exit, and for a Session not built by a
     /// [`SessionManager`].
     ///
+    /// Only meaningful on the Entry: nothing sets it on an Exit-side Session, where it is always `None`.
+    /// For a Session the Exit names by Session ID (one that is not resumable), a late error about an earlier
+    /// Session under the same pseudonym can close this one, and its reason is then reported here, because the
+    /// wire format cannot name the instance.
+    ///
     /// [`SessionManager`]: crate::SessionManager
     pub fn refusal(&self) -> Option<StartErrorReason> {
         self.refusal.as_ref().and_then(|cell| cell.get().copied())

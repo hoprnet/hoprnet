@@ -1880,7 +1880,7 @@ impl SlotInstance {
         let _ = self.refusal.set(reason);
     }
 
-    /// The Exit's reason for closing this Session during setup, if it did.
+    /// The Exit's reason for closing this Session, during its setup or after it, if it gave one.
     fn refusal(&self) -> Option<StartErrorReason> {
         self.refusal.get().copied()
     }
@@ -11315,6 +11315,7 @@ where
                 // not resumable (a non-PIX Session, or one whose Exit predates resumption) names it by Session ID,
                 // so a stale one can still close a successor: the wire format cannot name the instance. For an
                 // outgoing Session the reason is recorded on the instance that is closed, so the app can read it.
+                // A stale error about an earlier Session under this pseudonym can thus be recorded here.
                 let outgoing = self
                     .sessions
                     .get(&session_id)
@@ -35171,6 +35172,42 @@ mod tests {
         assert!(instance.is_superseded());
         assert!(rig.mgr.sessions.get(&pseudonym).is_none(), "no slot is left");
         assert!(wait_for_no_active_sessions(&rig.mgr).await);
+        Ok(())
+    }
+
+    /// An error naming the Session by its ID, as an Exit does for a Session that is not resumable, fails a setup
+    /// still in progress with the Exit's reason, like one naming the challenge does.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_error_naming_the_session_id_during_setup_fails_new_session_with_the_exits_reason()
+    -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+
+        let injector = async {
+            let instance = slot_instance_in_setup(&rig.mgr, &pseudonym).await?;
+            rig.mgr
+                .handle_session_error(
+                    pseudonym,
+                    StartErrorType {
+                        identifier: ErrorIdentifier::SessionId(pseudonym),
+                        reason: StartErrorReason::UnacceptablePixParams,
+                    },
+                )
+                .await?;
+            Ok::<_, anyhow::Error>(instance)
+        };
+        let (connected, injected) = tokio::join!(rig.connect(balanced_entry_cfg(pseudonym)), injector);
+        let instance = injected?;
+        let err = connected.expect_err("the Exit closed the Session during its setup");
+        assert!(
+            matches!(
+                err.downcast_ref::<TransportSessionError>(),
+                Some(TransportSessionError::Rejected(StartErrorReason::UnacceptablePixParams))
+            ),
+            "got {err:?}"
+        );
+        assert!(instance.is_superseded());
+        assert!(rig.mgr.sessions.get(&pseudonym).is_none(), "no slot is left");
         Ok(())
     }
 
