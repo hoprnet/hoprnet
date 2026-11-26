@@ -163,7 +163,7 @@ hopr-protocol-pix = { version = "0.3.1", path = "protocols/pix", default-feature
 hopr-protocol-session = { version = "2.0.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "4.1.1", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.11.1" }
-hopr-transport = { version = "0.54.3", path = "transport/hopr" }
+hopr-transport = { version = "0.54.4", path = "transport/hopr" }
 hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.38.1", path = "transport/session", default-features = false }
