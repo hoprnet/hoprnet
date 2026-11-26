@@ -1886,12 +1886,18 @@ impl SlotInstance {
     }
 
     /// The error a setup in progress fails with: the Exit's refusal, or `Closed` if this instance was
-    /// replaced or torn down meanwhile. The refusal is checked first, as it also supersedes the instance.
+    /// replaced or torn down meanwhile. The refusal wins when both are set, as it also supersedes the instance.
+    ///
+    /// Supersession is read first. A refusal is recorded before the close that supersedes the instance, and
+    /// the `Acquire` load here pairs with the `Release` store in [`supersede`](Self::supersede), so a setup
+    /// that sees the instance superseded also sees the refusal. Read the other way round, a close landing
+    /// between the two reads would turn the Exit's reason into `Closed`.
     fn setup_failure(&self) -> Option<TransportSessionError> {
+        let superseded = self.is_superseded();
         if let Some(reason) = self.refusal() {
             return Some(TransportSessionError::Rejected(reason));
         }
-        self.is_superseded().then_some(TransportSessionError::Closed)
+        superseded.then_some(TransportSessionError::Closed)
     }
 
     /// Counts an Entry data write as activity: reads the slot (which resets its `time_to_idle`), at
