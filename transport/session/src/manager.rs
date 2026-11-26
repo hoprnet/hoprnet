@@ -30519,12 +30519,30 @@ mod tests {
 
         use crate::types::{DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SURPLUS_SHARES};
 
-        // A shared pool smaller than the burst, as on any Exit. Only a process of its own, as under
-        // nextest, lets the test size it.
-        if cpu::init_thread_pool(2).is_err() {
-            tracing::warn!("skipped: the shared CPU pool was built before this test could size it");
+        // The test sizes the shared pool, which takes a process of its own, so it runs itself again,
+        // alone, in a child process. Under `cargo test` its siblings would share the pool.
+        const ALONE: &str = "HOPR_TEST_SSA_COMMIT_BURST_ALONE";
+        if std::env::var_os(ALONE).is_none() {
+            let module = module_path!().split_once("::").map_or("", |(_, module)| module);
+            let name = format!("{module}::ssa_commit_burst_leaves_the_shared_pool_to_packets");
+            let run = std::process::Command::new(std::env::current_exe()?)
+                .args(["--exact", name.as_str(), "--nocapture"])
+                .env(ALONE, "1")
+                .output()?;
+            let stdout = String::from_utf8_lossy(&run.stdout);
+            print!("{stdout}{}", String::from_utf8_lossy(&run.stderr));
+            anyhow::ensure!(
+                run.status.success() && stdout.contains("test result: ok. 1 passed;"),
+                "the test failed, or did not run, in a process of its own"
+            );
             return Ok(());
         }
+
+        // A shared pool smaller than the burst, as on any Exit.
+        anyhow::ensure!(
+            cpu::init_thread_pool(2).is_ok(),
+            "the shared CPU pool was built before this test could size it"
+        );
 
         let dims = SsaGeneratorConfig {
             polynomials_per_ssa: DEFAULT_PIX_POLYS_PER_SSA,
@@ -30587,21 +30605,21 @@ mod tests {
         let burst_len = burst.len();
 
         // Packet decodes, one every 2 ms, each waiting on the shared pool as the pipeline's do.
-        let probes = Arc::new(parking_lot::Mutex::new(Vec::<(Instant, Duration)>::new()));
         let stop = Arc::new(AtomicBool::new(false));
         let prober = tokio::spawn({
-            let (probes, stop) = (probes.clone(), stop.clone());
+            let stop = stop.clone();
             async move {
                 let mut tick = tokio::time::interval(Duration::from_millis(2));
+                let mut probes = Vec::new();
                 while !stop.load(Ordering::Relaxed) {
                     tick.tick().await;
-                    let probes = probes.clone();
-                    tokio::spawn(async move {
+                    probes.push(tokio::spawn(async {
                         let sent = Instant::now();
                         let _ = cpu::spawn_decode_blocking(|| (), "packet_decode").await;
-                        probes.lock().push((sent, sent.elapsed()));
-                    });
+                        (sent, sent.elapsed())
+                    }));
                 }
+                probes
             }
         });
 
@@ -30612,8 +30630,10 @@ mod tests {
         }
         let burst_time = started.elapsed();
         stop.store(true, Ordering::Relaxed);
-        prober.await?;
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Every probe must come back: one still queued would leave its wait out of the verdict.
+        let probes = tokio::time::timeout(Duration::from_secs(5), futures::future::try_join_all(prober.await?))
+            .await
+            .context("a probed packet decode never finished")??;
 
         let completed = tokio::time::timeout(Duration::from_secs(5), async {
             while let Some(event) = pix_events_rx.next().await {
@@ -30627,10 +30647,9 @@ mod tests {
         assert!(completed, "the burst must complete the cycle's commitment");
 
         let mut waits: Vec<Duration> = probes
-            .lock()
-            .iter()
+            .into_iter()
             .filter(|(sent, _)| *sent >= started && *sent < started + burst_time)
-            .map(|(_, wait)| *wait)
+            .map(|(_, wait)| wait)
             .collect();
         waits.sort_unstable();
         let worst = *waits.last().context("no packet decode was probed during the burst")?;

@@ -44,11 +44,11 @@
 //! | `hopr_pix_cycle_phase_seconds` | MultiHistogram | seconds | cycle leaves a phase | `phase` — same set as `hopr_pix_cycles_active` |
 //! | `hopr_pix_deposits_confirmed_uhopr_total` | SimpleCounter | µHOPR | deposit confirmed | — |
 //! | `hopr_pix_deposits_recovered_uhopr_total` | SimpleCounter | µHOPR | cycle finalization (recovered) | — |
+//! | `hopr_pix_pool_queue_wait_seconds` | SimpleHistogram | seconds | PIX pool job ends | — |
+//! | `hopr_pix_pool_execution_seconds` | MultiHistogram | seconds | PIX pool job ends | `operation` = `commitment_ingest\|commitment_generation` |
 //! | `hopr_pix_closures_total` | MultiCounter | Sessions | supervisor close | `reason` — see [`SessionPixCloseReason`] |
 //! | `hopr_pix_fill_backoff_total` | MultiCounter | occasions | fill withheld / stall onset | `reason` = `surb_reserve\|stalled` |
 //! | `hopr_pix_resumptions_total` | MultiCounter | occasions | data plane ends and the Session is detached / an Entry takes a held Session over / the resume window runs out / a takeover is refused | `event` = `detached\|taken_over\|window_expired\|refused` |
-//! | `hopr_pix_pool_queue_wait_seconds` | SimpleHistogram | seconds | PIX pool job ends | — |
-//! | `hopr_pix_pool_execution_seconds` | MultiHistogram | seconds | PIX pool job ends | `operation` = `commitment_ingest\|commitment_generation` |
 //!
 //! A *detached* Session (see `hopr_pix_resumptions_total`) is still a live PIX Session: its supervisor
 //! and cycles carry on, so `hopr_pix_sessions_active` and `hopr_pix_cycles_active` count it for the
