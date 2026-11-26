@@ -33,11 +33,30 @@ use crate::{
     types::{NeighborProbe, NeighborTelemetry, PathTelemetry},
 };
 
-/// Longest a pong waits for egress capacity; a pong later than the probe timeout is useless.
+/// Longest a pong waits for egress capacity before it is dropped. It matches the default probe timeout: a pong the
+/// pinger has already given up on is no use.
 const PONG_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// Maximum number of pongs waiting for egress capacity node-wide; further pongs are dropped.
 const MAX_PENDING_PONGS: usize = 64;
+
+/// Cumulative count of pongs dropped because [`MAX_PENDING_PONGS`] pongs were already pending.
+pub static PONG_PENDING_LIMIT_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative count of pongs dropped because too many pongs were pending.
+#[inline]
+pub fn pong_pending_limit_drop_count() -> usize {
+    PONG_PENDING_LIMIT_DROPS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Cumulative count of pongs dropped because the egress lane stayed full for [`PONG_SEND_TIMEOUT`].
+pub static PONG_TIMEOUT_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative count of pongs dropped because their send timed out.
+#[inline]
+pub fn pong_timeout_drop_count() -> usize {
+    PONG_TIMEOUT_DROPS.load(std::sync::atomic::Ordering::Relaxed)
+}
 
 type CacheNeighborKey = (HoprPseudonym, NeighborProbe);
 type CacheNeighborValue = (Box<NodeId>, std::time::Duration, Option<PingQueryReplier>);
@@ -83,6 +102,7 @@ where
         T::Error: Send,
     {
         let Ok(permit) = self.pending_pongs.clone().try_acquire_owned() else {
+            PONG_PENDING_LIMIT_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             tracing::debug!(%pseudonym, "dropped a pong: too many pongs pending");
             return;
         };
@@ -91,7 +111,10 @@ where
                 match timeout_fut(PONG_SEND_TIMEOUT, push_to_network.send((routing, data))).await {
                     Ok(Ok(())) => {}
                     Ok(Err(_)) => tracing::error!(%pseudonym, "failed to send back a pong"),
-                    Err(_) => tracing::debug!(%pseudonym, "dropped a pong: the egress lane stayed full"),
+                    Err(_) => {
+                        PONG_TIMEOUT_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        tracing::debug!(%pseudonym, "dropped a pong: the egress lane stayed full")
+                    }
                 }
                 drop(permit);
             }
@@ -1773,6 +1796,7 @@ mod tests {
     #[tokio::test]
     async fn pongs_beyond_the_bound_are_dropped_without_blocking() -> anyhow::Result<()> {
         let classifier = pong_test_classifier();
+        let drops = pong_pending_limit_drop_count();
         for _ in 0..MAX_PENDING_PONGS + 10 {
             let result = tokio::time::timeout(
                 Duration::from_secs(1),
@@ -1782,6 +1806,23 @@ mod tests {
             assert!(matches!(result, ProbeDispatch::Consumed));
         }
         assert_eq!(classifier.pending_pongs.available_permits(), 0);
+        assert!(pong_pending_limit_drop_count() >= drops + 10);
+        Ok(())
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_pong_that_times_out_is_counted_and_releases_its_permit() -> anyhow::Result<()> {
+        let classifier = pong_test_classifier();
+        let drops = pong_timeout_drop_count();
+        let result = classifier
+            .classify(NeverReady, HoprPseudonym::random(), ping_in()?)
+            .await;
+        assert!(matches!(result, ProbeDispatch::Consumed));
+        assert_eq!(classifier.pending_pongs.available_permits(), MAX_PENDING_PONGS - 1);
+
+        tokio::time::sleep(PONG_SEND_TIMEOUT + Duration::from_secs(1)).await;
+        assert!(pong_timeout_drop_count() > drops);
+        assert_eq!(classifier.pending_pongs.available_permits(), MAX_PENDING_PONGS);
         Ok(())
     }
 }
