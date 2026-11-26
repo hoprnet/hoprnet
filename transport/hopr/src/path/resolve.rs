@@ -79,6 +79,7 @@ pub(crate) fn surb_resolution_wait(configured: Option<std::time::Duration>) -> s
 /// A packet whose routing cannot be resolved is dropped and counted. A packet whose *return* routing
 /// finds no SURB is retried for up to `surb_wait` before being dropped the same way; see
 /// [`DEFAULT_SURB_RESOLUTION_WAIT`] for why that bound has to exist.
+/// A pong is the exception: its SURB came with its ping, so it gets one attempt.
 ///
 /// Ordering is deliberate: out-of-order delivery to the entry's reassembler makes the sequencer
 /// discard frames that arrive after `frame_timeout`. Forward routes are resolved concurrently in a
@@ -127,6 +128,8 @@ where
                     hopr_transport_session::counters::ROUTING_RESOLUTION_ATTEMPTS
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     trace!(?unresolved, "resolving routing for packet");
+                    let pong = matches!(unresolved, DestinationRouting::Return(_))
+                        && data.data.application_tag == hopr_protocol_app::prelude::ReservedTag::Ping.into();
                     match resolve(
                         data.data.total_len(),
                         data.estimate_surbs_with_msg(),
@@ -166,18 +169,30 @@ where
                             trace!(?resolved, "resolved routing for packet");
                             return Some(crate::trace_context::WithContext::new((resolved, data), output_span));
                         }
-                        Err(error) if error.is_surb() && std::time::Instant::now() >= deadline => {
+                        // A pong is not retried: the only SURB it can use came in the same packet as its
+                        // ping and is stored before the probe sees the ping, so if it is missing now, no
+                        // other is coming.
+                        Err(error) if error.is_surb() && (pong || std::time::Instant::now() >= deadline) => {
                             hopr_transport_session::counters::ROUTING_RESOLUTION_SURB_TIMEOUTS
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            // Warn rather than trace: this is the only externally visible sign that
-                            // a counterparty has stopped replenishing, and the outage it replaces
-                            // was invisible precisely because nothing on this path said anything.
-                            warn!(
-                                ?unresolved,
-                                ?surb_wait,
-                                %error,
-                                "dropping an outgoing packet: no SURB for its return path within the wait"
-                            );
+                            if pong {
+                                // Not a warning: whether a ping brings a SURB is up to whoever sent it.
+                                tracing::debug!(
+                                    ?unresolved,
+                                    %error,
+                                    "dropping a pong: its ping left no SURB to answer on"
+                                );
+                            } else {
+                                // Warn rather than trace: this is the only externally visible sign that
+                                // a counterparty has stopped replenishing, and the outage it replaces
+                                // was invisible precisely because nothing on this path said anything.
+                                warn!(
+                                    ?unresolved,
+                                    ?surb_wait,
+                                    %error,
+                                    "dropping an outgoing packet: no SURB for its return path within the wait"
+                                );
+                            }
                             // Its sender may have counted the SURB as consumed already, and the packet
                             // leaves without one.
                             data.surb_refund.give_back();
@@ -737,6 +752,115 @@ mod tests {
             1,
             attempts.load(Ordering::Relaxed),
             "a zero wait must resolve once and give up, not retry"
+        );
+
+        Ok(())
+    }
+
+    /// A pong gets one attempt at its SURB. The only SURB it can use came in with its ping, so a
+    /// pong that finds none is dropped at once, instead of being retried for the whole wait.
+    #[test_log::test(tokio::test)]
+    async fn a_pong_should_get_one_attempt_at_its_surb() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        let wait = std::time::Duration::from_secs(2);
+        let refunds = Arc::new(AtomicU64::new(0));
+        let pong = |refund: bool| -> anyhow::Result<ApplicationDataOut> {
+            let nonce = match hopr_transport_probe::types::NeighborProbe::random_nonce() {
+                hopr_transport_probe::types::NeighborProbe::Ping(nonce) => nonce,
+                other => anyhow::bail!("expected a ping nonce, got {other}"),
+            };
+            let data: ApplicationData =
+                hopr_transport_probe::content::Message::Probe(hopr_transport_probe::types::NeighborProbe::Pong(nonce))
+                    .try_into()
+                    .context("a pong must convert to application data")?;
+            let mut out = ApplicationDataOut::with_no_packet_info(data);
+            if refund {
+                out.surb_refund = SurbRefund::to(refunds.clone());
+            }
+            Ok(out)
+        };
+        let (starved, served_pong, served_packet) = (
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+        );
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let dropped_before = hopr_transport_session::counters::routing_resolution_surb_timeout_count();
+
+        let starved_pong = pong(true)?;
+        assert_eq!(
+            starved_pong.data.application_tag,
+            hopr_protocol_app::prelude::ReservedTag::Ping.into(),
+            "the stage recognises a pong by the reserved ping tag, and the probe's pong no longer carries it"
+        );
+
+        let input = futures::stream::iter(vec![
+            (return_routing(starved), starved_pong),
+            (return_routing(served_pong), pong(false)?),
+            (return_routing(served_packet), packet(7)),
+        ]);
+
+        let started = std::time::Instant::now();
+        let emitted = {
+            let attempts = attempts.clone();
+            resolve_routing_stage(
+                input,
+                move |_size_hint, _max_surbs, routing: DestinationRouting| {
+                    let attempts = attempts.clone();
+                    async move {
+                        match &routing {
+                            DestinationRouting::Return(matcher) if matcher.pseudonym() == starved => {
+                                attempts.fetch_add(1, Ordering::Relaxed);
+                                Err(no_surb(&routing))
+                            }
+                            _ => Ok((resolved(), Some(5), None)),
+                        }
+                    }
+                },
+                TEST_DISTRESS_THRESHOLD,
+                TEST_CONCURRENCY,
+                wait,
+            )
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+            .await
+            .map_err(|_| anyhow::anyhow!("the stage stalled instead of dropping the starved pong"))?
+        };
+        let elapsed = started.elapsed();
+
+        assert!(
+            elapsed < wait / 4,
+            "the stage took {elapsed:?} to finish, so the starved pong was retried instead of dropped"
+        );
+        assert_eq!(
+            emitted.len(),
+            2,
+            "exactly the two packets that found their SURB must be emitted, and not the starved pong"
+        );
+        assert_eq!(
+            emitted[0].1.data.application_tag,
+            hopr_protocol_app::prelude::ReservedTag::Ping.into(),
+            "the first packet out must be the pong that found its SURB"
+        );
+        assert_eq!(
+            marker_of(&emitted[1].1),
+            7,
+            "the second packet out must be the ordinary packet that found its SURB"
+        );
+        assert_eq!(
+            1,
+            attempts.load(Ordering::Relaxed),
+            "a pong without a SURB must be resolved once and not retried"
+        );
+        assert_eq!(
+            1,
+            refunds.load(Ordering::Relaxed),
+            "the dropped pong must give its counted SURB back exactly once"
+        );
+        assert!(
+            hopr_transport_session::counters::routing_resolution_surb_timeout_count() > dropped_before,
+            "the dropped pong was not counted, so the drop stays invisible"
         );
 
         Ok(())
