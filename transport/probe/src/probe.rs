@@ -15,7 +15,13 @@ use hopr_protocol_app::{
     v1::Tag,
 };
 use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
-use hopr_utils::{platform::time::native::current_time, runtime::AbortableList};
+use hopr_utils::{
+    platform::time::native::current_time,
+    runtime::{
+        AbortableList,
+        prelude::{spawn, timeout_fut},
+    },
+};
 
 use crate::{
     HoprProbeProcess,
@@ -25,6 +31,12 @@ use crate::{
     ping::PingQueryReplier,
     types::{NeighborProbe, NeighborTelemetry, PathTelemetry},
 };
+
+/// Longest a pong waits for egress capacity; a pong later than the probe timeout is useless.
+const PONG_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Maximum number of pongs waiting for egress capacity node-wide; further pongs are dropped.
+const MAX_PENDING_PONGS: usize = 64;
 
 type CacheNeighborKey = (HoprPseudonym, NeighborProbe);
 type CacheNeighborValue = (Box<NodeId>, std::time::Duration, Option<PingQueryReplier>);
@@ -47,6 +59,7 @@ pub struct ProbeClassifierState<G> {
     active_neighbor_probes: moka::future::Cache<CacheNeighborKey, CacheNeighborValue>,
     active_path_probes: moka::future::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)>,
     network_graph: G,
+    pending_pongs: Arc<tokio::sync::Semaphore>,
 }
 
 impl<G> ProbeClassifierState<G>
@@ -96,8 +109,20 @@ where
                         if let Ok(data) = message.try_into() {
                             let routing = DestinationRouting::Return(pseudonym.into());
                             let data = ApplicationDataOut::with_no_packet_info(data);
-                            if let Err(_error) = push_to_network.send((routing, data)).await {
-                                tracing::error!(%pseudonym, "failed to send back a pong");
+                            // Never wait for egress capacity here: the caller is the single ingress dispatcher.
+                            if let Ok(permit) = self.pending_pongs.clone().try_acquire_owned() {
+                                spawn(async move {
+                                    match timeout_fut(PONG_SEND_TIMEOUT, push_to_network.send((routing, data))).await {
+                                        Ok(Ok(())) => {}
+                                        Ok(Err(_error)) => tracing::error!(%pseudonym, "failed to send back a pong"),
+                                        Err(_) => {
+                                            tracing::debug!(%pseudonym, "dropped a pong: egress lane stayed full")
+                                        }
+                                    }
+                                    drop(permit);
+                                });
+                            } else {
+                                tracing::debug!(%pseudonym, "dropped a pong: too many pongs pending");
                             }
                         } else {
                             tracing::error!(%pseudonym, "failed to convert pong message into data");
@@ -483,6 +508,7 @@ impl Probe {
             active_neighbor_probes: classifier_neighbor_probes,
             active_path_probes: classifier_path_probes,
             network_graph,
+            pending_pongs: Arc::new(tokio::sync::Semaphore::new(MAX_PENDING_PONGS)),
         };
 
         (processes, classifier)
@@ -743,6 +769,7 @@ mod tests {
                         active_neighbor_probes: moka::future::Cache::new(1),
                         active_path_probes: moka::future::Cache::new(1),
                         network_graph: store.clone(),
+                        pending_pongs: Arc::new(tokio::sync::Semaphore::new(MAX_PENDING_PONGS)),
                     };
                     let pseudonym = HoprPseudonym::random();
                     let ordinary = ApplicationDataIn {
@@ -1623,6 +1650,117 @@ mod tests {
         assert_eq!(outcomes.len(), 1);
         assert_eq!(outcomes[0].0, NEIGHBOURS[0]);
         assert!(outcomes[0].1.is_err());
+        Ok(())
+    }
+
+    type PongItem = (DestinationRouting, ApplicationDataOut);
+
+    /// A sink that never becomes ready, like a permanently full egress lane.
+    struct NeverReady;
+
+    impl futures::Sink<PongItem> for NeverReady {
+        type Error = std::convert::Infallible;
+
+        fn poll_ready(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Pending
+        }
+
+        fn start_send(self: std::pin::Pin<&mut Self>, _: PongItem) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Pending
+        }
+
+        fn poll_close(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Pending
+        }
+    }
+
+    fn pong_test_classifier() -> ProbeClassifierState<PeerStore> {
+        ProbeClassifierState {
+            active_neighbor_probes: moka::future::Cache::new(1),
+            active_path_probes: moka::future::Cache::new(1),
+            network_graph: PeerStore {
+                me: *OFFCHAIN_KEYPAIR.public(),
+                get_peers: Arc::new(RwLock::new(VecDeque::new())),
+                on_finished: Arc::new(RwLock::new(Vec::new())),
+            },
+            pending_pongs: Arc::new(tokio::sync::Semaphore::new(MAX_PENDING_PONGS)),
+        }
+    }
+
+    fn ping_in() -> anyhow::Result<ApplicationDataIn> {
+        Ok(ApplicationDataIn {
+            data: Message::Probe(NeighborProbe::random_nonce()).try_into()?,
+            packet_info: Default::default(),
+        })
+    }
+
+    #[tokio::test]
+    async fn ping_must_not_block_the_dispatcher_when_the_pong_cannot_be_placed() -> anyhow::Result<()> {
+        let classifier = pong_test_classifier();
+        let result = tokio::time::timeout(
+            Duration::from_secs(1),
+            classifier.classify(NeverReady, HoprPseudonym::random(), ping_in()?),
+        )
+        .await?;
+        assert!(matches!(result, ProbeDispatch::Consumed));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pong_is_delivered_once_the_egress_lane_frees_up() -> anyhow::Result<()> {
+        let classifier = pong_test_classifier();
+        let pseudonym = HoprPseudonym::random();
+        let (mut tx, mut rx) = futures::channel::mpsc::channel::<PongItem>(0);
+        // Occupy the only slot of the lane.
+        tx.try_send((
+            DestinationRouting::Return(pseudonym.into()),
+            ApplicationDataOut::with_no_packet_info(ApplicationData::new(Tag::MAX, b"filler")?),
+        ))?;
+
+        let result =
+            tokio::time::timeout(Duration::from_secs(1), classifier.classify(tx, pseudonym, ping_in()?)).await?;
+        assert!(matches!(result, ProbeDispatch::Consumed));
+
+        // Free the lane: the filler comes out first, then the pong.
+        tokio::time::timeout(Duration::from_secs(1), rx.next())
+            .await?
+            .expect("filler");
+        let (routing, data) = tokio::time::timeout(Duration::from_secs(1), rx.next())
+            .await?
+            .expect("pong");
+        assert!(matches!(routing, DestinationRouting::Return(_)));
+        assert!(matches!(
+            Message::try_from(data.data)?,
+            Message::Probe(NeighborProbe::Pong(_))
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pongs_beyond_the_bound_are_dropped_without_blocking() -> anyhow::Result<()> {
+        let classifier = pong_test_classifier();
+        for _ in 0..MAX_PENDING_PONGS + 10 {
+            let result = tokio::time::timeout(
+                Duration::from_secs(1),
+                classifier.classify(NeverReady, HoprPseudonym::random(), ping_in()?),
+            )
+            .await?;
+            assert!(matches!(result, ProbeDispatch::Consumed));
+        }
+        assert_eq!(classifier.pending_pongs.available_permits(), 0);
         Ok(())
     }
 }
