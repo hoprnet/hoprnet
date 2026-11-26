@@ -14,6 +14,7 @@ pub(crate) mod exit_control;
 mod exit_receipts;
 pub mod flow_control;
 mod manager;
+mod pix_pool;
 /// Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session
 /// worker that drives them.
 pub(crate) mod supervision;
