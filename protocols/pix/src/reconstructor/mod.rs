@@ -4048,9 +4048,7 @@ mod tests {
     ///
     /// What this test covers is the *arrival point*, not the subgroup filter itself: `TestSpec` is
     /// secp256k1, cofactor 1, so no small-order point exists to feed it. The subgroup case is
-    /// `pix_group_element_rejects_a_small_order_point` in `hopr-crypto-packet`, which also records
-    /// why the filter cannot be isolated by any test — the Baby JubJub backend's own `from_bytes`
-    /// already rejects, so `is_torsion_free` is defence in depth rather than the acting check.
+    /// `pix_group_element_rejects_a_small_order_point` in `hopr-crypto-packet`, on Baby JubJub.
     #[test]
     fn decode_commitment_is_the_single_validation_point() {
         use vsss_rs::elliptic_curve::group::GroupEncoding;
