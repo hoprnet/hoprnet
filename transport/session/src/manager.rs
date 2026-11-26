@@ -853,14 +853,14 @@ const MAX_CONCURRENT_START_SESSIONS: usize = 256;
 /// transport stops waiting, not when `admit` returns, so the server needs its own bound.
 pub const START_SESSION_ADMISSION_CONCURRENCY: usize = 64;
 
-/// Capacity of the control Start protocol lane (every variant but `StartSession`).
+/// Capacity of the commitment Start protocol lane (`SsaCommit`) and of the control lane (every other variant but
+/// `StartSession`).
 ///
 /// Fed by [`SessionManager::dispatch_message`] with `try_send`, and an overflow **drops** the
 /// message. For most Start messages that is recoverable, but a dropped `SsaCommit` is not: there is
 /// no NACK or retransmission, so the coefficient cell stays empty forever, the commitment never
 /// completes, and the cycle dies on the supervisor's `max_deposit_wait` deadline. It therefore keeps
-/// the whole PIX commitment term. It sizes both the commitment lane (`SsaCommit` only) and the control lane,
-/// which kept its capacity when `SsaCommit` moved off it.
+/// the whole PIX commitment term. The control lane kept this capacity when `SsaCommit` moved off it.
 ///
 /// PIX load is the *entire* commitment set of an SSA cycle, chunked into packet-sized messages.
 /// Batching multiplies it: an Exit may ask for up to
