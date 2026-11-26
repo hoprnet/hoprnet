@@ -22,6 +22,7 @@ use hopr_utils::{
         prelude::{spawn, timeout_fut},
     },
 };
+use tracing::{Instrument, instrument::WithSubscriber};
 
 use crate::{
     HoprProbeProcess,
@@ -66,13 +67,47 @@ impl<G> ProbeClassifierState<G>
 where
     G: NetworkGraphUpdate + Clone + Send + Sync + 'static,
 {
+    /// Sends a pong from a task of its own, because the caller is the node's single ingress dispatcher and
+    /// must never wait for egress capacity.
+    ///
+    /// At most [`MAX_PENDING_PONGS`] pongs wait at a time. A pong beyond that, or one that still has no room
+    /// after [`PONG_SEND_TIMEOUT`], is dropped: by then the ping's sender has given up on it.
+    fn send_pong<T>(
+        &self,
+        mut push_to_network: T,
+        pseudonym: HoprPseudonym,
+        routing: DestinationRouting,
+        data: ApplicationDataOut,
+    ) where
+        T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin + Send + 'static,
+        T::Error: Send,
+    {
+        let Ok(permit) = self.pending_pongs.clone().try_acquire_owned() else {
+            tracing::debug!(%pseudonym, "dropped a pong: too many pongs pending");
+            return;
+        };
+        spawn(
+            async move {
+                match timeout_fut(PONG_SEND_TIMEOUT, push_to_network.send((routing, data))).await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(_)) => tracing::error!(%pseudonym, "failed to send back a pong"),
+                    Err(_) => tracing::debug!(%pseudonym, "dropped a pong: the egress lane stayed full"),
+                }
+                drop(permit);
+            }
+            // The pong carries the ping's context, and its logs go to the caller's subscriber.
+            .in_current_span()
+            .with_current_subscriber(),
+        );
+    }
+
     /// Classify one incoming `(pseudonym, data)` pair.
     ///
     /// The `push_to_network` sink is used to send pong replies when the message is a Ping.
     /// Returns `Consumed` if the message was a probe, or `Passthrough` for all other messages.
     pub async fn classify<T>(
         &self,
-        mut push_to_network: T,
+        push_to_network: T,
         pseudonym: HoprPseudonym,
         in_data: ApplicationDataIn,
     ) -> ProbeDispatch
@@ -109,21 +144,7 @@ where
                         if let Ok(data) = message.try_into() {
                             let routing = DestinationRouting::Return(pseudonym.into());
                             let data = ApplicationDataOut::with_no_packet_info(data);
-                            // Never wait for egress capacity here: the caller is the single ingress dispatcher.
-                            if let Ok(permit) = self.pending_pongs.clone().try_acquire_owned() {
-                                spawn(async move {
-                                    match timeout_fut(PONG_SEND_TIMEOUT, push_to_network.send((routing, data))).await {
-                                        Ok(Ok(())) => {}
-                                        Ok(Err(_error)) => tracing::error!(%pseudonym, "failed to send back a pong"),
-                                        Err(_) => {
-                                            tracing::debug!(%pseudonym, "dropped a pong: egress lane stayed full")
-                                        }
-                                    }
-                                    drop(permit);
-                                });
-                            } else {
-                                tracing::debug!(%pseudonym, "dropped a pong: too many pongs pending");
-                            }
+                            self.send_pong(push_to_network, pseudonym, routing, data);
                         } else {
                             tracing::error!(%pseudonym, "failed to convert pong message into data");
                         }

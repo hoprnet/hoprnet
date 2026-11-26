@@ -103,10 +103,21 @@ async fn dispatch_preserves_context_and_continues_after_drops_and_errors() -> an
         assert_eq!(delivered.len(), 1);
         assert_eq!(delivered[0].data, payload);
         futures::pin_mut!(out_rx);
-        let reply = tokio::time::timeout(Duration::from_secs(2), out_rx.next())
-            .await
-            .context("probe reply timed out")?
-            .context("probe must produce a pong")?;
+        // The pong is sent asynchronously, so other egress items may come first.
+        let reply = tokio::time::timeout(Duration::from_secs(2), async {
+            while let Some(item) = out_rx.next().await {
+                if matches!(
+                    Message::try_from(item.value.1.data.clone()),
+                    Ok(Message::Probe(NeighborProbe::Pong(_)))
+                ) {
+                    return Some(item);
+                }
+            }
+            None
+        })
+        .await
+        .context("probe reply timed out")?
+        .context("probe must produce a pong")?;
         let reply_context = reply.span().id();
         assert_eq!(reply.value.0, DestinationRouting::Return(id.into()));
         assert_eq!(
