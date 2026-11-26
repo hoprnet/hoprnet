@@ -107,9 +107,18 @@ pub enum SessionManagerError {
     /// as an ordinary outcome rather than a fault.
     #[error("the request was not admitted: {0}")]
     NotAdmitted(String),
+    /// The local deposit pool cannot supply the deposit data for an SSA batch: nothing listens for the
+    /// request, the pool closed its replies before answering everything, or it answered for other SSAs.
+    ///
+    /// Faults of this node that a retry would meet again, unlike
+    /// [`DepositPoolTooSlow`](Self::DepositPoolTooSlow).
     #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]
     MissingDepositData(String),
-    #[error("the commitment registration lapsed while the deposit pool answered: {0}")]
+    /// The local deposit pool was too slow for the SSA batch: its request queue was full, it missed the
+    /// deadline, or it answered after the batch's commitment registrations had lapsed.
+    ///
+    /// Transient and local, so a retry may succeed.
+    #[error("the deposit pool was too slow for the SSA batch: {0}")]
     DepositPoolTooSlow(String),
     #[error(transparent)]
     PixError(#[from] hopr_protocol_pix::errors::PixError<SimplePseudonym>),
