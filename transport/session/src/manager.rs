@@ -1822,7 +1822,10 @@ pub(crate) struct SlotInstance {
     /// Set by the first [`park_records`](Self::park_records): what the slot parks leaves it once.
     parked: std::sync::atomic::AtomicBool,
     /// The reason the Exit gave for closing this Session while the Entry was still setting it up.
-    refusal: OnceLock<StartErrorReason>,
+    ///
+    /// Shared with the [`HoprSession`] built for this instance, which reads it once the Session is in the
+    /// app's hands, see [`HoprSession::refusal`].
+    refusal: Arc<OnceLock<StartErrorReason>>,
     /// Where an Entry slot's challenge goes when the slot is torn down, see [`ChallengeHome`].
     challenge_home: OnceLock<ChallengeHome>,
     /// Whether the Entry that established this instance announced `Capability::Resumable` (Exit only).
@@ -1862,7 +1865,7 @@ impl SlotInstance {
             last_refresh_ms: std::sync::atomic::AtomicU64::new(0),
             ledger_home: OnceLock::new(),
             parked: std::sync::atomic::AtomicBool::new(false),
-            refusal: OnceLock::new(),
+            refusal: Arc::new(OnceLock::new()),
             challenge_home: OnceLock::new(),
             resume_capable,
             stream_progress: OnceLock::new(),
@@ -7229,7 +7232,7 @@ where
                         cfg.flow_control,
                         None,
                     )?
-                    .with_slot_instance(instance.id());
+                    .with_slot_instance(instance.id(), instance.refusal.clone());
 
                     #[cfg(feature = "telemetry")]
                     initialize_session_telemetry(
@@ -7356,7 +7359,7 @@ where
                         ),
                         Some(notifier),
                     )?
-                    .with_slot_instance(instance.id());
+                    .with_slot_instance(instance.id(), instance.refusal.clone());
 
                     #[cfg(feature = "telemetry")]
                     initialize_session_telemetry(session_id, &self.cfg, cfg.capabilities, None, None, instance.id());
@@ -7788,8 +7791,12 @@ where
                                 // transient or already self-correcting, and the supervisor is the
                                 // right judge of them; this one is neither. The data only ever
                                 // travels in the `SsaRequest` that carries the commitments, so it
-                                // cannot be supplied later, and the pool will not answer a retry it
-                                // did not answer the first time.
+                                // cannot be supplied later, and this Session cannot go on without it.
+                                //
+                                // The cause is local to the Exit, though, and transient: a pool that
+                                // is late now may be on time for the next Session. So the Entry is
+                                // told the Exit is busy, which it may retry, rather than that its
+                                // parameters were unacceptable, which it may not.
                                 //
                                 // A pool that answered after the registrations lapsed is just as local: the
                                 // Entry is told the Exit is busy, and nothing blames the supervisor.
@@ -7815,8 +7822,8 @@ where
 
                                 // Named rather than folded into the supervisor's `PixFailure`,
                                 // because it points at this node's own pool while every reason the
-                                // supervisor has points at the peer — and the Entry is told with a
-                                // reason it can act on rather than the generic one.
+                                // supervisor has points at the peer. Locally the closure keeps its own
+                                // reason, so the metrics tell it from a pool that was too slow.
                                 if matches!(
                                     error,
                                     TransportSessionError::Manager(SessionManagerError::MissingDepositData(_))
@@ -7830,7 +7837,7 @@ where
                                             ClosureReason::MissingDepositData,
                                             &control_plane,
                                             reply_routing.clone(),
-                                            StartErrorReason::UnacceptablePixParams,
+                                            StartErrorReason::Busy,
                                             "session error due to missing deposit data",
                                         )
                                         .await;
@@ -10261,7 +10268,7 @@ where
             let _ = instance.stream_progress.set(progress);
         }
 
-        Ok(session.with_slot_instance(instance.id()))
+        Ok(session.with_slot_instance(instance.id(), instance.refusal.clone()))
     }
 
     /// Hands a paid Exit PIX Session, which a client has come back for, to its new data plane: the
@@ -26372,8 +26379,9 @@ mod tests {
     /// needs it and does not get it cannot ask for it later — it would simply never deposit, and the
     /// Session would die on the Exit's own commitment deadline, blamed on the peer. Failing here
     /// costs one Session that was not going to work, and points at the local pool instead: the Entry
-    /// is told with `UnacceptablePixParams` rather than the supervisor's generic `Unknown`, and this
-    /// node records [`ClosureReason::MissingDepositData`] rather than `PixFailure`.
+    /// is told `Busy`, which it may retry, rather than the supervisor's generic `Unknown` or a
+    /// permanent `UnacceptablePixParams`, and this node records [`ClosureReason::MissingDepositData`] rather than
+    /// `PixFailure`.
     ///
     /// The event stream is dropped rather than left unanswered, which reaches the same failure
     /// through the listener check instead of [`DEPOSIT_DATA_REQUEST_TIMEOUT`] — the same error, the
@@ -26461,9 +26469,8 @@ mod tests {
             "no SsaRequest may go on the wire without the deposit data it has to carry, got {sent:?}"
         );
         assert!(
-            sent.iter()
-                .any(|m| m == &format!("error:{}", StartErrorReason::UnacceptablePixParams)),
-            "the Entry must be told with a reason that names the failure, got {sent:?}"
+            sent.iter().any(|m| m == &format!("error:{}", StartErrorReason::Busy)),
+            "the Entry must be told the Exit is busy, got {sent:?}"
         );
 
         bob_sender.close_channel();
@@ -35252,6 +35259,58 @@ mod tests {
         );
         injected?;
         let _second = connected.context("the setup timed out")??;
+        Ok(())
+    }
+
+    /// The Exit's reason for closing an established Session stays readable from the app's handle: the read
+    /// ends with 0 bytes, and [`HoprSession::refusal`] says why.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_error_after_establishment_is_readable_from_the_session() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let mut session = rig.connect_pix(Some(pseudonym)).await?;
+        let challenge = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.challenge;
+        assert_eq!(None, session.refusal());
+
+        rig.mgr
+            .handle_session_error(
+                pseudonym,
+                StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(challenge),
+                    reason: StartErrorReason::Busy,
+                },
+            )
+            .await?;
+
+        let mut buffer = [0u8; 16];
+        let read = timeout(
+            Duration::from_secs(5),
+            futures::AsyncReadExt::read(&mut session, &mut buffer),
+        )
+        .await
+        .context("the read must end once the Session is closed")??;
+        assert_eq!(0, read);
+        assert_eq!(Some(StartErrorReason::Busy), session.refusal());
+        Ok(())
+    }
+
+    /// A Session that is closed without an error from the Exit has no refusal to read.
+    #[test_log::test(tokio::test)]
+    async fn a_session_closed_without_an_exit_error_has_no_refusal() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let mut session = rig.connect_pix(Some(pseudonym)).await?;
+        assert!(rig.mgr.close_session(&pseudonym));
+
+        let mut buffer = [0u8; 16];
+        let read = timeout(
+            Duration::from_secs(5),
+            futures::AsyncReadExt::read(&mut session, &mut buffer),
+        )
+        .await
+        .context("the read must end once the Session is closed")??;
+        assert_eq!(0, read);
+        assert_eq!(None, session.refusal());
         Ok(())
     }
 

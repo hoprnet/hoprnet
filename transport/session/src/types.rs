@@ -2,7 +2,7 @@ use std::{
     convert::Into,
     fmt::Debug,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, OnceLock},
     task::{Context, Poll},
     time::Duration,
 };
@@ -30,7 +30,7 @@ use hopr_protocol_session::{
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
-use hopr_protocol_start::StartProtocol;
+use hopr_protocol_start::{StartErrorReason, StartProtocol};
 use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
 use tracing::{debug, warn};
 
@@ -752,6 +752,8 @@ pub struct HoprSession {
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     /// The slot instance the manager built this Session for; see [`HoprSession::slot_instance`].
     slot_instance: Option<u64>,
+    /// The Exit's reason for closing this Session once established; see [`HoprSession::refusal`].
+    refusal: Option<Arc<OnceLock<StartErrorReason>>>,
 }
 
 pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
@@ -992,12 +994,15 @@ impl HoprSession {
             cfg,
             on_close,
             slot_instance: None,
+            refusal: None,
         })
     }
 
-    /// Binds this Session to the manager's slot instance it was built for.
-    pub(crate) fn with_slot_instance(mut self, instance_id: u64) -> Self {
+    /// Binds this Session to the manager's slot instance it was built for, and to the cell the instance
+    /// records the Exit's refusal in.
+    pub(crate) fn with_slot_instance(mut self, instance_id: u64, refusal: Arc<OnceLock<StartErrorReason>>) -> Self {
         self.slot_instance = Some(instance_id);
+        self.refusal = Some(refusal);
         self
     }
 
@@ -1011,6 +1016,18 @@ impl HoprSession {
     /// [`SessionManager::close_session_instance`]: crate::SessionManager::close_session_instance
     pub fn slot_instance(&self) -> Option<u64> {
         self.slot_instance
+    }
+
+    /// The reason the Exit gave when it closed this Session after it was established, e.g.
+    /// [`StartErrorReason::Busy`].
+    ///
+    /// Meant to be read once a read returns 0 bytes, which is all the Session itself shows of the close.
+    /// `None` when the Session ended without a reason from the Exit, and for a Session not built by a
+    /// [`SessionManager`].
+    ///
+    /// [`SessionManager`]: crate::SessionManager
+    pub fn refusal(&self) -> Option<StartErrorReason> {
+        self.refusal.as_ref().and_then(|cell| cell.get().copied())
     }
 
     /// The progress of this Session's stream, for a Session on the stateless frame-based socket.
