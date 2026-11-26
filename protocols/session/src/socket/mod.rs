@@ -187,6 +187,12 @@ impl StreamProgress {
     }
 }
 
+/// How many incoming messages the read path takes between two consumptions of Tokio's cooperative budget.
+///
+/// A poll then drains at most this many times the 128-unit budget (2048 messages) before yielding,
+/// well under a millisecond, while consuming budget on every packet measurably slowed the read path.
+const READ_BUDGET_EVERY: u32 = 16;
+
 /// The highest allowed [`SessionSocketConfig::stream_base`], 2^31.
 ///
 /// It leaves half of the `u32` frame id space (2^31 frames) to the stream, which cannot be
@@ -367,11 +373,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Pipeline OUT: Packets incoming from Downstream
         // Continue receiving packets from downstream, unless we received a terminating frame.
         // Once the terminating frame is received, the `packets_in_abort_handle` is triggered, terminating the pipeline.
+        let mut budget_tick = 0u32;
         let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
                 let _span = stage1_span.enter();
-                futures::future::ready(match packet {
+                let result = match packet {
                     Ok(packet) => {
                         packet.try_as_segment().filter(|s| {
                             #[cfg(feature = "telemetry")]
@@ -417,7 +424,18 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         s1.error();
                         None
                     }
-                })
+                };
+                // The input channel takes no part in Tokio's cooperative budget, so without this a
+                // backlog of messages that produce no output would be drained in a single poll.
+                budget_tick = budget_tick.wrapping_add(1);
+                if budget_tick.is_multiple_of(READ_BUDGET_EVERY) {
+                    futures::future::Either::Right(async move {
+                        hopr_utils::runtime::prelude::consume_budget().await;
+                        result
+                    })
+                } else {
+                    futures::future::Either::Left(futures::future::ready(result))
+                }
             })
             // Reassemble the segments into frames
             .reassembler_sharing(cfg.frame_timeout, cfg.capacity, reorder.clone())
@@ -614,11 +632,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         // Continue receiving packets from downstream, unless we received a terminating frame.
         // Once the terminating frame is received, the `packets_in_abort_handle` is triggered, terminating the pipeline.
+        let mut budget_tick = 0u32;
         let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter out Session control messages and update the State, pass only Segments onwards
             .filter_map(move |packet| {
                 let _span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly").entered();
-                futures::future::ready(match packet {
+                let result = match packet {
                     Ok(packet) => {
                         if let Err(error) = st_1.incoming_message(&packet) {
                             tracing::debug!(%error, "incoming message state update failed");
@@ -649,7 +668,18 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         s1.error();
                         None
                     }
-                })
+                };
+                // The input channel takes no part in Tokio's cooperative budget, so without this a
+                // backlog of messages that produce no output would be drained in a single poll.
+                budget_tick = budget_tick.wrapping_add(1);
+                if budget_tick.is_multiple_of(READ_BUDGET_EVERY) {
+                    futures::future::Either::Right(async move {
+                        hopr_utils::runtime::prelude::consume_budget().await;
+                        result
+                    })
+                } else {
+                    futures::future::Either::Left(futures::future::ready(result))
+                }
             })
             // Reassemble segments into frames
             .reassembler_with_inspector(cfg.frame_timeout, cfg.capacity, inspector)
@@ -855,6 +885,127 @@ mod tests {
             log_state_update_error(&SessionError::InvalidFrameId, "frame complete state update failed");
         });
         assert_eq!(*levels.lock(), vec![tracing::Level::DEBUG, tracing::Level::ERROR]);
+    }
+
+    /// Always-ready transport: reads come from a fixed buffer, writes go nowhere.
+    struct ReadyTransport(futures::io::Cursor<Vec<u8>>);
+
+    impl futures::io::AsyncRead for ReadyTransport {
+        fn poll_read(
+            mut self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+            buf: &mut [u8],
+        ) -> std::task::Poll<std::io::Result<usize>> {
+            std::pin::Pin::new(&mut self.0).poll_read(cx, buf)
+        }
+    }
+
+    impl futures::io::AsyncWrite for ReadyTransport {
+        fn poll_write(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+            buf: &[u8],
+        ) -> std::task::Poll<std::io::Result<usize>> {
+            std::task::Poll::Ready(Ok(buf.len()))
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    /// A backlog of messages that produce no output must not hold the reading task: a timer on a
+    /// current-thread runtime has to keep firing while `read` drains it.
+    #[tokio::test(flavor = "current_thread")]
+    async fn read_of_a_backlog_without_output_should_yield_to_the_scheduler() -> anyhow::Result<()> {
+        use crate::protocol::{Segment, SeqIndicator};
+
+        const BACKLOG: usize = 600_000;
+
+        let acknowledgement = Vec::from(SessionMessage::<MTU>::Acknowledge(vec![1].try_into()?));
+        let expected = b"after the backlog";
+        let segment = Vec::from(SessionMessage::<MTU>::Segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: SeqIndicator::new_with_flags(1, false),
+            data: expected.to_vec().into_boxed_slice(),
+        }));
+        let mut input = Vec::with_capacity(BACKLOG * acknowledgement.len() + segment.len());
+        for _ in 0..BACKLOG {
+            input.extend_from_slice(&acknowledgement);
+        }
+        input.extend_from_slice(&segment);
+
+        for stateless in [true, false] {
+            let transport = ReadyTransport(futures::io::Cursor::new(input.clone()));
+            let mut socket = if stateless {
+                SessionSocket::new_stateless(
+                    "backlog",
+                    transport,
+                    SessionSocketConfig::default(),
+                    None,
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            } else {
+                SessionSocket::new(
+                    transport,
+                    Stateless::<MTU>::new("backlog"),
+                    SessionSocketConfig::default(),
+                    None,
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            };
+
+            let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let ticker = tokio::spawn({
+                let stop = stop.clone();
+                async move {
+                    let period = Duration::from_millis(1);
+                    let mut worst = Duration::ZERO;
+                    let mut last = std::time::Instant::now();
+                    while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                        tokio::time::sleep(period).await;
+                        let now = std::time::Instant::now();
+                        worst = worst.max(now.duration_since(last).saturating_sub(period));
+                        last = now;
+                    }
+                    worst
+                }
+            });
+            // Let the ticker start before the read begins.
+            tokio::time::sleep(Duration::from_millis(5)).await;
+
+            let started = std::time::Instant::now();
+            let mut output = [0u8; 64];
+            let read = tokio::time::timeout(Duration::from_secs(60), socket.read(&mut output)).await??;
+            let drain_time = started.elapsed();
+            assert_eq!(&output[..read], expected);
+
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            let worst = ticker.await?;
+
+            assert!(
+                drain_time > Duration::from_millis(20),
+                "backlog drained too fast ({drain_time:?}) for the check to be meaningful"
+            );
+            assert!(
+                worst * 4 < drain_time,
+                "stateless={stateless}: timer was starved for {worst:?} while read drained for {drain_time:?}"
+            );
+        }
+        Ok(())
     }
 
     #[tokio::test]
