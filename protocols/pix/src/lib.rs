@@ -648,7 +648,9 @@ impl<S: PixSpec> SsaPartCommitment<S, S::Pseudonym> {
     /// No value-based filtering is applied — a coefficient commitment equal to the generator
     /// validly represents scalar coefficient 1 and must be preserved.
     pub fn decode_commitment(commitment: &PixGroupRepr<S>) -> errors::Result<PixGroup<S>, S::Pseudonym> {
-        Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(commitment))
+        // Unchecked, because `is_torsion_free` is the subgroup check: on Baby JubJub, `from_bytes` runs
+        // the same check first and doubles the cost of decoding a commitment (hoprnet#8765).
+        Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes_unchecked(commitment))
             .filter(|pt| bool::from(pt.is_torsion_free()))
             .ok_or(errors::PixError::InvalidInput)
     }

@@ -47,6 +47,8 @@
 //! | `hopr_pix_closures_total` | MultiCounter | Sessions | supervisor close | `reason` — see [`SessionPixCloseReason`] |
 //! | `hopr_pix_fill_backoff_total` | MultiCounter | occasions | fill withheld / stall onset | `reason` = `surb_reserve\|stalled` |
 //! | `hopr_pix_resumptions_total` | MultiCounter | occasions | data plane ends and the Session is detached / an Entry takes a held Session over / the resume window runs out / a takeover is refused | `event` = `detached\|taken_over\|window_expired\|refused` |
+//! | `hopr_pix_pool_queue_wait_seconds` | SimpleHistogram | seconds | PIX pool job ends | — |
+//! | `hopr_pix_pool_execution_seconds` | MultiHistogram | seconds | PIX pool job ends | `operation` = `commitment_ingest\|commitment_generation` |
 //!
 //! A *detached* Session (see `hopr_pix_resumptions_total`) is still a live PIX Session: its supervisor
 //! and cycles carry on, so `hopr_pix_sessions_active` and `hopr_pix_cycles_active` count it for the
@@ -231,11 +233,16 @@
 //!   # should equal hopr_pix_live_cycle_bytes
 //! ```
 
-use crate::supervision::{
-    GateBlockReason, SessionPixCloseReason,
-    telemetry::{
-        PixAdmissionRejection, PixCycleEvent, PixCycleOutcome, PixCyclePhase, PixGateBlock, PixGateMode, PixShareKind,
-        PixStallCause,
+use std::time::Duration;
+
+use crate::{
+    pix_pool::PixPoolOperation,
+    supervision::{
+        GateBlockReason, SessionPixCloseReason,
+        telemetry::{
+            PixAdmissionRejection, PixCycleEvent, PixCycleOutcome, PixCyclePhase, PixGateBlock, PixGateMode,
+            PixShareKind, PixStallCause,
+        },
     },
 };
 
@@ -396,11 +403,28 @@ lazy_static::lazy_static! {
         "PIX Sessions detached when their data plane ended, taken over by a reconnecting Entry, expired from the resume window, or refused a takeover, by event",
         &["event"]
     ).unwrap();
+    static ref METRIC_PIX_POOL_QUEUE_WAIT: hopr_api::types::telemetry::SimpleHistogram = hopr_api::types::telemetry::SimpleHistogram::new(
+        "hopr_pix_pool_queue_wait_seconds",
+        "Time PIX commitment work waited for a thread of the PIX pool",
+        vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 15.0]
+    ).unwrap();
+    static ref METRIC_PIX_POOL_EXECUTION: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
+        "hopr_pix_pool_execution_seconds",
+        "Time PIX commitment work ran on the PIX pool, by operation",
+        vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 15.0],
+        &["operation"]
+    ).unwrap();
 }
 
 /// Counts one event of the detach and takeover lifecycle.
 pub(crate) fn record_resumption(event: PixResumption) {
     METRIC_PIX_RESUMPTIONS_TOTAL.increment(&[event.to_string().as_str()]);
+}
+
+/// Observes one job of the PIX pool: how long it waited for a thread, and how long it ran.
+pub(crate) fn record_pix_pool_job(operation: PixPoolOperation, queue_wait: Duration, execution: Duration) {
+    METRIC_PIX_POOL_QUEUE_WAIT.observe(queue_wait.as_secs_f64());
+    METRIC_PIX_POOL_EXECUTION.observe(&[operation.to_string().as_str()], execution.as_secs_f64());
 }
 
 /// Moves `hopr_pix_sessions_active` for one gate mode by a signed delta.
