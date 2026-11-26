@@ -453,7 +453,8 @@ enum PixMilestone {
 /// the Exit blocks its first `SsaRequest` on the deposit pool with a three-second budget, while
 /// `connect_to` on a Session with a SURB balancer does not return until the balancer has filled —
 /// comfortably longer than that. A test that only begins answering once it holds the Session has
-/// already lost the first cycle to `UnacceptablePixParams`, and would report that as a fill failure.
+/// already lost the first cycle to a deposit-data timeout, which the Entry is told as `Busy`, and would report that as
+/// a fill failure.
 ///
 /// Every deposit is signalled and every deposit-data request is answered with empty data, which is
 /// what the deposit pool this cluster does not have would do. The tests then only have to say which

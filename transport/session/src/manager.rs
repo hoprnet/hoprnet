@@ -1821,8 +1821,11 @@ pub(crate) struct SlotInstance {
     ledger_home: OnceLock<LedgerHome>,
     /// Set by the first [`park_records`](Self::park_records): what the slot parks leaves it once.
     parked: std::sync::atomic::AtomicBool,
-    /// The reason the Exit gave for closing this Session while the Entry was still setting it up.
-    refusal: OnceLock<StartErrorReason>,
+    /// The reason the Exit gave for closing this Session, during its setup or after it.
+    ///
+    /// Shared with the [`HoprSession`] built for this instance, which reads it once the Session is in the
+    /// app's hands, see [`HoprSession::refusal`].
+    refusal: Arc<OnceLock<StartErrorReason>>,
     /// Where an Entry slot's challenge goes when the slot is torn down, see [`ChallengeHome`].
     challenge_home: OnceLock<ChallengeHome>,
     /// Whether the Entry that established this instance announced `Capability::Resumable` (Exit only).
@@ -1862,7 +1865,7 @@ impl SlotInstance {
             last_refresh_ms: std::sync::atomic::AtomicU64::new(0),
             ledger_home: OnceLock::new(),
             parked: std::sync::atomic::AtomicBool::new(false),
-            refusal: OnceLock::new(),
+            refusal: Arc::new(OnceLock::new()),
             challenge_home: OnceLock::new(),
             resume_capable,
             stream_progress: OnceLock::new(),
@@ -1877,18 +1880,24 @@ impl SlotInstance {
         let _ = self.refusal.set(reason);
     }
 
-    /// The Exit's reason for closing this Session during setup, if it did.
+    /// The Exit's reason for closing this Session, during its setup or after it, if it gave one.
     fn refusal(&self) -> Option<StartErrorReason> {
         self.refusal.get().copied()
     }
 
     /// The error a setup in progress fails with: the Exit's refusal, or `Closed` if this instance was
-    /// replaced or torn down meanwhile. The refusal is checked first, as it also supersedes the instance.
+    /// replaced or torn down meanwhile. The refusal wins when both are set, as it also supersedes the instance.
+    ///
+    /// Supersession is read first. A refusal is recorded before the close that supersedes the instance, and
+    /// the `Acquire` load here pairs with the `Release` store in [`supersede`](Self::supersede), so a setup
+    /// that sees the instance superseded also sees the refusal. Read the other way round, a close landing
+    /// between the two reads would turn the Exit's reason into `Closed`.
     fn setup_failure(&self) -> Option<TransportSessionError> {
+        let superseded = self.is_superseded();
         if let Some(reason) = self.refusal() {
             return Some(TransportSessionError::Rejected(reason));
         }
-        self.is_superseded().then_some(TransportSessionError::Closed)
+        superseded.then_some(TransportSessionError::Closed)
     }
 
     /// Counts an Entry data write as activity: reads the slot (which resets its `time_to_idle`), at
@@ -7229,7 +7238,7 @@ where
                         cfg.flow_control,
                         None,
                     )?
-                    .with_slot_instance(instance.id());
+                    .with_slot_instance(instance.id(), instance.refusal.clone());
 
                     #[cfg(feature = "telemetry")]
                     initialize_session_telemetry(
@@ -7356,7 +7365,7 @@ where
                         ),
                         Some(notifier),
                     )?
-                    .with_slot_instance(instance.id());
+                    .with_slot_instance(instance.id(), instance.refusal.clone());
 
                     #[cfg(feature = "telemetry")]
                     initialize_session_telemetry(session_id, &self.cfg, cfg.capabilities, None, None, instance.id());
@@ -7608,10 +7617,28 @@ where
     }
 
     /// Asks the deposit pool for the data to attach to a batch of SSAs, and collects its answers.
+    ///
+    /// A shortfall is told apart by its cause, because the causes call for different answers to the Entry.
+    /// A request queue that is full or an answer that misses the deadline is the pool being too slow, a
+    /// [`DepositPoolTooSlow`](SessionManagerError::DepositPoolTooSlow) that a retry may well get past. No
+    /// listener, a reply channel the pool closed before it had answered everything, and answers for other
+    /// SSAs are [`MissingDepositData`](SessionManagerError::MissingDepositData): faults of this node that a
+    /// retry will meet again.
     async fn request_deposit_data(
         pix_toolbox: &PixToolbox,
         session_id: SessionId,
         ssa_indices: &[SsaIndex],
+    ) -> errors::Result<HoprPixDepositData> {
+        Self::request_deposit_data_within(pix_toolbox, session_id, ssa_indices, DEPOSIT_DATA_REQUEST_TIMEOUT).await
+    }
+
+    /// [`request_deposit_data`](Self::request_deposit_data) with the deadline as a parameter, so that tests
+    /// need not wait out the real one.
+    async fn request_deposit_data_within(
+        pix_toolbox: &PixToolbox,
+        session_id: SessionId,
+        ssa_indices: &[SsaIndex],
+        deadline: Duration,
     ) -> errors::Result<HoprPixDepositData> {
         let deposit_ids = ssa_indices
             .iter()
@@ -7620,53 +7647,72 @@ where
 
         let (deposit_data_created, deposit_data_rx) = futures::channel::mpsc::channel(ssa_indices.len().max(1));
 
-        if pix_toolbox
+        if let Err(error) = pix_toolbox
             .pix_events
             .try_send(HoprSessionOutPixEvent::DepositDataRequest(PixDepositDataRequest {
                 deposit_ids,
                 deposit_data_created,
             }))
-            .is_err()
         {
-            return Err(SessionManagerError::MissingDepositData(format!(
-                "session {session_id} has no listener for the deposit data request"
-            ))
+            return Err(if matches!(error, crossfire::TrySendError::Full(_)) {
+                SessionManagerError::DepositPoolTooSlow(format!(
+                    "session {session_id} found the deposit data request queue full"
+                ))
+            } else {
+                SessionManagerError::MissingDepositData(format!(
+                    "session {session_id} has no listener for the deposit data request"
+                ))
+            }
             .into());
         }
 
-        let mut outstanding = ssa_indices
+        let asked = ssa_indices
             .iter()
             .map(|&ssa_index| PixAddressId::new(&session_id, ssa_index))
             .collect::<std::collections::HashSet<_>>();
+        let mut outstanding = asked.clone();
         let requested = outstanding.len();
 
         let mut deposit_data = HoprPixDepositData::with_capacity(requested);
-        {
+        let mut foreign = 0usize;
+        let timed_out = {
             let replies = deposit_data_rx
                 .take(2 * requested)
-                .take_until(futures_time::task::sleep(futures_time::time::Duration::from(
-                    DEPOSIT_DATA_REQUEST_TIMEOUT,
-                )));
+                .take_until(futures_time::task::sleep(futures_time::time::Duration::from(deadline)));
             futures::pin_mut!(replies);
             while let Some(entry) = replies.next().await {
+                if !asked.contains(&entry.id) {
+                    foreign += 1;
+                }
                 outstanding.remove(&entry.id);
                 deposit_data.push(entry);
                 if outstanding.is_empty() {
                     break;
                 }
             }
-        }
+            // Set only when the deadline resolved; `is_stopped` is also true once the stream itself ended.
+            replies.take_result().is_some()
+        };
 
         // Counted here rather than left to `deposit_data_for_batch`, which sees the same shortfall
-        // but cannot tell a pool that went quiet from one that answered about the wrong SSAs. Both
-        // are fatal; only one of them is fixed by making the pool faster.
+        // but cannot tell a pool that went quiet from one that answered about the wrong SSAs. Only
+        // the first is fixed by making the pool faster.
         if !outstanding.is_empty() {
-            return Err(SessionManagerError::MissingDepositData(format!(
-                "session {session_id} got {} of {requested} requested deposit data entries within \
-                 {DEPOSIT_DATA_REQUEST_TIMEOUT:?} ({} replies read in total)",
+            let detail = format!(
+                "session {session_id} got {} of {requested} requested deposit data entries ({} replies read in total, \
+                 {foreign} for other SSAs)",
                 requested - outstanding.len(),
                 deposit_data.len(),
-            ))
+            );
+            return Err(if foreign > 0 {
+                SessionManagerError::MissingDepositData(format!("{detail}: the pool answered for other SSAs"))
+            } else if timed_out {
+                SessionManagerError::DepositPoolTooSlow(format!("{detail}: not within {deadline:?}"))
+            } else {
+                SessionManagerError::MissingDepositData(format!(
+                    "{detail}: the pool stopped answering before it had answered them all"
+                ))
+            }
             .into());
         }
 
@@ -7788,11 +7834,12 @@ where
                                 // transient or already self-correcting, and the supervisor is the
                                 // right judge of them; this one is neither. The data only ever
                                 // travels in the `SsaRequest` that carries the commitments, so it
-                                // cannot be supplied later, and the pool will not answer a retry it
-                                // did not answer the first time.
+                                // cannot be supplied later, and this Session cannot go on without it.
                                 //
-                                // A pool that answered after the registrations lapsed is just as local: the
-                                // Entry is told the Exit is busy, and nothing blames the supervisor.
+                                // A pool that missed the deadline, had a full request queue, or
+                                // answered after the registrations lapsed is too slow for now. That is
+                                // local and transient: the Entry is told the Exit is busy and may
+                                // retry, and nothing blames the supervisor.
                                 if matches!(
                                     error,
                                     TransportSessionError::Manager(SessionManagerError::DepositPoolTooSlow(_))
@@ -7813,10 +7860,14 @@ where
                                     return;
                                 }
 
+                                // No listener, a pool that failed to generate some entries, or answers
+                                // for other SSAs are faults of this Exit that a retry would meet again,
+                                // so the Entry is told with a permanent reason and does not retry.
+                                //
                                 // Named rather than folded into the supervisor's `PixFailure`,
                                 // because it points at this node's own pool while every reason the
-                                // supervisor has points at the peer — and the Entry is told with a
-                                // reason it can act on rather than the generic one.
+                                // supervisor has points at the peer. Locally the closure keeps its own
+                                // reason, so the metrics tell it from a pool that was too slow.
                                 if matches!(
                                     error,
                                     TransportSessionError::Manager(SessionManagerError::MissingDepositData(_))
@@ -8652,7 +8703,10 @@ where
         // lapsed while the pool answered is not sent for: the Entry would answer a request the Exit can
         // no longer match, after it has been told to deposit.
         if !refresh_registrations(&pix_toolbox_local.share_processor, ssa_ids) {
-            return Err(SessionManagerError::DepositPoolTooSlow(format!("session {session_id}")).into());
+            return Err(SessionManagerError::DepositPoolTooSlow(format!(
+                "session {session_id} had its commitment registrations lapse while the pool answered"
+            ))
+            .into());
         }
 
         // Only a request that is going out has its deposit data kept for the `DepositNeeded` to come.
@@ -10261,7 +10315,7 @@ where
             let _ = instance.stream_progress.set(progress);
         }
 
-        Ok(session.with_slot_instance(instance.id()))
+        Ok(session.with_slot_instance(instance.id(), instance.refusal.clone()))
     }
 
     /// Hands a paid Exit PIX Session, which a client has come back for, to its new data plane: the
@@ -11306,8 +11360,20 @@ where
                 );
                 // Best-effort close; the session may have already been removed. An error about a Session that is
                 // not resumable (a non-PIX Session, or one whose Exit predates resumption) names it by Session ID,
-                // so a stale one can still close a successor: the wire format cannot name the instance.
-                self.close_session(&session_id);
+                // so a stale one can still close a successor: the wire format cannot name the instance. For an
+                // outgoing Session the reason is recorded on the instance that is closed, so the app can read it.
+                // A stale error about an earlier Session under this pseudonym can thus be recorded here.
+                let outgoing = self
+                    .sessions
+                    .get(&session_id)
+                    .filter(|slot| matches!(slot.routing_opts, DestinationRouting::Forward { .. }))
+                    .map(|slot| slot.instance.clone());
+                if let Some(instance) = outgoing {
+                    instance.refuse(reason);
+                    self.close_session_scoped(&session_id, ClosureReason::Eviction, CloseScope::Instance(&instance));
+                } else {
+                    self.close_session(&session_id);
+                }
             }
         }
 
@@ -26370,8 +26436,9 @@ mod tests {
     /// needs it and does not get it cannot ask for it later — it would simply never deposit, and the
     /// Session would die on the Exit's own commitment deadline, blamed on the peer. Failing here
     /// costs one Session that was not going to work, and points at the local pool instead: the Entry
-    /// is told with `UnacceptablePixParams` rather than the supervisor's generic `Unknown`, and this
-    /// node records [`ClosureReason::MissingDepositData`] rather than `PixFailure`.
+    /// is told `UnacceptablePixParams`, a permanent reason, rather than the supervisor's generic
+    /// `Unknown`, and this node records [`ClosureReason::MissingDepositData`] rather than `PixFailure`. A pool
+    /// that is merely slow is told `Busy` instead, see the `request_deposit_data` tests below.
     ///
     /// The event stream is dropped rather than left unanswered, which reaches the same failure
     /// through the listener check instead of [`DEPOSIT_DATA_REQUEST_TIMEOUT`] — the same error, the
@@ -26461,7 +26528,7 @@ mod tests {
         assert!(
             sent.iter()
                 .any(|m| m == &format!("error:{}", StartErrorReason::UnacceptablePixParams)),
-            "the Entry must be told with a reason that names the failure, got {sent:?}"
+            "the Entry must be told with a permanent reason, got {sent:?}"
         );
 
         bob_sender.close_channel();
@@ -31609,6 +31676,18 @@ mod tests {
         batch: &[SsaIndex],
         script: impl FnOnce(Vec<PixAddressId>) -> Vec<PixDepositData> + Send + 'static,
     ) -> errors::Result<HoprPixDepositData> {
+        request_deposit_data_pool(session_id, batch, DEPOSIT_DATA_REQUEST_TIMEOUT, false, script).await
+    }
+
+    /// [`request_deposit_data_answered_with`] with the deadline, and with the choice of whether the pool
+    /// closes its reply channel once the script has run out instead of holding it open.
+    async fn request_deposit_data_pool(
+        session_id: SessionId,
+        batch: &[SsaIndex],
+        deadline: Duration,
+        close_when_done: bool,
+        script: impl FnOnce(Vec<PixAddressId>) -> Vec<PixDepositData> + Send + 'static,
+    ) -> errors::Result<HoprPixDepositData> {
         let (pix_toolbox, pix_events) = PixToolbox::new(
             SsaShareGenerator::new(SsaGeneratorConfig {
                 polynomials_per_ssa: 2,
@@ -31628,15 +31707,19 @@ mod tests {
                         return;
                     }
                 }
+                if close_when_done {
+                    return;
+                }
                 // Held open, not dropped — see above. The task is torn down with the test's runtime.
                 std::future::pending::<()>().await;
             }
         });
 
-        SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::request_deposit_data(
+        SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::request_deposit_data_within(
             &pix_toolbox,
             session_id,
             batch,
+            deadline,
         )
         .await
     }
@@ -31817,6 +31900,149 @@ mod tests {
             );
         }
 
+        Ok(())
+    }
+
+    /// A pool that stays silent past the deadline is too slow, which the Entry may retry.
+    #[test_log::test(tokio::test)]
+    async fn a_silent_pool_past_the_deadline_is_too_slow() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        // The pool answers one SSA and holds the channel open, so only the deadline can end the read.
+        let result = request_deposit_data_pool(session_id, &batch, Duration::from_millis(100), false, |ids| {
+            vec![PixDepositData {
+                id: ids[0],
+                data: b"mine".as_slice().into(),
+            }]
+        })
+        .await;
+
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::DepositPoolTooSlow(
+                    _
+                )))
+            ),
+            "got {result:?}"
+        );
+        Ok(())
+    }
+
+    /// A pool that closes its reply channel with entries missing cannot supply them: a retry meets the same.
+    #[test_log::test(tokio::test)]
+    async fn a_pool_closing_its_replies_early_is_missing_data() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        let result = timeout(
+            Duration::from_secs(1),
+            request_deposit_data_pool(session_id, &batch, DEPOSIT_DATA_REQUEST_TIMEOUT, true, |ids| {
+                vec![PixDepositData {
+                    id: ids[0],
+                    data: b"mine".as_slice().into(),
+                }]
+            }),
+        )
+        .await
+        .context("a closed channel must end the read before the deadline")?;
+
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::MissingDepositData(
+                    _
+                )))
+            ),
+            "got {result:?}"
+        );
+        Ok(())
+    }
+
+    /// Answers for other SSAs are a fault, even when the deadline also passed.
+    #[test_log::test(tokio::test)]
+    async fn a_pool_answering_for_other_ssas_is_missing_data_even_past_the_deadline() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        let result = request_deposit_data_pool(session_id, &batch, Duration::from_millis(100), false, move |_| {
+            vec![PixDepositData {
+                id: PixAddressId::new(&other_session, SsaIndex::MIN),
+                data: b"someone else's".as_slice().into(),
+            }]
+        })
+        .await;
+
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::MissingDepositData(
+                    _
+                )))
+            ),
+            "got {result:?}"
+        );
+        Ok(())
+    }
+
+    /// A full request queue is the pool being too slow; a closed one means nothing listens.
+    #[test_log::test(tokio::test)]
+    async fn a_full_request_queue_is_too_slow_and_a_closed_one_is_missing_data() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN];
+        let new_toolbox = || {
+            PixToolbox::new(
+                SsaShareGenerator::new(SsaGeneratorConfig {
+                    polynomials_per_ssa: 2,
+                    threshold: 2,
+                    surplus_shares: 1,
+                })
+                .into(),
+                Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+            )
+        };
+        type Mgr = SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>;
+
+        // Nobody reads the events, so filling the queue leaves the next request nowhere to go.
+        let (full, _events) = new_toolbox();
+        loop {
+            let (deposit_data_created, _rx) = futures::channel::mpsc::channel(1);
+            if full
+                .pix_events
+                .try_send(HoprSessionOutPixEvent::DepositDataRequest(PixDepositDataRequest {
+                    deposit_ids: Vec::new(),
+                    deposit_data_created,
+                }))
+                .is_err()
+            {
+                break;
+            }
+        }
+        let result = Mgr::request_deposit_data(&full, session_id, &batch).await;
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::DepositPoolTooSlow(
+                    _
+                )))
+            ),
+            "got {result:?}"
+        );
+
+        let (closed, events) = new_toolbox();
+        drop(events);
+        let result = Mgr::request_deposit_data(&closed, session_id, &batch).await;
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::MissingDepositData(
+                    _
+                )))
+            ),
+            "got {result:?}"
+        );
         Ok(())
     }
 
@@ -35330,6 +35556,42 @@ mod tests {
         Ok(())
     }
 
+    /// An error naming the Session by its ID, as an Exit does for a Session that is not resumable, fails a setup
+    /// still in progress with the Exit's reason, like one naming the challenge does.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_error_naming_the_session_id_during_setup_fails_new_session_with_the_exits_reason()
+    -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+
+        let injector = async {
+            let instance = slot_instance_in_setup(&rig.mgr, &pseudonym).await?;
+            rig.mgr
+                .handle_session_error(
+                    pseudonym,
+                    StartErrorType {
+                        identifier: ErrorIdentifier::SessionId(pseudonym),
+                        reason: StartErrorReason::UnacceptablePixParams,
+                    },
+                )
+                .await?;
+            Ok::<_, anyhow::Error>(instance)
+        };
+        let (connected, injected) = tokio::join!(rig.connect(balanced_entry_cfg(pseudonym)), injector);
+        let instance = injected?;
+        let err = connected.expect_err("the Exit closed the Session during its setup");
+        assert!(
+            matches!(
+                err.downcast_ref::<TransportSessionError>(),
+                Some(TransportSessionError::Rejected(StartErrorReason::UnacceptablePixParams))
+            ),
+            "got {err:?}"
+        );
+        assert!(instance.is_superseded());
+        assert!(rig.mgr.sessions.get(&pseudonym).is_none(), "no slot is left");
+        Ok(())
+    }
+
     /// A reconnect under the same pseudonym that replaces a Session still waiting for its SURBs fails that
     /// setup with `Closed`, and leaves the replacement in place, instead of returning a dead Session.
     #[test_log::test(tokio::test)]
@@ -35426,6 +35688,103 @@ mod tests {
         );
         injected?;
         let _second = connected.context("the setup timed out")??;
+        Ok(())
+    }
+
+    /// The Exit's reason for closing an established Session stays readable from the app's handle: the read
+    /// ends with 0 bytes, and [`HoprSession::refusal`] says why.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_error_after_establishment_is_readable_from_the_session() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let mut session = rig.connect_pix(Some(pseudonym)).await?;
+        let challenge = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.challenge;
+        assert_eq!(None, session.refusal());
+
+        rig.mgr
+            .handle_session_error(
+                pseudonym,
+                StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(challenge),
+                    reason: StartErrorReason::Busy,
+                },
+            )
+            .await?;
+
+        let mut buffer = [0u8; 16];
+        let read = timeout(
+            Duration::from_secs(5),
+            futures::AsyncReadExt::read(&mut session, &mut buffer),
+        )
+        .await
+        .context("the read must end once the Session is closed")??;
+        assert_eq!(0, read);
+        assert_eq!(Some(StartErrorReason::Busy), session.refusal());
+        Ok(())
+    }
+
+    /// An Exit error that names the Session by its ID, as it does for a Session that is not resumable, is
+    /// readable from the app's handle too; one naming another Session changes nothing.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_error_naming_the_session_id_is_readable_from_the_session() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let mut session = rig.connect_pix(Some(pseudonym)).await?;
+
+        rig.mgr
+            .handle_session_error(
+                pseudonym,
+                StartErrorType {
+                    identifier: ErrorIdentifier::SessionId(HoprPseudonym::random()),
+                    reason: StartErrorReason::Busy,
+                },
+            )
+            .await?;
+        assert!(
+            rig.mgr.sessions.get(&pseudonym).is_some(),
+            "another Session's error is dropped"
+        );
+        assert_eq!(None, session.refusal());
+
+        rig.mgr
+            .handle_session_error(
+                pseudonym,
+                StartErrorType {
+                    identifier: ErrorIdentifier::SessionId(pseudonym),
+                    reason: StartErrorReason::Busy,
+                },
+            )
+            .await?;
+
+        let mut buffer = [0u8; 16];
+        let read = timeout(
+            Duration::from_secs(5),
+            futures::AsyncReadExt::read(&mut session, &mut buffer),
+        )
+        .await
+        .context("the read must end once the Session is closed")??;
+        assert_eq!(0, read);
+        assert_eq!(Some(StartErrorReason::Busy), session.refusal());
+        Ok(())
+    }
+
+    /// A Session that is closed without an error from the Exit has no refusal to read.
+    #[test_log::test(tokio::test)]
+    async fn a_session_closed_without_an_exit_error_has_no_refusal() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let mut session = rig.connect_pix(Some(pseudonym)).await?;
+        assert!(rig.mgr.close_session(&pseudonym));
+
+        let mut buffer = [0u8; 16];
+        let read = timeout(
+            Duration::from_secs(5),
+            futures::AsyncReadExt::read(&mut session, &mut buffer),
+        )
+        .await
+        .context("the read must end once the Session is closed")??;
+        assert_eq!(0, read);
+        assert_eq!(None, session.refusal());
         Ok(())
     }
 

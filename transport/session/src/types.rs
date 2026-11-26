@@ -2,7 +2,7 @@ use std::{
     convert::Into,
     fmt::Debug,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, OnceLock},
     task::{Context, Poll},
     time::Duration,
 };
@@ -30,7 +30,7 @@ use hopr_protocol_session::{
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
-use hopr_protocol_start::StartProtocol;
+use hopr_protocol_start::{StartErrorReason, StartProtocol};
 use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
 use tracing::{debug, warn};
 
@@ -348,14 +348,15 @@ pub enum HoprSessionOutPixEvent {
     /// commitments for a batch of SSAs, asking the deposit pool for the data to attach to them.
     ///
     /// The Exit waits [`DEPOSIT_DATA_REQUEST_TIMEOUT`](crate::DEPOSIT_DATA_REQUEST_TIMEOUT) for one
-    /// answer per requested id, and a shortfall is *fatal*: the SSA request fails with
-    /// [`MissingDepositData`](crate::errors::SessionManagerError::MissingDepositData) and the Session
-    /// is closed with [`ClosureReason::MissingDepositData`]. A pool with nothing to attach must
+    /// answer per requested id, and a shortfall is *fatal*: the SSA request fails and the Session
+    /// is closed, with [`ClosureReason::DepositPoolTooSlow`] for a missed deadline and
+    /// [`ClosureReason::MissingDepositData`] for the other causes. A pool with nothing to attach must
     /// therefore answer with *empty* data rather than stay silent — empty is a value, silence is not.
     ///
     /// A listener that cannot answer at all should drop the attached sender: that ends the wait
     /// immediately and fails the request now, whereas holding it costs every SSA request the full
-    /// timeout before failing anyway.
+    /// timeout before failing anyway. A sender dropped before every id was answered is read as a fault
+    /// of this node, so the Entry is told with a permanent reason and does not retry.
     DepositDataRequest(hopr_api::node::PixDepositDataRequest),
 }
 
@@ -437,16 +438,18 @@ pub enum ClosureReason {
     Eviction,
     /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
     UnrealizedDeposit,
-    /// The local deposit pool did not supply the deposit data an SSA batch needs.
+    /// The local deposit pool cannot supply the deposit data an SSA batch needs: nothing listens for the
+    /// request, the pool closed its replies before answering everything, or it answered for other SSAs.
     ///
     /// Exit-side and locally caused, unlike [`UnrealizedDeposit`](Self::UnrealizedDeposit) which is
     /// the Entry failing to pay. Kept apart from it for exactly that reason: the two look alike from
     /// the outside — a PIX Session that stopped — and point at opposite nodes.
     MissingDepositData,
-    /// The local deposit pool answered after the SSA batch's commitment registrations had lapsed, so the
-    /// request was not sent.
+    /// The local deposit pool was too slow for the SSA batch, so the request was not sent: its request
+    /// queue was full, it missed the deadline, or it answered after the commitment registrations had lapsed.
     ///
-    /// Exit-side like [`MissingDepositData`](Self::MissingDepositData): the pool is too slow, the peer is not at fault.
+    /// Exit-side like [`MissingDepositData`](Self::MissingDepositData), but transient: the peer is not at
+    /// fault and is told to retry.
     DepositPoolTooSlow,
     /// The PIX supervisor ended the Session — a recovery deadline elapsed, too many shares failed
     /// verification, or the supervisor itself became unavailable.
@@ -752,6 +755,8 @@ pub struct HoprSession {
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     /// The slot instance the manager built this Session for; see [`HoprSession::slot_instance`].
     slot_instance: Option<u64>,
+    /// The Exit's reason for closing this Session once established; see [`HoprSession::refusal`].
+    refusal: Option<Arc<OnceLock<StartErrorReason>>>,
 }
 
 pub(crate) const SESSION_SOCKET_CAPACITY: usize = 16384;
@@ -992,12 +997,15 @@ impl HoprSession {
             cfg,
             on_close,
             slot_instance: None,
+            refusal: None,
         })
     }
 
-    /// Binds this Session to the manager's slot instance it was built for.
-    pub(crate) fn with_slot_instance(mut self, instance_id: u64) -> Self {
+    /// Binds this Session to the manager's slot instance it was built for, and to the cell the instance
+    /// records the Exit's refusal in.
+    pub(crate) fn with_slot_instance(mut self, instance_id: u64, refusal: Arc<OnceLock<StartErrorReason>>) -> Self {
         self.slot_instance = Some(instance_id);
+        self.refusal = Some(refusal);
         self
     }
 
@@ -1011,6 +1019,23 @@ impl HoprSession {
     /// [`SessionManager::close_session_instance`]: crate::SessionManager::close_session_instance
     pub fn slot_instance(&self) -> Option<u64> {
         self.slot_instance
+    }
+
+    /// The reason the Exit gave when it closed this Session after it was established, e.g.
+    /// [`StartErrorReason::Busy`].
+    ///
+    /// Meant to be read once a read returns 0 bytes, which is all the Session itself shows of the close.
+    /// `None` when the Session ended without a reason from the Exit, and for a Session not built by a
+    /// [`SessionManager`].
+    ///
+    /// Only meaningful on the Entry: nothing sets it on an Exit-side Session, where it is always `None`.
+    /// For a Session the Exit names by Session ID (one that is not resumable), a late error about an earlier
+    /// Session under the same pseudonym can close this one, and its reason is then reported here, because the
+    /// wire format cannot name the instance.
+    ///
+    /// [`SessionManager`]: crate::SessionManager
+    pub fn refusal(&self) -> Option<StartErrorReason> {
+        self.refusal.as_ref().and_then(|cell| cell.get().copied())
     }
 
     /// The progress of this Session's stream, for a Session on the stateless frame-based socket.
