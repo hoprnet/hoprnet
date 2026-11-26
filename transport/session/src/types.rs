@@ -355,7 +355,8 @@ pub enum HoprSessionOutPixEvent {
     ///
     /// A listener that cannot answer at all should drop the attached sender: that ends the wait
     /// immediately and fails the request now, whereas holding it costs every SSA request the full
-    /// timeout before failing anyway.
+    /// timeout before failing anyway. A sender dropped before every id was answered is read as a fault
+    /// of this node, so the Entry is told with a permanent reason and does not retry.
     DepositDataRequest(hopr_api::node::PixDepositDataRequest),
 }
 
