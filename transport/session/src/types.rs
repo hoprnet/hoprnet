@@ -348,9 +348,9 @@ pub enum HoprSessionOutPixEvent {
     /// commitments for a batch of SSAs, asking the deposit pool for the data to attach to them.
     ///
     /// The Exit waits [`DEPOSIT_DATA_REQUEST_TIMEOUT`](crate::DEPOSIT_DATA_REQUEST_TIMEOUT) for one
-    /// answer per requested id, and a shortfall is *fatal*: the SSA request fails with
-    /// [`MissingDepositData`](crate::errors::SessionManagerError::MissingDepositData) and the Session
-    /// is closed with [`ClosureReason::MissingDepositData`]. A pool with nothing to attach must
+    /// answer per requested id, and a shortfall is *fatal*: the SSA request fails and the Session
+    /// is closed, with [`ClosureReason::DepositPoolTooSlow`] for a missed deadline and
+    /// [`ClosureReason::MissingDepositData`] for the other causes. A pool with nothing to attach must
     /// therefore answer with *empty* data rather than stay silent — empty is a value, silence is not.
     ///
     /// A listener that cannot answer at all should drop the attached sender: that ends the wait
@@ -437,16 +437,18 @@ pub enum ClosureReason {
     Eviction,
     /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
     UnrealizedDeposit,
-    /// The local deposit pool did not supply the deposit data an SSA batch needs.
+    /// The local deposit pool cannot supply the deposit data an SSA batch needs: nothing listens for the
+    /// request, the pool closed its replies before answering everything, or it answered for other SSAs.
     ///
     /// Exit-side and locally caused, unlike [`UnrealizedDeposit`](Self::UnrealizedDeposit) which is
     /// the Entry failing to pay. Kept apart from it for exactly that reason: the two look alike from
     /// the outside — a PIX Session that stopped — and point at opposite nodes.
     MissingDepositData,
-    /// The local deposit pool answered after the SSA batch's commitment registrations had lapsed, so the
-    /// request was not sent.
+    /// The local deposit pool was too slow for the SSA batch, so the request was not sent: its request
+    /// queue was full, it missed the deadline, or it answered after the commitment registrations had lapsed.
     ///
-    /// Exit-side like [`MissingDepositData`](Self::MissingDepositData): the pool is too slow, the peer is not at fault.
+    /// Exit-side like [`MissingDepositData`](Self::MissingDepositData), but transient: the peer is not at
+    /// fault and is told to retry.
     DepositPoolTooSlow,
     /// The PIX supervisor ended the Session — a recovery deadline elapsed, too many shares failed
     /// verification, or the supervisor itself became unavailable.
