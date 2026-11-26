@@ -1821,7 +1821,7 @@ pub(crate) struct SlotInstance {
     ledger_home: OnceLock<LedgerHome>,
     /// Set by the first [`park_records`](Self::park_records): what the slot parks leaves it once.
     parked: std::sync::atomic::AtomicBool,
-    /// The reason the Exit gave for closing this Session while the Entry was still setting it up.
+    /// The reason the Exit gave for closing this Session, during its setup or after it.
     ///
     /// Shared with the [`HoprSession`] built for this instance, which reads it once the Session is in the
     /// app's hands, see [`HoprSession::refusal`].
@@ -11313,8 +11313,19 @@ where
                 );
                 // Best-effort close; the session may have already been removed. An error about a Session that is
                 // not resumable (a non-PIX Session, or one whose Exit predates resumption) names it by Session ID,
-                // so a stale one can still close a successor: the wire format cannot name the instance.
-                self.close_session(&session_id);
+                // so a stale one can still close a successor: the wire format cannot name the instance. For an
+                // outgoing Session the reason is recorded on the instance that is closed, so the app can read it.
+                let outgoing = self
+                    .sessions
+                    .get(&session_id)
+                    .filter(|slot| matches!(slot.routing_opts, DestinationRouting::Forward { .. }))
+                    .map(|slot| slot.instance.clone());
+                if let Some(instance) = outgoing {
+                    instance.refuse(reason);
+                    self.close_session_scoped(&session_id, ClosureReason::Eviction, CloseScope::Instance(&instance));
+                } else {
+                    self.close_session(&session_id);
+                }
             }
         }
 
@@ -35277,6 +35288,51 @@ mod tests {
                 pseudonym,
                 StartErrorType {
                     identifier: ErrorIdentifier::Challenge(challenge),
+                    reason: StartErrorReason::Busy,
+                },
+            )
+            .await?;
+
+        let mut buffer = [0u8; 16];
+        let read = timeout(
+            Duration::from_secs(5),
+            futures::AsyncReadExt::read(&mut session, &mut buffer),
+        )
+        .await
+        .context("the read must end once the Session is closed")??;
+        assert_eq!(0, read);
+        assert_eq!(Some(StartErrorReason::Busy), session.refusal());
+        Ok(())
+    }
+
+    /// An Exit error that names the Session by its ID, as it does for a Session that is not resumable, is
+    /// readable from the app's handle too; one naming another Session changes nothing.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_error_naming_the_session_id_is_readable_from_the_session() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let mut session = rig.connect_pix(Some(pseudonym)).await?;
+
+        rig.mgr
+            .handle_session_error(
+                pseudonym,
+                StartErrorType {
+                    identifier: ErrorIdentifier::SessionId(HoprPseudonym::random()),
+                    reason: StartErrorReason::Busy,
+                },
+            )
+            .await?;
+        assert!(
+            rig.mgr.sessions.get(&pseudonym).is_some(),
+            "another Session's error is dropped"
+        );
+        assert_eq!(None, session.refusal());
+
+        rig.mgr
+            .handle_session_error(
+                pseudonym,
+                StartErrorType {
+                    identifier: ErrorIdentifier::SessionId(pseudonym),
                     reason: StartErrorReason::Busy,
                 },
             )
