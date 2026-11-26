@@ -644,6 +644,9 @@ mod tests {
     /// change that stops checking, which on a cofactor-8 curve is a real hazard rather than a
     /// hypothetical one.
     ///
+    /// `SsaPartCommitment::decode_commitment` decodes unchecked, so there `is_torsion_free` is the
+    /// acting check, and the first assertion below pins it.
+    ///
     /// On secp256k1 the cofactor is 1, no such point exists, and the case is vacuous.
     #[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
     #[test]
@@ -670,6 +673,10 @@ mod tests {
         );
 
         let repr = hopr_protocol_pix::GroupEncoding::to_bytes(&PixGroup::<HoprPixSpec>::from(order_two));
+        assert!(
+            hopr_protocol_pix::SsaPartCommitment::<HoprPixSpec>::decode_commitment(&repr).is_err(),
+            "a small-order point must not decode as a coefficient commitment"
+        );
         assert!(
             HoprPixGroupElement(repr).try_into_pix_group().is_err(),
             "a small-order point must not parse into a pix group element"

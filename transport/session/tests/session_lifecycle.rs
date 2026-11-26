@@ -1031,3 +1031,170 @@ async fn a_lost_session_established_is_recovered_by_repeating_the_start_session(
     bob_handle.await??;
     Ok(())
 }
+
+/// Every WireGuard datagram size crosses a `Segmentation | NoDelay` Session whole, in both directions (#8716).
+///
+/// A WireGuard data message is the tunnel MTU + 32 B, so tunnel MTUs 940, 1280 and 1420 give 972, 1312 and
+/// `SESSION_MTU` (1452) B datagrams; one byte either side of `SESSION_MTU` covers the segment boundary.
+///
+/// ## Steps
+/// 1. Alice opens a Session to Bob as gnosis_vpn-client does: `Segmentation | NoDelay`, 1 hop, a SURB balancer and as
+///    many SURBs per data packet as fit. The mock reports the SURBs each packet would carry on the network.
+/// 2. For each size, Alice writes N datagrams with distinct payloads; Bob reads with a buffer larger than a datagram,
+///    and every read is exactly one whole datagram, in order.
+/// 3. The same from Bob to Alice over SURBs.
+#[test(tokio::test)]
+async fn a_no_delay_session_should_deliver_every_wireguard_datagram_size_whole() -> Result<()> {
+    use hopr_api::types::{internal::routing::RoutingOptions, primitive::bounded::BoundedSize};
+    use hopr_crypto_packet::prelude::HoprPacket;
+    use hopr_transport_session::{HoprSession, SESSION_MTU};
+
+    const DATAGRAM_SIZES: [usize; 5] = [972, 1312, SESSION_MTU - 1, SESSION_MTU, SESSION_MTU + 1];
+    const DATAGRAMS_PER_SIZE: usize = 16;
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(Default::default());
+
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_for_alice = Arc::new(bob_mgr.clone());
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let num_saved_surbs = data
+                .packet_info
+                .unwrap_or_default()
+                .max_surbs_in_packet
+                .min(HoprPacket::max_surbs_with_message(data.data.total_len()));
+            let bob_mgr = bob_mgr_for_alice.clone();
+            Box::pin(async move {
+                bob_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: IncomingPacketInfo {
+                            num_saved_surbs,
+                            ..Default::default()
+                        },
+                    },
+                )?;
+                Ok(())
+            })
+        });
+
+    let alice_mgr_for_bob = Arc::new(alice_mgr.clone());
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let alice_mgr = alice_mgr_for_bob.clone();
+            Box::pin(async move {
+                alice_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                )?;
+                Ok(())
+            })
+        });
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?);
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?);
+
+    let one_hop = RoutingOptions::Hops(BoundedSize::try_from(1)?);
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio::time::timeout(
+        Duration::from_secs(2),
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::UdpStream(SealedHost::Plain("127.0.0.1:51820".parse()?)),
+                SessionClientConfig {
+                    forward_path_options: one_hop.clone(),
+                    return_path_options: one_hop,
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::Segmentation | Capability::NoDelay,
+                    surb_management: Some(SurbBalancerConfig::default()),
+                    max_surbs_per_data_packet: usize::MAX,
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout: {e}"))?;
+    let mut alice_session = alice_session?;
+    let mut bob_session = bob_session.context("bob must get an incoming session")?.session;
+    assert_eq!(
+        Capability::Segmentation | Capability::NoDelay,
+        bob_session.config().capabilities
+    );
+
+    async fn send_and_read_datagrams(
+        sender: &mut HoprSession,
+        receiver: &mut HoprSession,
+        size: usize,
+        count: usize,
+    ) -> Result<()> {
+        let datagrams: Vec<Vec<u8>> = (0..count)
+            .map(|i| (0..size).map(|j| (i * 31 + j) as u8).collect())
+            .collect();
+
+        let send = async {
+            for datagram in &datagrams {
+                sender.write_all(datagram).await?;
+                sender.flush().await?;
+            }
+            anyhow::Ok(())
+        };
+        let read = async {
+            let mut buf = vec![0u8; 2 * size];
+            for (i, expected) in datagrams.iter().enumerate() {
+                let n = receiver.read(&mut buf).await?;
+                assert_eq!(size, n, "datagram {i} of {size} B must arrive in one read");
+                assert!(
+                    buf[..n] == expected[..],
+                    "datagram {i} of {size} B arrived corrupted or out of order"
+                );
+            }
+            anyhow::Ok(())
+        };
+        let (sent, read) = tokio::time::timeout(Duration::from_secs(10), futures::future::join(send, read))
+            .await
+            .with_context(|| format!("datagrams of {size} B did not all arrive"))?;
+        sent?;
+        read
+    }
+
+    for size in DATAGRAM_SIZES {
+        send_and_read_datagrams(&mut alice_session, &mut bob_session, size, DATAGRAMS_PER_SIZE)
+            .await
+            .with_context(|| format!("alice to bob, {size} B"))?;
+        send_and_read_datagrams(&mut bob_session, &mut alice_session, size, DATAGRAMS_PER_SIZE)
+            .await
+            .with_context(|| format!("bob to alice, {size} B"))?;
+    }
+
+    for ah in ahs {
+        ah.abort();
+    }
+    drop((alice_session, bob_session));
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+    Ok(())
+}

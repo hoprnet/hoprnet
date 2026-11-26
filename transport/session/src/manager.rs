@@ -11525,10 +11525,10 @@ where
             .transpose()
             .map_err(SessionManagerError::other)?;
 
-        // Insert the newly received coefficients into the SSA Reconstructor
+        // Insert the newly received coefficients into the SSA Reconstructor, off the shared CPU pool
         let pix_toolbox_clone = pix_toolbox.clone();
-        let ssa_client_commitment_state = hopr_utils::parallelize::cpu::spawn_blocking(
-            move || {
+        let ssa_client_commitment_state =
+            crate::pix_pool::spawn_pix_blocking(crate::pix_pool::PixPoolOperation::CommitmentIngest, move || {
                 pix_toolbox_clone
                     .share_processor
                     .insert_coefficient_commitments(
@@ -11538,15 +11538,13 @@ where
                         msg.coefficient_commitments.into_iter().map(|(k, v)| (k, v.0)),
                     )
                     .map_err(SessionManagerError::PixError)
-            },
-            "ssa commitment reconstructor",
-        )
-        .await
-        .map_err(|_| {
-            SessionManagerError::Other(anyhow::anyhow!(
-                "failed to insert SSA coefficients into the SSA reconstructor"
-            ))
-        })??;
+            })
+            .await
+            .map_err(|_| {
+                SessionManagerError::Other(anyhow::anyhow!(
+                    "failed to insert SSA coefficients into the SSA reconstructor"
+                ))
+            })??;
 
         // A verifiable commitment is what starts the deposit clock, so tell the supervisor before
         // the observer below can report anything against it.
@@ -12432,13 +12430,13 @@ where
                 // params on Exit).  If the client sends commitments that exceed the
                 // Exit's expected dimensions, the Exit rejects them as InvalidInput.
                 let pix_toolbox_clone = pix_toolbox.clone();
-                let client_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+                let client_commitment = crate::pix_pool::spawn_pix_blocking(
+                    crate::pix_pool::PixPoolOperation::CommitmentGeneration,
                     move || {
                         pix_toolbox_clone
                             .share_generator
                             .new_ssa_commitment(&pseudonym, ssa_index)
                     },
-                    "client_ssa_commitment",
                 )
                 .await
                 .map_err(SessionManagerError::other)?
@@ -30496,6 +30494,182 @@ mod tests {
         bob_sender.close_channel();
         bob_handle.await??;
 
+        Ok(())
+    }
+
+    /// Ingesting one cycle's commitment burst must leave the shared CPU pool to packets (hoprnet#8765).
+    ///
+    /// The Exit takes the burst's ~45 `SsaCommit` messages at once. On the shared pool their jobs took
+    /// every thread, and a packet decode queued behind them waited for the whole burst. The bound is
+    /// relative to the burst's own length, so the verdict does not depend on machine speed.
+    #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 2))]
+    async fn ssa_commit_burst_leaves_the_shared_pool_to_packets() -> anyhow::Result<()> {
+        use std::{
+            sync::{
+                Arc,
+                atomic::{AtomicBool, Ordering},
+            },
+            time::{Duration, Instant},
+        };
+
+        use hopr_crypto_packet::prelude::{HoprPixCommitmentProof, HoprPixGroupElement};
+        use hopr_protocol_pix::{EntryShareGenerator, SsaReconstructor, SsaShareGenerator};
+        use hopr_protocol_start::StartInitiation;
+        use hopr_utils::parallelize::cpu;
+
+        use crate::types::{DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SURPLUS_SHARES};
+
+        // The test sizes the shared pool, which takes a process of its own, so it runs itself again,
+        // alone, in a child process. Under `cargo test` its siblings would share the pool.
+        const ALONE: &str = "HOPR_TEST_SSA_COMMIT_BURST_ALONE";
+        if std::env::var_os(ALONE).is_none() {
+            let module = module_path!().split_once("::").map_or("", |(_, module)| module);
+            let name = format!("{module}::ssa_commit_burst_leaves_the_shared_pool_to_packets");
+            let run = std::process::Command::new(std::env::current_exe()?)
+                .args(["--exact", name.as_str(), "--nocapture"])
+                .env(ALONE, "1")
+                .output()?;
+            let stdout = String::from_utf8_lossy(&run.stdout);
+            print!("{stdout}{}", String::from_utf8_lossy(&run.stderr));
+            anyhow::ensure!(
+                run.status.success() && stdout.contains("test result: ok. 1 passed;"),
+                "the test failed, or did not run, in a process of its own"
+            );
+            return Ok(());
+        }
+
+        // A shared pool smaller than the burst, as on any Exit.
+        anyhow::ensure!(
+            cpu::init_thread_pool(2).is_ok(),
+            "the shared CPU pool was built before this test could size it"
+        );
+
+        let dims = SsaGeneratorConfig {
+            polynomials_per_ssa: DEFAULT_PIX_POLYS_PER_SSA,
+            threshold: DEFAULT_PIX_SHARES_PER_POLY,
+            surplus_shares: DEFAULT_PIX_SURPLUS_SHARES,
+        };
+        let (pix_toolbox, pix_events_rx) = PixToolbox::new(
+            SsaShareGenerator::new(dims).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+        let mut pix_events_rx = Box::pin(crate::testing::answering_deposit_pool(pix_events_rx, |id| {
+            vec![id.ssa_index().get() as u8; 3]
+        }));
+
+        let mgr = SessionManager::new(SessionManagerConfig::default());
+        let mut transport = MockMsgSender::new();
+        transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let (sender, sender_handle) = mock_packet_planning(transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while new_session_rx.next().await.is_some() {}
+        });
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox.clone()), None)?;
+
+        let entry = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            entry,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: pix_additional_data(
+                    DEFAULT_PIX_POLYS_PER_SSA,
+                    DEFAULT_PIX_SHARES_PER_POLY,
+                    DEFAULT_PIX_SURPLUS_SHARES,
+                ),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(entry, SsaIndex::MIN);
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !pix_toolbox.share_processor.contains_builder(&ssa_id) {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the opening SSA request never registered an exit commitment")?;
+
+        // The Entry's answer: one default cycle's commitment, chunked as it goes on the wire.
+        let entry_generator = SsaShareGenerator::<HoprPixSpec>::new(dims);
+        let burst: Vec<SsaClientCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixCommitmentProof>> =
+            SsaClientCommitmentMessage::new_multiple(
+                entry,
+                entry_generator.new_ssa_commitment(&entry, SsaIndex::MIN)?,
+            )?;
+        let burst_len = burst.len();
+
+        // Packet decodes, one every 2 ms, each waiting on the shared pool as the pipeline's do.
+        let stop = Arc::new(AtomicBool::new(false));
+        let prober = tokio::spawn({
+            let stop = stop.clone();
+            async move {
+                let mut tick = tokio::time::interval(Duration::from_millis(2));
+                let mut probes = Vec::new();
+                while !stop.load(Ordering::Relaxed) {
+                    tick.tick().await;
+                    probes.push(tokio::spawn(async {
+                        let sent = Instant::now();
+                        let _ = cpu::spawn_decode_blocking(|| (), "packet_decode").await;
+                        (sent, sent.elapsed())
+                    }));
+                }
+                probes
+            }
+        });
+
+        // All at once, as the control lane hands them over.
+        let started = Instant::now();
+        for result in futures::future::join_all(burst.into_iter().map(|msg| mgr.handle_ssa_commit(entry, msg))).await {
+            result?;
+        }
+        let burst_time = started.elapsed();
+        stop.store(true, Ordering::Relaxed);
+        // Every probe must come back: one still queued would leave its wait out of the verdict.
+        let probes = tokio::time::timeout(Duration::from_secs(5), futures::future::try_join_all(prober.await?))
+            .await
+            .context("a probed packet decode never finished")??;
+
+        let completed = tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(event) = pix_events_rx.next().await {
+                if matches!(&event, HoprSessionOutPixEvent::DepositNeeded(quota, _) if quota.ssa_id == ssa_id) {
+                    return true;
+                }
+            }
+            false
+        })
+        .await?;
+        assert!(completed, "the burst must complete the cycle's commitment");
+
+        let mut waits: Vec<Duration> = probes
+            .into_iter()
+            .filter(|(sent, _)| *sent >= started && *sent < started + burst_time)
+            .map(|(_, wait)| wait)
+            .collect();
+        waits.sort_unstable();
+        let worst = *waits.last().context("no packet decode was probed during the burst")?;
+        let median = waits[waits.len() / 2];
+        tracing::info!(
+            ?burst_time,
+            ?median,
+            ?worst,
+            probes = waits.len(),
+            burst_len,
+            "packet decode waits during the commitment burst"
+        );
+        assert!(
+            worst * 4 < burst_time,
+            "a packet decode waited {worst:?} during a {burst_time:?} commitment burst (median {median:?}): the burst \
+             held every shared pool thread"
+        );
+
+        sender.close_channel();
+        sender_handle.await??;
         Ok(())
     }
 

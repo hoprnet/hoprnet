@@ -162,19 +162,19 @@ hopr-protocol-pix = { version = "0.3.1", path = "protocols/pix", default-feature
 ] }
 hopr-protocol-session = { version = "2.0.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "4.1.1", path = "protocols/start", default-features = false }
-hopr-ticket-manager = { version = "0.11.0" }
-hopr-transport = { version = "0.54.1", path = "transport/hopr" }
+hopr-ticket-manager = { version = "0.11.1" }
+hopr-transport = { version = "0.54.3", path = "transport/hopr" }
 hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.38.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.35.0" }
+hopr-chain-connector = { version = "0.36.1" }
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.8.0", default-features = false }
 hopr-transport-p2p = { version = "0.15.0", features = ["transport-quic"] }
-hopr-ct-full-network = { version = "0.11.0", default-features = false }
-hopr-network-graph = { version = "0.12.1", default-features = false }
+hopr-ct-full-network = { version = "0.12.0", default-features = false }
+hopr-network-graph = { version = "0.13.0", default-features = false }
 
 [profile.dev]
 panic = "abort"

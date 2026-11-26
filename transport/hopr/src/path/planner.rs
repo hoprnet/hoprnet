@@ -153,8 +153,9 @@ pub struct PathPlannerConfig {
     /// a relayer on probation and an edge probes measured dead, and also a healthy path slow or thin
     /// enough to weigh less than a tenth. An exploring return draw takes one of those only within a
     /// node-wide allowance of one a second, while an ordinary return draw keeps it at its tempered
-    /// weight: a reply through a relayer on probation is what revives it. A forward draw, exploring or
-    /// not, never takes one, as a forward packet probes nothing.
+    /// weight: a reply through a relayer on probation is what revives it, and a relayer is on
+    /// probation only until that probe is out. A forward draw, exploring or not, never takes one, as
+    /// a forward packet probes nothing.
     ///
     /// Costs throughput in proportion: this share of draws, forward and return, deliberately ignores
     /// which plausible candidate looks best. Candidates have already passed the selector's gates
@@ -339,12 +340,12 @@ fn pick_uniform_index(len: usize) -> Option<usize> {
 /// The fraction of the best candidate's (tempered) weight below which a candidate is one the cost
 /// function all but rejects.
 ///
-/// A relayer on probation is published at a health of a thousandth and an edge probes measured dead
-/// is floored at a billionth: tempered, they sit at about 3 % and 0.003 % of a healthy candidate. A
+/// A relayer on probation is published at a health of a millionth and an edge probes measured dead
+/// is floored at a billionth: tempered, they sit at about 0.1 % and 0.003 % of a healthy candidate. A
 /// stalled relayer still delivering at a hundredth of its health is at 10 %, and stays explorable.
 ///
 /// Those figures are for the default `return_path_weight_temper` of 0.5. A weight tempered by `t`
-/// puts a relayer on probation at `0.001^t` of a healthy one, so a temper of 1/3 or less lifts it to
+/// puts a relayer on probation at `0.000001^t` of a healthy one, so a temper of 1/6 or less lifts it to
 /// this fraction or above: exploration then counts it as plausible, forward draws among them, and
 /// the probe budget no longer holds it back. Whoever lowers the temper that far trades this gate for
 /// the wider spread.
@@ -1015,8 +1016,9 @@ where
                 // Over plausible candidates only, exploring or not: a forward packet through a relayer
                 // on probation, or over an edge probes measured dead, is data lost, PIX shares and
                 // SURBs with it, and it probes nothing (a probation ends on a reply through the
-                // relayer, which only a return path carries). Tempered, a relayer on probation keeps
-                // about 3 % of a healthy one's weight, so the ordinary draw is gated too.
+                // relayer, which only a return path carries). Tempered, such a candidate still has a
+                // weight, a thousandth of a healthy one's for a relayer on probation and up to a tenth
+                // for a stalled one, so the ordinary draw is gated too.
                 let mut weights = paths.1.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
                 if source == NodeId::Offchain(self.me) {
                     self.exclude_judged_relayers(&paths.1, &mut weights);
