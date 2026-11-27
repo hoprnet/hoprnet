@@ -969,8 +969,11 @@ mod tests {
             };
 
             let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            // Only gaps measured once the read has started count, so a hiccup during the warm-up
+            // cannot fail a read that yields.
+            let reading = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let ticker = tokio::spawn({
-                let stop = stop.clone();
+                let (stop, reading) = (stop.clone(), reading.clone());
                 async move {
                     let period = Duration::from_millis(1);
                     let mut worst = Duration::ZERO;
@@ -978,7 +981,9 @@ mod tests {
                     while !stop.load(std::sync::atomic::Ordering::Relaxed) {
                         tokio::time::sleep(period).await;
                         let now = std::time::Instant::now();
-                        worst = worst.max(now.duration_since(last).saturating_sub(period));
+                        if reading.load(std::sync::atomic::Ordering::Relaxed) {
+                            worst = worst.max(now.duration_since(last).saturating_sub(period));
+                        }
                         last = now;
                     }
                     worst
@@ -987,6 +992,7 @@ mod tests {
             // Let the ticker start before the read begins.
             tokio::time::sleep(Duration::from_millis(5)).await;
 
+            reading.store(true, std::sync::atomic::Ordering::Relaxed);
             let started = std::time::Instant::now();
             let mut output = [0u8; 64];
             let read = tokio::time::timeout(Duration::from_secs(60), socket.read(&mut output)).await??;
