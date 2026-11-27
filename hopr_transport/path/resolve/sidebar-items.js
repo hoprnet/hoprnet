@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_SURB_RESOLUTION_WAIT","MAX_WAITING","MAX_WAITING_PER_PSEUDONYM","SURB_RETRY_INTERVAL"],"enum":["Staged"],"fn":["resolve_per_pseudonym","resolve_routing_stage_with_context","surb_resolution_wait"],"type":["Resolved"]};

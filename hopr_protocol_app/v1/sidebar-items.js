@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ReservedTag","Tag"],"fn":["check_len"],"struct":["ApplicationData","ApplicationDataIn","ApplicationDataOut","IncomingPacketInfo","OutgoingPacketInfo","ReservedTagIter","SurbRefund"]};

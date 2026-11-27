@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FORWARD_CONFIRMATION","FORWARD_GRACE","FORWARD_VERDICT_TTL","MAX_FORWARD_VERDICTS_PER_EXIT","MAX_MISSING","MAX_RECORDS","NEW_SESSION_SEQ_MAX","RECORD_TTL","RESET_AFTER","STATE_TTL","STREAM_TTL"],"fn":["id_of"],"struct":["ForwardReceipts","Record","State","Stream","Suspicion"],"type":["Key"]};

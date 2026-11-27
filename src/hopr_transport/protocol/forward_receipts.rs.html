@@ -1,0 +1,1650 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `transport/hopr/src/protocol/forward_receipts.rs`."><title>forward_receipts.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ddecd707.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="hopr_transport" data-themes="" data-resource-suffix="" data-rustdoc-version="1.99.0-nightly (da80ed070 2026-07-14)" data-channel="nightly" data-search-js="search-cf4fc35e.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">hopr_transport/protocol/</div>forward_receipts.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-4"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Judges forward relayers from the receipts an Exit sends for the Session packets it received.
+<a href=#2 id=2 data-nosnippet>2</a>//!
+<a href=#3 id=3 data-nosnippet>3</a>//! Each Session packet sent over a forward path is recorded with its secret-derived tag. A receipt lists the tags
+<a href=#4 id=4 data-nosnippet>4</a>//! that reached the Exit; a packet still unreceipted once later packets of the same Session are (`FORWARD_GRACE`)
+<a href=#5 id=5 data-nosnippet>5</a>//! is overdue, and counts against the relayers on its path that nothing has been delivered through since. A relayer
+<a href=#6 id=6 data-nosnippet>6</a>//! that the overdue packets point at, after `explain_away` and `FORWARD_CONFIRMATION`, is excluded from the forward
+<a href=#7 id=7 data-nosnippet>7</a>//! draws to that Exit until the verdict is lifted. Everything is judged within one pseudonym, so a Session's receipts
+<a href=#8 id=8 data-nosnippet>8</a>//! never judge another Session's packets.
+<a href=#9 id=9 data-nosnippet>9</a>
+<a href=#10 id=10 data-nosnippet>10</a></span><span class="kw">use </span>std::{
+<a href=#11 id=11 data-nosnippet>11</a>    collections::{HashMap, HashSet, VecDeque},
+<a href=#12 id=12 data-nosnippet>12</a>    sync::atomic::{AtomicBool, Ordering},
+<a href=#13 id=13 data-nosnippet>13</a>    time::{Duration, Instant},
+<a href=#14 id=14 data-nosnippet>14</a>};
+<a href=#15 id=15 data-nosnippet>15</a>
+<a href=#16 id=16 data-nosnippet>16</a><span class="kw">use </span>dashmap::DashMap;
+<a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span>hopr_api::types::{
+<a href=#18 id=18 data-nosnippet>18</a>    crypto::types::OffchainPublicKey,
+<a href=#19 id=19 data-nosnippet>19</a>    internal::prelude::{HoprPseudonym, HoprSurbId, RoutingOptions, SURB_ID_SIZE},
+<a href=#20 id=20 data-nosnippet>20</a>};
+<a href=#21 id=21 data-nosnippet>21</a><span class="kw">use </span>hopr_transport_session::ForwardReceiptSink;
+<a href=#22 id=22 data-nosnippet>22</a><span class="kw">use </span>parking_lot::{Mutex, RwLock};
+<a href=#23 id=23 data-nosnippet>23</a>
+<a href=#24 id=24 data-nosnippet>24</a><span class="kw">use </span><span class="kw">super</span>::surb_telemetry::{MIN_RACES, Suspect, explain_away};
+<a href=#25 id=25 data-nosnippet>25</a>
+<a href=#26 id=26 data-nosnippet>26</a><span class="doccomment">/// The most packets recorded at once; the oldest is evicted first.
+<a href=#27 id=27 data-nosnippet>27</a></span><span class="kw">const </span>MAX_RECORDS: usize = <span class="number">16_384</span>;
+<a href=#28 id=28 data-nosnippet>28</a><span class="doccomment">/// How long a packet is waited for, after which its record is dropped and counts for nothing.
+<a href=#29 id=29 data-nosnippet>29</a></span><span class="kw">const </span>RECORD_TTL: Duration = Duration::from_secs(<span class="number">10</span>);
+<a href=#30 id=30 data-nosnippet>30</a><span class="doccomment">/// How long a packet may trail a receipted one, sent after it, before it is overdue.
+<a href=#31 id=31 data-nosnippet>31</a></span><span class="kw">const </span>FORWARD_GRACE: Duration = Duration::from_millis(<span class="number">500</span>);
+<a href=#32 id=32 data-nosnippet>32</a><span class="doccomment">/// How long a verdict excludes a relayer.
+<a href=#33 id=33 data-nosnippet>33</a></span><span class="kw">const </span>FORWARD_VERDICT_TTL: Duration = Duration::from_secs(<span class="number">30</span>);
+<a href=#34 id=34 data-nosnippet>34</a><span class="doccomment">/// The most relayers excluded for one Exit at once, which bounds how far a lying Exit can steer.
+<a href=#35 id=35 data-nosnippet>35</a></span><span class="kw">const </span>MAX_FORWARD_VERDICTS_PER_EXIT: usize = <span class="number">2</span>;
+<a href=#36 id=36 data-nosnippet>36</a><span class="doccomment">/// How long a suspect stands as a black hole before it is judged.
+<a href=#37 id=37 data-nosnippet>37</a></span><span class="kw">const </span>FORWARD_CONFIRMATION: Duration = Duration::from_millis(<span class="number">500</span>);
+<a href=#38 id=38 data-nosnippet>38</a><span class="doccomment">/// How long a delivery is kept without news.
+<a href=#39 id=39 data-nosnippet>39</a></span><span class="kw">const </span>STATE_TTL: Duration = Duration::from_secs(<span class="number">60</span>);
+<a href=#40 id=40 data-nosnippet>40</a><span class="doccomment">/// How long a receipt stream is kept without news: longer than the default idle timeout (3 min), so that the first
+<a href=#41 id=41 data-nosnippet>41</a>/// receipt after an idle continues it.
+<a href=#42 id=42 data-nosnippet>42</a></span><span class="kw">const </span>STREAM_TTL: Duration = Duration::from_secs(<span class="number">600</span>);
+<a href=#43 id=43 data-nosnippet>43</a><span class="doccomment">/// How old a stream must be to be reset by a reused pseudonym: a copy of an early receipt, delayed on a stalled return
+<a href=#44 id=44 data-nosnippet>44</a>/// path, is no new Session.
+<a href=#45 id=45 data-nosnippet>45</a></span><span class="kw">const </span>RESET_AFTER: Duration = RECORD_TTL;
+<a href=#46 id=46 data-nosnippet>46</a><span class="doccomment">/// The most receipts one receipt is held to have skipped over; a larger gap is a loss.
+<a href=#47 id=47 data-nosnippet>47</a></span><span class="kw">const </span>MAX_MISSING: u32 = <span class="number">16</span>;
+<a href=#48 id=48 data-nosnippet>48</a><span class="doccomment">/// The highest `seq` a new Session sends first (see the Exit's overflow jump).
+<a href=#49 id=49 data-nosnippet>49</a></span><span class="kw">const </span>NEW_SESSION_SEQ_MAX: u32 = <span class="number">3</span>;
+<a href=#50 id=50 data-nosnippet>50</a>
+<a href=#51 id=51 data-nosnippet>51</a><span class="kw">type </span>Key = OffchainPublicKey;
+<a href=#52 id=52 data-nosnippet>52</a>
+<a href=#53 id=53 data-nosnippet>53</a><span class="kw">struct </span>Record {
+<a href=#54 id=54 data-nosnippet>54</a>    exit: Key,
+<a href=#55 id=55 data-nosnippet>55</a>    <span class="doccomment">/// The relayers, nearest to us first.
+<a href=#56 id=56 data-nosnippet>56</a>    </span>relayers: [<span class="prelude-ty">Option</span>&lt;Key&gt;; RoutingOptions::MAX_INTERMEDIATE_HOPS],
+<a href=#57 id=57 data-nosnippet>57</a>    sent_at: Instant,
+<a href=#58 id=58 data-nosnippet>58</a>    <span class="doccomment">/// Another packet of the pseudonym had the same tag: a receipt for it says nothing about either, so it credits
+<a href=#59 id=59 data-nosnippet>59</a>    /// nobody and the packets are never overdue.
+<a href=#60 id=60 data-nosnippet>60</a>    </span>ambiguous: bool,
+<a href=#61 id=61 data-nosnippet>61</a>}
+<a href=#62 id=62 data-nosnippet>62</a>
+<a href=#63 id=63 data-nosnippet>63</a><span class="kw">impl </span>Record {
+<a href=#64 id=64 data-nosnippet>64</a>    <span class="kw">fn </span>relayers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span>Key&gt; {
+<a href=#65 id=65 data-nosnippet>65</a>        <span class="self">self</span>.relayers.iter().flatten()
+<a href=#66 id=66 data-nosnippet>66</a>    }
+<a href=#67 id=67 data-nosnippet>67</a>}
+<a href=#68 id=68 data-nosnippet>68</a>
+<a href=#69 id=69 data-nosnippet>69</a><span class="doccomment">/// The receipts of one pseudonym.
+<a href=#70 id=70 data-nosnippet>70</a></span><span class="kw">struct </span>Stream {
+<a href=#71 id=71 data-nosnippet>71</a>    last_seq: u32,
+<a href=#72 id=72 data-nosnippet>72</a>    <span class="doccomment">/// Packets sent before it are no evidence: receipts may have been lost.
+<a href=#73 id=73 data-nosnippet>73</a>    </span>floor: Instant,
+<a href=#74 id=74 data-nosnippet>74</a>    <span class="doccomment">/// The latest send time among the packets receipted.
+<a href=#75 id=75 data-nosnippet>75</a>    </span>watermark: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
+<a href=#76 id=76 data-nosnippet>76</a>    seen: Instant,
+<a href=#77 id=77 data-nosnippet>77</a>    <span class="doccomment">/// When the stream began.
+<a href=#78 id=78 data-nosnippet>78</a>    </span>started: Instant,
+<a href=#79 id=79 data-nosnippet>79</a>    <span class="doccomment">/// Receipts skipped over, and since when; they may only be late, so nothing is judged while they are awaited.
+<a href=#80 id=80 data-nosnippet>80</a>    </span>missing: Vec&lt;(u32, Instant)&gt;,
+<a href=#81 id=81 data-nosnippet>81</a>}
+<a href=#82 id=82 data-nosnippet>82</a>
+<a href=#83 id=83 data-nosnippet>83</a><span class="doccomment">/// A relayer that has been a black hole since `since`, over packets from `oldest` on.
+<a href=#84 id=84 data-nosnippet>84</a></span><span class="kw">struct </span>Suspicion {
+<a href=#85 id=85 data-nosnippet>85</a>    since: Instant,
+<a href=#86 id=86 data-nosnippet>86</a>    oldest: Instant,
+<a href=#87 id=87 data-nosnippet>87</a>    pseudonym: HoprPseudonym,
+<a href=#88 id=88 data-nosnippet>88</a>}
+<a href=#89 id=89 data-nosnippet>89</a>
+<a href=#90 id=90 data-nosnippet>90</a><span class="attr">#[derive(Default)]
+<a href=#91 id=91 data-nosnippet>91</a></span><span class="kw">struct </span>State {
+<a href=#92 id=92 data-nosnippet>92</a>    <span class="doccomment">/// By pseudonym, so that judging a Session touches only its packets.
+<a href=#93 id=93 data-nosnippet>93</a>    </span>records: HashMap&lt;HoprPseudonym, HashMap&lt;u32, Record&gt;&gt;,
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="doccomment">/// How many records there are in all.
+<a href=#95 id=95 data-nosnippet>95</a>    </span>count: usize,
+<a href=#96 id=96 data-nosnippet>96</a>    <span class="doccomment">/// Records by send time; entries of records gone are skipped.
+<a href=#97 id=97 data-nosnippet>97</a>    </span>order: VecDeque&lt;(HoprPseudonym, u32, Instant)&gt;,
+<a href=#98 id=98 data-nosnippet>98</a>    streams: HashMap&lt;HoprPseudonym, Stream&gt;,
+<a href=#99 id=99 data-nosnippet>99</a>    <span class="doccomment">/// When the packet sent last got through each (exit, relayer).
+<a href=#100 id=100 data-nosnippet>100</a>    </span>delivered: HashMap&lt;(Key, Key), Instant&gt;,
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="doccomment">/// The (exit, relayer) pairs excluded, and since when.
+<a href=#102 id=102 data-nosnippet>102</a>    </span>verdicts: HashMap&lt;(Key, Key), Instant&gt;,
+<a href=#103 id=103 data-nosnippet>103</a>    <span class="doccomment">/// When each verdict was last lifted; a relapse within the TTL is judged without the wait.
+<a href=#104 id=104 data-nosnippet>104</a>    </span>lifted: HashMap&lt;(Key, Key), Instant&gt;,
+<a href=#105 id=105 data-nosnippet>105</a>    <span class="doccomment">/// The relayers that are black holes but have not yet stood for `FORWARD_CONFIRMATION`.
+<a href=#106 id=106 data-nosnippet>106</a>    </span>suspected: HashMap&lt;(Key, Key), Suspicion&gt;,
+<a href=#107 id=107 data-nosnippet>107</a>    <span class="doccomment">/// Whether the verdicts changed since they were last published.
+<a href=#108 id=108 data-nosnippet>108</a>    </span>changed: bool,
+<a href=#109 id=109 data-nosnippet>109</a>}
+<a href=#110 id=110 data-nosnippet>110</a>
+<a href=#111 id=111 data-nosnippet>111</a><span class="doccomment">/// Records forward Session packets and judges their relayers from the Exit's receipts.
+<a href=#112 id=112 data-nosnippet>112</a></span><span class="attr">#[derive(Default)]
+<a href=#113 id=113 data-nosnippet>113</a></span><span class="kw">pub struct </span>ForwardReceipts {
+<a href=#114 id=114 data-nosnippet>114</a>    any_verdict: AtomicBool,
+<a href=#115 id=115 data-nosnippet>115</a>    <span class="doccomment">/// The relayers excluded per Exit, for the planner.
+<a href=#116 id=116 data-nosnippet>116</a>    </span>excluded: RwLock&lt;HashMap&lt;Key, Vec&lt;Key&gt;&gt;&gt;,
+<a href=#117 id=117 data-nosnippet>117</a>    <span class="doccomment">/// The pseudonyms whose Session asked for receipts, with the Session instance: only theirs are recorded, so that
+<a href=#118 id=118 data-nosnippet>118</a>    /// Sessions without receipts cannot crowd out the evidence of the others. Kept from the Session's start to its
+<a href=#119 id=119 data-nosnippet>119</a>    /// end, however long it is idle.
+<a href=#120 id=120 data-nosnippet>120</a>    </span>active: DashMap&lt;HoprPseudonym, u64&gt;,
+<a href=#121 id=121 data-nosnippet>121</a>    state: Mutex&lt;State&gt;,
+<a href=#122 id=122 data-nosnippet>122</a>}
+<a href=#123 id=123 data-nosnippet>123</a>
+<a href=#124 id=124 data-nosnippet>124</a><span class="kw">impl </span>ForwardReceipts {
+<a href=#125 id=125 data-nosnippet>125</a>    <span class="attr">#[cfg(test)]
+<a href=#126 id=126 data-nosnippet>126</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>recorded(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#127 id=127 data-nosnippet>127</a>        <span class="self">self</span>.state.lock().count
+<a href=#128 id=128 data-nosnippet>128</a>    }
+<a href=#129 id=129 data-nosnippet>129</a>
+<a href=#130 id=130 data-nosnippet>130</a>    <span class="doccomment">/// Judges `relayer` for `exit` as of `at`, for the tests of the reply rule.
+<a href=#131 id=131 data-nosnippet>131</a>    </span><span class="attr">#[cfg(test)]
+<a href=#132 id=132 data-nosnippet>132</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>judge_at(<span class="kw-2">&amp;</span><span class="self">self</span>, exit: Key, relayer: Key, at: Instant) {
+<a href=#133 id=133 data-nosnippet>133</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock();
+<a href=#134 id=134 data-nosnippet>134</a>        state.verdicts.insert((exit, relayer), at);
+<a href=#135 id=135 data-nosnippet>135</a>        state.changed = <span class="bool-val">true</span>;
+<a href=#136 id=136 data-nosnippet>136</a>        state.publish(<span class="kw-2">&amp;</span><span class="self">self</span>.excluded, <span class="kw-2">&amp;</span><span class="self">self</span>.any_verdict);
+<a href=#137 id=137 data-nosnippet>137</a>    }
+<a href=#138 id=138 data-nosnippet>138</a>
+<a href=#139 id=139 data-nosnippet>139</a>    <span class="doccomment">/// The relayers excluded from forward draws to `exit`; the only cost without verdicts is an atomic load.
+<a href=#140 id=140 data-nosnippet>140</a>    </span><span class="kw">pub fn </span>excluded_relayers(<span class="kw-2">&amp;</span><span class="self">self</span>, exit: <span class="kw-2">&amp;</span>Key) -&gt; Vec&lt;Key&gt; {
+<a href=#141 id=141 data-nosnippet>141</a>        <span class="kw">if </span>!<span class="self">self</span>.any_verdict.load(Ordering::Relaxed) {
+<a href=#142 id=142 data-nosnippet>142</a>            <span class="kw">return </span>Vec::new();
+<a href=#143 id=143 data-nosnippet>143</a>        }
+<a href=#144 id=144 data-nosnippet>144</a>        <span class="self">self</span>.excluded.read().get(exit).cloned().unwrap_or_default()
+<a href=#145 id=145 data-nosnippet>145</a>    }
+<a href=#146 id=146 data-nosnippet>146</a>
+<a href=#147 id=147 data-nosnippet>147</a>    <span class="doccomment">/// The (exit, relayer) pairs with a forward verdict; cheap while there is none.
+<a href=#148 id=148 data-nosnippet>148</a>    </span><span class="kw">pub fn </span>judged_pairs(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; std::collections::HashSet&lt;(Key, Key)&gt; {
+<a href=#149 id=149 data-nosnippet>149</a>        <span class="kw">if </span>!<span class="self">self</span>.any_verdict.load(Ordering::Relaxed) {
+<a href=#150 id=150 data-nosnippet>150</a>            <span class="kw">return </span>Default::default();
+<a href=#151 id=151 data-nosnippet>151</a>        }
+<a href=#152 id=152 data-nosnippet>152</a>        <span class="self">self</span>.excluded
+<a href=#153 id=153 data-nosnippet>153</a>            .read()
+<a href=#154 id=154 data-nosnippet>154</a>            .iter()
+<a href=#155 id=155 data-nosnippet>155</a>            .flat_map(|(exit, relayers)| relayers.iter().map(|relayer| (<span class="kw-2">*</span>exit, <span class="kw-2">*</span>relayer)))
+<a href=#156 id=156 data-nosnippet>156</a>            .collect()
+<a href=#157 id=157 data-nosnippet>157</a>    }
+<a href=#158 id=158 data-nosnippet>158</a>
+<a href=#159 id=159 data-nosnippet>159</a>    <span class="doccomment">/// Records a Session packet sent over `path`, the relayers and then the Exit, if its Session asked for receipts.
+<a href=#160 id=160 data-nosnippet>160</a>    </span><span class="kw">pub fn </span>record(<span class="kw-2">&amp;</span><span class="self">self</span>, pseudonym: HoprPseudonym, tag: u32, path: <span class="kw-2">&amp;</span>[Key]) {
+<a href=#161 id=161 data-nosnippet>161</a>        <span class="kw">if </span>!<span class="self">self</span>.active.contains_key(<span class="kw-2">&amp;</span>pseudonym) {
+<a href=#162 id=162 data-nosnippet>162</a>            <span class="kw">return</span>;
+<a href=#163 id=163 data-nosnippet>163</a>        }
+<a href=#164 id=164 data-nosnippet>164</a>        <span class="self">self</span>.record_at(pseudonym, tag, path, Instant::now());
+<a href=#165 id=165 data-nosnippet>165</a>    }
+<a href=#166 id=166 data-nosnippet>166</a>
+<a href=#167 id=167 data-nosnippet>167</a>    <span class="doccomment">/// Starts recording the packets of `pseudonym`, forgetting what an earlier Session under it left.
+<a href=#168 id=168 data-nosnippet>168</a>    </span><span class="kw">fn </span>start_session(<span class="kw-2">&amp;</span><span class="self">self</span>, pseudonym: HoprPseudonym, instance: u64) {
+<a href=#169 id=169 data-nosnippet>169</a>        {
+<a href=#170 id=170 data-nosnippet>170</a>            <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock();
+<a href=#171 id=171 data-nosnippet>171</a>            state.remove_where_owned(pseudonym);
+<a href=#172 id=172 data-nosnippet>172</a>            state.streams.remove(<span class="kw-2">&amp;</span>pseudonym);
+<a href=#173 id=173 data-nosnippet>173</a>        }
+<a href=#174 id=174 data-nosnippet>174</a>        <span class="self">self</span>.active.insert(pseudonym, instance);
+<a href=#175 id=175 data-nosnippet>175</a>    }
+<a href=#176 id=176 data-nosnippet>176</a>
+<a href=#177 id=177 data-nosnippet>177</a>    <span class="kw">fn </span>record_at(<span class="kw-2">&amp;</span><span class="self">self</span>, pseudonym: HoprPseudonym, tag: u32, path: <span class="kw-2">&amp;</span>[Key], sent_at: Instant) {
+<a href=#178 id=178 data-nosnippet>178</a>        <span class="kw">let </span><span class="prelude-val">Some</span>((exit, relayers)) = path.split_last() <span class="kw">else </span>{
+<a href=#179 id=179 data-nosnippet>179</a>            <span class="kw">return</span>;
+<a href=#180 id=180 data-nosnippet>180</a>        };
+<a href=#181 id=181 data-nosnippet>181</a>        <span class="kw">let </span><span class="kw-2">mut </span>slots = [<span class="prelude-val">None</span>; RoutingOptions::MAX_INTERMEDIATE_HOPS];
+<a href=#182 id=182 data-nosnippet>182</a>        <span class="kw">for </span>(slot, relayer) <span class="kw">in </span>slots.iter_mut().zip(relayers) {
+<a href=#183 id=183 data-nosnippet>183</a>            <span class="kw-2">*</span>slot = <span class="prelude-val">Some</span>(<span class="kw-2">*</span>relayer);
+<a href=#184 id=184 data-nosnippet>184</a>        }
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock();
+<a href=#186 id=186 data-nosnippet>186</a>        <span class="kw">while </span>state.count &gt;= MAX_RECORDS || state.order.len() &gt;= <span class="number">2 </span>* MAX_RECORDS {
+<a href=#187 id=187 data-nosnippet>187</a>            <span class="kw">let </span><span class="prelude-val">Some</span>((owner, tag, at)) = state.order.pop_front() <span class="kw">else </span>{
+<a href=#188 id=188 data-nosnippet>188</a>                <span class="kw">break</span>;
+<a href=#189 id=189 data-nosnippet>189</a>            };
+<a href=#190 id=190 data-nosnippet>190</a>            <span class="kw">if </span>state.is_live(owner, tag, at) {
+<a href=#191 id=191 data-nosnippet>191</a>                state.remove(owner, tag);
+<a href=#192 id=192 data-nosnippet>192</a>            }
+<a href=#193 id=193 data-nosnippet>193</a>        }
+<a href=#194 id=194 data-nosnippet>194</a>        <span class="kw">let </span>record = Record {
+<a href=#195 id=195 data-nosnippet>195</a>            exit: <span class="kw-2">*</span>exit,
+<a href=#196 id=196 data-nosnippet>196</a>            relayers: slots,
+<a href=#197 id=197 data-nosnippet>197</a>            sent_at,
+<a href=#198 id=198 data-nosnippet>198</a>            ambiguous: <span class="bool-val">false</span>,
+<a href=#199 id=199 data-nosnippet>199</a>        };
+<a href=#200 id=200 data-nosnippet>200</a>        <span class="kw">if </span>state.insert(pseudonym, tag, record) {
+<a href=#201 id=201 data-nosnippet>201</a>            state.order.push_back((pseudonym, tag, sent_at));
+<a href=#202 id=202 data-nosnippet>202</a>        }
+<a href=#203 id=203 data-nosnippet>203</a>    }
+<a href=#204 id=204 data-nosnippet>204</a>
+<a href=#205 id=205 data-nosnippet>205</a>    <span class="doccomment">/// Takes the receipt numbered `seq` for `pseudonym`, which lists the `tags` that reached the Exit in the
+<a href=#206 id=206 data-nosnippet>206</a>    /// intervals `first_seq..=seq`.
+<a href=#207 id=207 data-nosnippet>207</a>    </span><span class="kw">fn </span>receipts_at(<span class="kw-2">&amp;</span><span class="self">self</span>, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: <span class="kw-2">&amp;</span>[u32], now: Instant) {
+<a href=#208 id=208 data-nosnippet>208</a>        <span class="kw">let </span>first_seq = first_seq.min(seq);
+<a href=#209 id=209 data-nosnippet>209</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock();
+<a href=#210 id=210 data-nosnippet>210</a>
+<a href=#211 id=211 data-nosnippet>211</a>        <span class="kw">let </span><span class="kw-2">mut </span>gap = <span class="number">0</span>;
+<a href=#212 id=212 data-nosnippet>212</a>        <span class="kw">let </span>before = state
+<a href=#213 id=213 data-nosnippet>213</a>            .streams
+<a href=#214 id=214 data-nosnippet>214</a>            .get(<span class="kw-2">&amp;</span>pseudonym)
+<a href=#215 id=215 data-nosnippet>215</a>            .map(|stream| (stream.last_seq, stream.missing.clone()));
+<a href=#216 id=216 data-nosnippet>216</a>        <span class="kw">match </span>state.streams.get_mut(<span class="kw-2">&amp;</span>pseudonym) {
+<a href=#217 id=217 data-nosnippet>217</a>            <span class="comment">// The pseudonym was reused: a new Session numbers from 1, or a little above it. Not a copy of an early
+<a href=#218 id=218 data-nosnippet>218</a>            // receipt that arrives late, though.
+<a href=#219 id=219 data-nosnippet>219</a>            </span><span class="prelude-val">Some</span>(stream)
+<a href=#220 id=220 data-nosnippet>220</a>                <span class="kw">if </span>now.saturating_duration_since(stream.started) &gt; RESET_AFTER
+<a href=#221 id=221 data-nosnippet>221</a>                    &amp;&amp; ((seq == <span class="number">1 </span>&amp;&amp; stream.last_seq &gt; <span class="number">1</span>)
+<a href=#222 id=222 data-nosnippet>222</a>                        || (seq &lt;= NEW_SESSION_SEQ_MAX &amp;&amp; seq.saturating_add(<span class="number">2</span>) &lt; stream.last_seq)) =&gt;
+<a href=#223 id=223 data-nosnippet>223</a>            {
+<a href=#224 id=224 data-nosnippet>224</a>                <span class="kw-2">*</span>stream = Stream::new(seq, now);
+<a href=#225 id=225 data-nosnippet>225</a>            }
+<a href=#226 id=226 data-nosnippet>226</a>            <span class="prelude-val">Some</span>(stream) =&gt; {
+<a href=#227 id=227 data-nosnippet>227</a>                <span class="comment">// The seqs after the last one and before the first this receipt covers are skipped over: maybe late
+<a href=#228 id=228 data-nosnippet>228</a>                </span><span class="kw">let </span>next = stream.last_seq.saturating_add(<span class="number">1</span>);
+<a href=#229 id=229 data-nosnippet>229</a>                gap = first_seq.saturating_sub(next);
+<a href=#230 id=230 data-nosnippet>230</a>                <span class="kw">if </span>gap &gt; MAX_MISSING {
+<a href=#231 id=231 data-nosnippet>231</a>                    stream.floor = now;
+<a href=#232 id=232 data-nosnippet>232</a>                } <span class="kw">else </span>{
+<a href=#233 id=233 data-nosnippet>233</a>                    stream.missing.extend((next..first_seq).map(|missing| (missing, now)));
+<a href=#234 id=234 data-nosnippet>234</a>                }
+<a href=#235 id=235 data-nosnippet>235</a>                stream
+<a href=#236 id=236 data-nosnippet>236</a>                    .missing
+<a href=#237 id=237 data-nosnippet>237</a>                    .retain(|(missing, <span class="kw">_</span>)| !(first_seq..=seq).contains(missing));
+<a href=#238 id=238 data-nosnippet>238</a>                <span class="comment">// Still missing after the grace: lost. It can only have carried packets that reached the Exit
+<a href=#239 id=239 data-nosnippet>239</a>                // before the jump, so the evidence from then on stays.
+<a href=#240 id=240 data-nosnippet>240</a>                </span><span class="kw">let </span>lost = stream
+<a href=#241 id=241 data-nosnippet>241</a>                    .missing
+<a href=#242 id=242 data-nosnippet>242</a>                    .iter()
+<a href=#243 id=243 data-nosnippet>243</a>                    .filter(|(<span class="kw">_</span>, since)| now.saturating_duration_since(<span class="kw-2">*</span>since) &gt; FORWARD_GRACE)
+<a href=#244 id=244 data-nosnippet>244</a>                    .map(|(<span class="kw">_</span>, since)| <span class="kw-2">*</span>since)
+<a href=#245 id=245 data-nosnippet>245</a>                    .max();
+<a href=#246 id=246 data-nosnippet>246</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>(since) = lost {
+<a href=#247 id=247 data-nosnippet>247</a>                    stream.floor = stream.floor.max(since);
+<a href=#248 id=248 data-nosnippet>248</a>                    stream
+<a href=#249 id=249 data-nosnippet>249</a>                        .missing
+<a href=#250 id=250 data-nosnippet>250</a>                        .retain(|(<span class="kw">_</span>, since)| now.saturating_duration_since(<span class="kw-2">*</span>since) &lt;= FORWARD_GRACE);
+<a href=#251 id=251 data-nosnippet>251</a>                }
+<a href=#252 id=252 data-nosnippet>252</a>                stream.last_seq = stream.last_seq.max(seq);
+<a href=#253 id=253 data-nosnippet>253</a>                stream.seen = now;
+<a href=#254 id=254 data-nosnippet>254</a>            }
+<a href=#255 id=255 data-nosnippet>255</a>            <span class="prelude-val">None </span>=&gt; {
+<a href=#256 id=256 data-nosnippet>256</a>                state.streams.insert(pseudonym, Stream::new(seq, now));
+<a href=#257 id=257 data-nosnippet>257</a>            }
+<a href=#258 id=258 data-nosnippet>258</a>        }
+<a href=#259 id=259 data-nosnippet>259</a>
+<a href=#260 id=260 data-nosnippet>260</a>        <span class="comment">// A packet is timely if it is not far behind what was receipted before this receipt
+<a href=#261 id=261 data-nosnippet>261</a>        </span><span class="kw">let </span>watermark_before = state.streams.get(<span class="kw-2">&amp;</span>pseudonym).and_then(|stream| stream.watermark);
+<a href=#262 id=262 data-nosnippet>262</a>        <span class="kw">let </span><span class="kw-2">mut </span>matched = <span class="number">0</span>;
+<a href=#263 id=263 data-nosnippet>263</a>        <span class="kw">let </span><span class="kw-2">mut </span>lifts = Vec::new();
+<a href=#264 id=264 data-nosnippet>264</a>        <span class="comment">// Nothing to match for a pseudonym with no records
+<a href=#265 id=265 data-nosnippet>265</a>        </span><span class="kw">let </span>to_match = <span class="kw">if </span>state.records.contains_key(<span class="kw-2">&amp;</span>pseudonym) {
+<a href=#266 id=266 data-nosnippet>266</a>            tags
+<a href=#267 id=267 data-nosnippet>267</a>        } <span class="kw">else </span>{
+<a href=#268 id=268 data-nosnippet>268</a>            <span class="kw-2">&amp;</span>[]
+<a href=#269 id=269 data-nosnippet>269</a>        };
+<a href=#270 id=270 data-nosnippet>270</a>        <span class="kw">for </span>tag <span class="kw">in </span>to_match {
+<a href=#271 id=271 data-nosnippet>271</a>            <span class="kw">let </span><span class="prelude-val">Some</span>(record) = state.remove(pseudonym, <span class="kw-2">*</span>tag) <span class="kw">else </span>{
+<a href=#272 id=272 data-nosnippet>272</a>                <span class="kw">continue</span>;
+<a href=#273 id=273 data-nosnippet>273</a>            };
+<a href=#274 id=274 data-nosnippet>274</a>            <span class="kw">if </span>record.ambiguous || now.saturating_duration_since(record.sent_at) &gt; RECORD_TTL {
+<a href=#275 id=275 data-nosnippet>275</a>                <span class="kw">continue</span>;
+<a href=#276 id=276 data-nosnippet>276</a>            }
+<a href=#277 id=277 data-nosnippet>277</a>            matched += <span class="number">1</span>;
+<a href=#278 id=278 data-nosnippet>278</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(stream) = state.streams.get_mut(<span class="kw-2">&amp;</span>pseudonym) {
+<a href=#279 id=279 data-nosnippet>279</a>                stream.watermark = stream.watermark.max(<span class="prelude-val">Some</span>(record.sent_at));
+<a href=#280 id=280 data-nosnippet>280</a>            }
+<a href=#281 id=281 data-nosnippet>281</a>            <span class="kw">let </span>timely = watermark_before.is_some_and(|watermark| record.sent_at + FORWARD_GRACE &gt; watermark);
+<a href=#282 id=282 data-nosnippet>282</a>            <span class="kw">for </span>relayer <span class="kw">in </span>record.relayers() {
+<a href=#283 id=283 data-nosnippet>283</a>                <span class="kw">let </span>key = (record.exit, <span class="kw-2">*</span>relayer);
+<a href=#284 id=284 data-nosnippet>284</a>                <span class="kw">let </span>delivered = state.delivered.entry(key).or_insert(record.sent_at);
+<a href=#285 id=285 data-nosnippet>285</a>                <span class="kw-2">*</span>delivered = (<span class="kw-2">*</span>delivered).max(record.sent_at);
+<a href=#286 id=286 data-nosnippet>286</a>                <span class="comment">// Only a timely packet sent after the verdict says the relayer is delivering again; a late one
+<a href=#287 id=287 data-nosnippet>287</a>                // may have been drawn just before the verdict and be what it was about.
+<a href=#288 id=288 data-nosnippet>288</a>                </span><span class="kw">if </span>timely
+<a href=#289 id=289 data-nosnippet>289</a>                    &amp;&amp; state
+<a href=#290 id=290 data-nosnippet>290</a>                        .verdicts
+<a href=#291 id=291 data-nosnippet>291</a>                        .get(<span class="kw-2">&amp;</span>key)
+<a href=#292 id=292 data-nosnippet>292</a>                        .is_some_and(|verdict| record.sent_at &gt; <span class="kw-2">*</span>verdict)
+<a href=#293 id=293 data-nosnippet>293</a>                {
+<a href=#294 id=294 data-nosnippet>294</a>                    lifts.push(key);
+<a href=#295 id=295 data-nosnippet>295</a>                }
+<a href=#296 id=296 data-nosnippet>296</a>            }
+<a href=#297 id=297 data-nosnippet>297</a>        }
+<a href=#298 id=298 data-nosnippet>298</a>        <span class="kw">for </span>(exit, relayer) <span class="kw">in </span>lifts {
+<a href=#299 id=299 data-nosnippet>299</a>            state.lift(exit, relayer, now);
+<a href=#300 id=300 data-nosnippet>300</a>        }
+<a href=#301 id=301 data-nosnippet>301</a>        <span class="kw">let </span>after = state
+<a href=#302 id=302 data-nosnippet>302</a>            .streams
+<a href=#303 id=303 data-nosnippet>303</a>            .get(<span class="kw-2">&amp;</span>pseudonym)
+<a href=#304 id=304 data-nosnippet>304</a>            .map(|stream| (stream.last_seq, stream.missing.clone()));
+<a href=#305 id=305 data-nosnippet>305</a>        <span class="kw">let </span>waiting = state
+<a href=#306 id=306 data-nosnippet>306</a>            .streams
+<a href=#307 id=307 data-nosnippet>307</a>            .get(<span class="kw-2">&amp;</span>pseudonym)
+<a href=#308 id=308 data-nosnippet>308</a>            .is_some_and(|stream| !stream.missing.is_empty());
+<a href=#309 id=309 data-nosnippet>309</a>        <span class="comment">// A copy of a receipt already taken tells nothing new: it must not let a confirmation mature ahead of the
+<a href=#310 id=310 data-nosnippet>310</a>        // next real receipt
+<a href=#311 id=311 data-nosnippet>311</a>        </span><span class="kw">let </span>nothing_new = matched == <span class="number">0 </span>&amp;&amp; before == after;
+<a href=#312 id=312 data-nosnippet>312</a>        <span class="kw">let </span>outstanding = <span class="kw">if </span>waiting || nothing_new {
+<a href=#313 id=313 data-nosnippet>313</a>            state.records.get(<span class="kw-2">&amp;</span>pseudonym).map_or(<span class="number">0</span>, HashMap::len)
+<a href=#314 id=314 data-nosnippet>314</a>        } <span class="kw">else </span>{
+<a href=#315 id=315 data-nosnippet>315</a>            state.evaluate(pseudonym, now)
+<a href=#316 id=316 data-nosnippet>316</a>        };
+<a href=#317 id=317 data-nosnippet>317</a>        state.publish(<span class="kw-2">&amp;</span><span class="self">self</span>.excluded, <span class="kw-2">&amp;</span><span class="self">self</span>.any_verdict);
+<a href=#318 id=318 data-nosnippet>318</a>        <span class="macro">tracing::debug!</span>(%pseudonym, seq, first_seq, tags = tags.len(), matched, gap, outstanding, <span class="string">"forward receipts received"</span>);
+<a href=#319 id=319 data-nosnippet>319</a>    }
+<a href=#320 id=320 data-nosnippet>320</a>
+<a href=#321 id=321 data-nosnippet>321</a>    <span class="doccomment">/// Lifts the verdicts that have run their course and forgets what has expired. Called once a second.
+<a href=#322 id=322 data-nosnippet>322</a>    </span><span class="kw">pub fn </span>refresh(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#323 id=323 data-nosnippet>323</a>        <span class="self">self</span>.refresh_at(Instant::now());
+<a href=#324 id=324 data-nosnippet>324</a>    }
+<a href=#325 id=325 data-nosnippet>325</a>
+<a href=#326 id=326 data-nosnippet>326</a>    <span class="kw">fn </span>refresh_at(<span class="kw-2">&amp;</span><span class="self">self</span>, now: Instant) {
+<a href=#327 id=327 data-nosnippet>327</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock();
+<a href=#328 id=328 data-nosnippet>328</a>        <span class="kw">let </span>expired: Vec&lt;<span class="kw">_</span>&gt; = state
+<a href=#329 id=329 data-nosnippet>329</a>            .verdicts
+<a href=#330 id=330 data-nosnippet>330</a>            .iter()
+<a href=#331 id=331 data-nosnippet>331</a>            .filter(|(<span class="kw">_</span>, since)| now.saturating_duration_since(<span class="kw-2">**</span>since) &gt;= FORWARD_VERDICT_TTL)
+<a href=#332 id=332 data-nosnippet>332</a>            .map(|(key, <span class="kw">_</span>)| <span class="kw-2">*</span>key)
+<a href=#333 id=333 data-nosnippet>333</a>            .collect();
+<a href=#334 id=334 data-nosnippet>334</a>        <span class="kw">for </span>(exit, relayer) <span class="kw">in </span>expired {
+<a href=#335 id=335 data-nosnippet>335</a>            state.lift(exit, relayer, now);
+<a href=#336 id=336 data-nosnippet>336</a>        }
+<a href=#337 id=337 data-nosnippet>337</a>        state.remove_where(|record| now.saturating_duration_since(record.sent_at) &gt; RECORD_TTL);
+<a href=#338 id=338 data-nosnippet>338</a>        state.prune_order(now);
+<a href=#339 id=339 data-nosnippet>339</a>        state
+<a href=#340 id=340 data-nosnippet>340</a>            .streams
+<a href=#341 id=341 data-nosnippet>341</a>            .retain(|<span class="kw">_</span>, stream| now.saturating_duration_since(stream.seen) &lt;= STREAM_TTL);
+<a href=#342 id=342 data-nosnippet>342</a>        state
+<a href=#343 id=343 data-nosnippet>343</a>            .delivered
+<a href=#344 id=344 data-nosnippet>344</a>            .retain(|<span class="kw">_</span>, at| now.saturating_duration_since(<span class="kw-2">*</span>at) &lt;= STATE_TTL);
+<a href=#345 id=345 data-nosnippet>345</a>        state
+<a href=#346 id=346 data-nosnippet>346</a>            .lifted
+<a href=#347 id=347 data-nosnippet>347</a>            .retain(|<span class="kw">_</span>, at| now.saturating_duration_since(<span class="kw-2">*</span>at) &lt;= FORWARD_VERDICT_TTL);
+<a href=#348 id=348 data-nosnippet>348</a>        state
+<a href=#349 id=349 data-nosnippet>349</a>            .suspected
+<a href=#350 id=350 data-nosnippet>350</a>            .retain(|<span class="kw">_</span>, suspicion| now.saturating_duration_since(suspicion.since) &lt;= RECORD_TTL);
+<a href=#351 id=351 data-nosnippet>351</a>        state.publish(<span class="kw-2">&amp;</span><span class="self">self</span>.excluded, <span class="kw-2">&amp;</span><span class="self">self</span>.any_verdict);
+<a href=#352 id=352 data-nosnippet>352</a>    }
+<a href=#353 id=353 data-nosnippet>353</a>}
+<a href=#354 id=354 data-nosnippet>354</a>
+<a href=#355 id=355 data-nosnippet>355</a><span class="kw">impl </span>Stream {
+<a href=#356 id=356 data-nosnippet>356</a>    <span class="kw">fn </span>new(seq: u32, now: Instant) -&gt; <span class="self">Self </span>{
+<a href=#357 id=357 data-nosnippet>357</a>        <span class="self">Self </span>{
+<a href=#358 id=358 data-nosnippet>358</a>            last_seq: seq,
+<a href=#359 id=359 data-nosnippet>359</a>            floor: now,
+<a href=#360 id=360 data-nosnippet>360</a>            watermark: <span class="prelude-val">None</span>,
+<a href=#361 id=361 data-nosnippet>361</a>            seen: now,
+<a href=#362 id=362 data-nosnippet>362</a>            started: now,
+<a href=#363 id=363 data-nosnippet>363</a>            missing: Vec::new(),
+<a href=#364 id=364 data-nosnippet>364</a>        }
+<a href=#365 id=365 data-nosnippet>365</a>    }
+<a href=#366 id=366 data-nosnippet>366</a>}
+<a href=#367 id=367 data-nosnippet>367</a>
+<a href=#368 id=368 data-nosnippet>368</a><span class="kw">impl </span>State {
+<a href=#369 id=369 data-nosnippet>369</a>    <span class="kw">fn </span>is_live(<span class="kw-2">&amp;</span><span class="self">self</span>, owner: HoprPseudonym, tag: u32, at: Instant) -&gt; bool {
+<a href=#370 id=370 data-nosnippet>370</a>        <span class="self">self</span>.records
+<a href=#371 id=371 data-nosnippet>371</a>            .get(<span class="kw-2">&amp;</span>owner)
+<a href=#372 id=372 data-nosnippet>372</a>            .and_then(|records| records.get(<span class="kw-2">&amp;</span>tag))
+<a href=#373 id=373 data-nosnippet>373</a>            .is_some_and(|record| record.sent_at == at)
+<a href=#374 id=374 data-nosnippet>374</a>    }
+<a href=#375 id=375 data-nosnippet>375</a>
+<a href=#376 id=376 data-nosnippet>376</a>    <span class="doccomment">/// Inserts the record, unless the tag is taken: then the earlier record is marked ambiguous and kept.
+<a href=#377 id=377 data-nosnippet>377</a>    /// Returns whether it was inserted.
+<a href=#378 id=378 data-nosnippet>378</a>    </span><span class="kw">fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, owner: HoprPseudonym, tag: u32, record: Record) -&gt; bool {
+<a href=#379 id=379 data-nosnippet>379</a>        <span class="kw">match </span><span class="self">self</span>.records.entry(owner).or_default().entry(tag) {
+<a href=#380 id=380 data-nosnippet>380</a>            std::collections::hash_map::Entry::Occupied(<span class="kw-2">mut </span>taken) =&gt; {
+<a href=#381 id=381 data-nosnippet>381</a>                taken.get_mut().ambiguous = <span class="bool-val">true</span>;
+<a href=#382 id=382 data-nosnippet>382</a>                <span class="bool-val">false
+<a href=#383 id=383 data-nosnippet>383</a>            </span>}
+<a href=#384 id=384 data-nosnippet>384</a>            std::collections::hash_map::Entry::Vacant(free) =&gt; {
+<a href=#385 id=385 data-nosnippet>385</a>                free.insert(record);
+<a href=#386 id=386 data-nosnippet>386</a>                <span class="self">self</span>.count += <span class="number">1</span>;
+<a href=#387 id=387 data-nosnippet>387</a>                <span class="bool-val">true
+<a href=#388 id=388 data-nosnippet>388</a>            </span>}
+<a href=#389 id=389 data-nosnippet>389</a>        }
+<a href=#390 id=390 data-nosnippet>390</a>    }
+<a href=#391 id=391 data-nosnippet>391</a>
+<a href=#392 id=392 data-nosnippet>392</a>    <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, owner: HoprPseudonym, tag: u32) -&gt; <span class="prelude-ty">Option</span>&lt;Record&gt; {
+<a href=#393 id=393 data-nosnippet>393</a>        <span class="kw">let </span>records = <span class="self">self</span>.records.get_mut(<span class="kw-2">&amp;</span>owner)<span class="question-mark">?</span>;
+<a href=#394 id=394 data-nosnippet>394</a>        <span class="kw">let </span>record = records.remove(<span class="kw-2">&amp;</span>tag)<span class="question-mark">?</span>;
+<a href=#395 id=395 data-nosnippet>395</a>        <span class="kw">if </span>records.is_empty() {
+<a href=#396 id=396 data-nosnippet>396</a>            <span class="self">self</span>.records.remove(<span class="kw-2">&amp;</span>owner);
+<a href=#397 id=397 data-nosnippet>397</a>        }
+<a href=#398 id=398 data-nosnippet>398</a>        <span class="self">self</span>.count -= <span class="number">1</span>;
+<a href=#399 id=399 data-nosnippet>399</a>        <span class="prelude-val">Some</span>(record)
+<a href=#400 id=400 data-nosnippet>400</a>    }
+<a href=#401 id=401 data-nosnippet>401</a>
+<a href=#402 id=402 data-nosnippet>402</a>    <span class="doccomment">/// Drops every record of `owner`.
+<a href=#403 id=403 data-nosnippet>403</a>    </span><span class="kw">fn </span>remove_where_owned(<span class="kw-2">&amp;mut </span><span class="self">self</span>, owner: HoprPseudonym) {
+<a href=#404 id=404 data-nosnippet>404</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(records) = <span class="self">self</span>.records.remove(<span class="kw-2">&amp;</span>owner) {
+<a href=#405 id=405 data-nosnippet>405</a>            <span class="self">self</span>.count -= records.len();
+<a href=#406 id=406 data-nosnippet>406</a>        }
+<a href=#407 id=407 data-nosnippet>407</a>    }
+<a href=#408 id=408 data-nosnippet>408</a>
+<a href=#409 id=409 data-nosnippet>409</a>    <span class="kw">fn </span>remove_where(<span class="kw-2">&amp;mut </span><span class="self">self</span>, gone: <span class="kw">impl </span>Fn(<span class="kw-2">&amp;</span>Record) -&gt; bool) {
+<a href=#410 id=410 data-nosnippet>410</a>        <span class="kw">for </span>records <span class="kw">in </span><span class="self">self</span>.records.values_mut() {
+<a href=#411 id=411 data-nosnippet>411</a>            records.retain(|<span class="kw">_</span>, record| !gone(record));
+<a href=#412 id=412 data-nosnippet>412</a>        }
+<a href=#413 id=413 data-nosnippet>413</a>        <span class="self">self</span>.records.retain(|<span class="kw">_</span>, records| !records.is_empty());
+<a href=#414 id=414 data-nosnippet>414</a>        <span class="self">self</span>.count = <span class="self">self</span>.records.values().map(HashMap::len).sum();
+<a href=#415 id=415 data-nosnippet>415</a>    }
+<a href=#416 id=416 data-nosnippet>416</a>
+<a href=#417 id=417 data-nosnippet>417</a>    <span class="doccomment">/// Drops the order entries of records gone or expired.
+<a href=#418 id=418 data-nosnippet>418</a>    </span><span class="kw">fn </span>prune_order(<span class="kw-2">&amp;mut </span><span class="self">self</span>, now: Instant) {
+<a href=#419 id=419 data-nosnippet>419</a>        <span class="kw">while let </span><span class="prelude-val">Some</span>((owner, tag, at)) = <span class="self">self</span>.order.front().copied() {
+<a href=#420 id=420 data-nosnippet>420</a>            <span class="kw">let </span>live = <span class="self">self</span>.is_live(owner, tag, at);
+<a href=#421 id=421 data-nosnippet>421</a>            <span class="kw">if </span>live &amp;&amp; now.saturating_duration_since(at) &lt;= RECORD_TTL {
+<a href=#422 id=422 data-nosnippet>422</a>                <span class="kw">break</span>;
+<a href=#423 id=423 data-nosnippet>423</a>            }
+<a href=#424 id=424 data-nosnippet>424</a>            <span class="kw">if </span>live {
+<a href=#425 id=425 data-nosnippet>425</a>                <span class="self">self</span>.remove(owner, tag);
+<a href=#426 id=426 data-nosnippet>426</a>            }
+<a href=#427 id=427 data-nosnippet>427</a>            <span class="self">self</span>.order.pop_front();
+<a href=#428 id=428 data-nosnippet>428</a>        }
+<a href=#429 id=429 data-nosnippet>429</a>    }
+<a href=#430 id=430 data-nosnippet>430</a>
+<a href=#431 id=431 data-nosnippet>431</a>    <span class="doccomment">/// Lifts the verdict on `relayer` for `exit`, dropping the packets sent through it before the lift.
+<a href=#432 id=432 data-nosnippet>432</a>    </span><span class="kw">fn </span>lift(<span class="kw-2">&amp;mut </span><span class="self">self</span>, exit: Key, relayer: Key, now: Instant) {
+<a href=#433 id=433 data-nosnippet>433</a>        <span class="kw">if </span><span class="self">self</span>.verdicts.remove(<span class="kw-2">&amp;</span>(exit, relayer)).is_none() {
+<a href=#434 id=434 data-nosnippet>434</a>            <span class="kw">return</span>;
+<a href=#435 id=435 data-nosnippet>435</a>        }
+<a href=#436 id=436 data-nosnippet>436</a>        <span class="macro">tracing::info!</span>(%relayer, %exit, <span class="string">"forward verdict lifted"</span>);
+<a href=#437 id=437 data-nosnippet>437</a>        <span class="self">self</span>.changed = <span class="bool-val">true</span>;
+<a href=#438 id=438 data-nosnippet>438</a>        <span class="self">self</span>.lifted.insert((exit, relayer), now);
+<a href=#439 id=439 data-nosnippet>439</a>        <span class="self">self</span>.suspected.remove(<span class="kw-2">&amp;</span>(exit, relayer));
+<a href=#440 id=440 data-nosnippet>440</a>        <span class="self">self</span>.remove_where(|record| record.exit == exit &amp;&amp; record.relayers().any(|other| <span class="kw-2">*</span>other == relayer));
+<a href=#441 id=441 data-nosnippet>441</a>    }
+<a href=#442 id=442 data-nosnippet>442</a>
+<a href=#443 id=443 data-nosnippet>443</a>    <span class="doccomment">/// Judges the packets of `pseudonym` that are overdue; returns how many it has outstanding.
+<a href=#444 id=444 data-nosnippet>444</a>    </span><span class="kw">fn </span>evaluate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, pseudonym: HoprPseudonym, now: Instant) -&gt; usize {
+<a href=#445 id=445 data-nosnippet>445</a>        <span class="kw">let </span>(<span class="prelude-val">Some</span>(stream), <span class="prelude-val">Some</span>(records)) = (<span class="self">self</span>.streams.get(<span class="kw-2">&amp;</span>pseudonym), <span class="self">self</span>.records.get(<span class="kw-2">&amp;</span>pseudonym)) <span class="kw">else </span>{
+<a href=#446 id=446 data-nosnippet>446</a>            <span class="kw">return </span><span class="number">0</span>;
+<a href=#447 id=447 data-nosnippet>447</a>        };
+<a href=#448 id=448 data-nosnippet>448</a>        <span class="kw">let </span>(floor, watermark) = (stream.floor, stream.watermark);
+<a href=#449 id=449 data-nosnippet>449</a>        <span class="kw">let </span>live = || {
+<a href=#450 id=450 data-nosnippet>450</a>            records
+<a href=#451 id=451 data-nosnippet>451</a>                .iter()
+<a href=#452 id=452 data-nosnippet>452</a>                .filter(|(<span class="kw">_</span>, record)| !record.ambiguous &amp;&amp; now.saturating_duration_since(record.sent_at) &lt;= RECORD_TTL)
+<a href=#453 id=453 data-nosnippet>453</a>        };
+<a href=#454 id=454 data-nosnippet>454</a>
+<a href=#455 id=455 data-nosnippet>455</a>        <span class="comment">// Per (exit, relayer): the unanswered overdue packets.
+<a href=#456 id=456 data-nosnippet>456</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>unanswered: HashMap&lt;(Key, Key), Vec&lt;(HoprSurbId, Instant)&gt;&gt; = HashMap::new();
+<a href=#457 id=457 data-nosnippet>457</a>        <span class="kw">let </span><span class="kw-2">mut </span>outstanding = <span class="number">0</span>;
+<a href=#458 id=458 data-nosnippet>458</a>        <span class="kw">for </span>(tag, record) <span class="kw">in </span>live() {
+<a href=#459 id=459 data-nosnippet>459</a>            outstanding += <span class="number">1</span>;
+<a href=#460 id=460 data-nosnippet>460</a>            <span class="kw">let </span>overdue = watermark
+<a href=#461 id=461 data-nosnippet>461</a>                .is_some_and(|watermark| record.sent_at &gt;= floor &amp;&amp; record.sent_at + FORWARD_GRACE &lt;= watermark);
+<a href=#462 id=462 data-nosnippet>462</a>            <span class="kw">if </span>!overdue {
+<a href=#463 id=463 data-nosnippet>463</a>                <span class="kw">continue</span>;
+<a href=#464 id=464 data-nosnippet>464</a>            }
+<a href=#465 id=465 data-nosnippet>465</a>            <span class="kw">for </span>relayer <span class="kw">in </span>record.relayers() {
+<a href=#466 id=466 data-nosnippet>466</a>                <span class="kw">let </span>key = (record.exit, <span class="kw-2">*</span>relayer);
+<a href=#467 id=467 data-nosnippet>467</a>                <span class="kw">if </span>!<span class="self">self</span>.delivered.get(<span class="kw-2">&amp;</span>key).is_some_and(|at| record.sent_at &lt;= <span class="kw-2">*</span>at) {
+<a href=#468 id=468 data-nosnippet>468</a>                    unanswered.entry(key).or_default().push((id_of(<span class="kw-2">*</span>tag), record.sent_at));
+<a href=#469 id=469 data-nosnippet>469</a>                }
+<a href=#470 id=470 data-nosnippet>470</a>            }
+<a href=#471 id=471 data-nosnippet>471</a>        }
+<a href=#472 id=472 data-nosnippet>472</a>        unanswered.retain(|<span class="kw">_</span>, packets| packets.len() &gt;= MIN_RACES);
+<a href=#473 id=473 data-nosnippet>473</a>
+<a href=#474 id=474 data-nosnippet>474</a>        <span class="comment">// The packets outstanding through each of those, with the relayer's position on their paths.
+<a href=#475 id=475 data-nosnippet>475</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>open: HashMap&lt;(Key, Key), HashMap&lt;HoprSurbId, usize&gt;&gt; = HashMap::new();
+<a href=#476 id=476 data-nosnippet>476</a>        <span class="kw">if </span>!unanswered.is_empty() {
+<a href=#477 id=477 data-nosnippet>477</a>            <span class="kw">for </span>(tag, record) <span class="kw">in </span>live() {
+<a href=#478 id=478 data-nosnippet>478</a>                <span class="kw">for </span>(position, relayer) <span class="kw">in </span>record.relayers().enumerate() {
+<a href=#479 id=479 data-nosnippet>479</a>                    <span class="kw">let </span>key = (record.exit, <span class="kw-2">*</span>relayer);
+<a href=#480 id=480 data-nosnippet>480</a>                    <span class="kw">if </span>unanswered.contains_key(<span class="kw-2">&amp;</span>key) {
+<a href=#481 id=481 data-nosnippet>481</a>                        open.entry(key).or_default().insert(id_of(<span class="kw-2">*</span>tag), position);
+<a href=#482 id=482 data-nosnippet>482</a>                    }
+<a href=#483 id=483 data-nosnippet>483</a>                }
+<a href=#484 id=484 data-nosnippet>484</a>            }
+<a href=#485 id=485 data-nosnippet>485</a>        }
+<a href=#486 id=486 data-nosnippet>486</a>
+<a href=#487 id=487 data-nosnippet>487</a>        <span class="kw">let </span><span class="kw-2">mut </span>suspects_by_exit: HashMap&lt;Key, Vec&lt;Suspect&lt;Key&gt;&gt;&gt; = HashMap::new();
+<a href=#488 id=488 data-nosnippet>488</a>        <span class="kw">let </span><span class="kw-2">mut </span>oldest: HashMap&lt;(Key, Key), Instant&gt; = HashMap::new();
+<a href=#489 id=489 data-nosnippet>489</a>        <span class="kw">for </span>(key, packets) <span class="kw">in </span>unanswered {
+<a href=#490 id=490 data-nosnippet>490</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(at) = packets.iter().map(|(<span class="kw">_</span>, at)| <span class="kw-2">*</span>at).min() {
+<a href=#491 id=491 data-nosnippet>491</a>                oldest.insert(key, at);
+<a href=#492 id=492 data-nosnippet>492</a>            }
+<a href=#493 id=493 data-nosnippet>493</a>            suspects_by_exit.entry(key.<span class="number">0</span>).or_default().push(Suspect {
+<a href=#494 id=494 data-nosnippet>494</a>                relayer: key.<span class="number">1</span>,
+<a href=#495 id=495 data-nosnippet>495</a>                unanswered: packets.into_iter().map(|(id, <span class="kw">_</span>)| id).collect(),
+<a href=#496 id=496 data-nosnippet>496</a>                open: open.remove(<span class="kw-2">&amp;</span>key).unwrap_or_default(),
+<a href=#497 id=497 data-nosnippet>497</a>                needed: MIN_RACES,
+<a href=#498 id=498 data-nosnippet>498</a>            });
+<a href=#499 id=499 data-nosnippet>499</a>        }
+<a href=#500 id=500 data-nosnippet>500</a>
+<a href=#501 id=501 data-nosnippet>501</a>        <span class="kw">let </span><span class="kw-2">mut </span>black_holes: HashSet&lt;(Key, Key)&gt; = HashSet::new();
+<a href=#502 id=502 data-nosnippet>502</a>        <span class="kw">for </span>(exit, suspects) <span class="kw">in </span>suspects_by_exit {
+<a href=#503 id=503 data-nosnippet>503</a>            <span class="kw">let </span>known_dead = |relayer: <span class="kw-2">&amp;</span>Key| <span class="self">self</span>.verdicts.contains_key(<span class="kw-2">&amp;</span>(exit, <span class="kw-2">*</span>relayer));
+<a href=#504 id=504 data-nosnippet>504</a>            <span class="kw">for </span>relayer <span class="kw">in </span>explain_away(suspects, known_dead) {
+<a href=#505 id=505 data-nosnippet>505</a>                black_holes.insert((exit, relayer));
+<a href=#506 id=506 data-nosnippet>506</a>            }
+<a href=#507 id=507 data-nosnippet>507</a>        }
+<a href=#508 id=508 data-nosnippet>508</a>
+<a href=#509 id=509 data-nosnippet>509</a>        <span class="kw">for </span>key <span class="kw">in </span><span class="kw-2">&amp;</span>black_holes {
+<a href=#510 id=510 data-nosnippet>510</a>            <span class="kw">if </span><span class="self">self</span>.verdicts.contains_key(key) {
+<a href=#511 id=511 data-nosnippet>511</a>                <span class="kw">continue</span>;
+<a href=#512 id=512 data-nosnippet>512</a>            }
+<a href=#513 id=513 data-nosnippet>513</a>            <span class="kw">let </span><span class="prelude-val">Some</span>(oldest) = oldest.get(key).copied() <span class="kw">else </span>{
+<a href=#514 id=514 data-nosnippet>514</a>                <span class="kw">continue</span>;
+<a href=#515 id=515 data-nosnippet>515</a>            };
+<a href=#516 id=516 data-nosnippet>516</a>            <span class="kw">let </span>delivered = <span class="self">self</span>.delivered.get(key).copied();
+<a href=#517 id=517 data-nosnippet>517</a>            <span class="kw">let </span>suspicion = <span class="self">self</span>.suspected.entry(<span class="kw-2">*</span>key).or_insert(Suspicion {
+<a href=#518 id=518 data-nosnippet>518</a>                since: now,
+<a href=#519 id=519 data-nosnippet>519</a>                oldest,
+<a href=#520 id=520 data-nosnippet>520</a>                pseudonym,
+<a href=#521 id=521 data-nosnippet>521</a>            });
+<a href=#522 id=522 data-nosnippet>522</a>            <span class="kw">if </span>delivered.is_some_and(|at| at &gt;= suspicion.oldest) {
+<a href=#523 id=523 data-nosnippet>523</a>                <span class="comment">// It delivers after all.
+<a href=#524 id=524 data-nosnippet>524</a>                </span><span class="kw-2">*</span>suspicion = Suspicion {
+<a href=#525 id=525 data-nosnippet>525</a>                    since: now,
+<a href=#526 id=526 data-nosnippet>526</a>                    oldest,
+<a href=#527 id=527 data-nosnippet>527</a>                    pseudonym,
+<a href=#528 id=528 data-nosnippet>528</a>                };
+<a href=#529 id=529 data-nosnippet>529</a>                <span class="kw">continue</span>;
+<a href=#530 id=530 data-nosnippet>530</a>            }
+<a href=#531 id=531 data-nosnippet>531</a>            <span class="kw">let </span>relapse = <span class="self">self
+<a href=#532 id=532 data-nosnippet>532</a>                </span>.lifted
+<a href=#533 id=533 data-nosnippet>533</a>                .get(key)
+<a href=#534 id=534 data-nosnippet>534</a>                .is_some_and(|at| now.saturating_duration_since(<span class="kw-2">*</span>at) &lt; FORWARD_VERDICT_TTL);
+<a href=#535 id=535 data-nosnippet>535</a>            <span class="kw">if </span>!relapse &amp;&amp; now.saturating_duration_since(suspicion.since) &lt; FORWARD_CONFIRMATION {
+<a href=#536 id=536 data-nosnippet>536</a>                <span class="kw">continue</span>;
+<a href=#537 id=537 data-nosnippet>537</a>            }
+<a href=#538 id=538 data-nosnippet>538</a>            <span class="kw">if </span><span class="self">self</span>.verdicts.keys().filter(|(exit, <span class="kw">_</span>)| <span class="kw-2">*</span>exit == key.<span class="number">0</span>).count() &gt;= MAX_FORWARD_VERDICTS_PER_EXIT {
+<a href=#539 id=539 data-nosnippet>539</a>                <span class="kw">continue</span>;
+<a href=#540 id=540 data-nosnippet>540</a>            }
+<a href=#541 id=541 data-nosnippet>541</a>            <span class="kw">let </span>(exit, relayer) = <span class="kw-2">*</span>key;
+<a href=#542 id=542 data-nosnippet>542</a>            <span class="macro">tracing::info!</span>(%relayer, %exit, over = <span class="string">"forward"</span>, <span class="string">"relayer judged dead"</span>);
+<a href=#543 id=543 data-nosnippet>543</a>            <span class="self">self</span>.suspected.remove(key);
+<a href=#544 id=544 data-nosnippet>544</a>            <span class="self">self</span>.verdicts.insert(<span class="kw-2">*</span>key, now);
+<a href=#545 id=545 data-nosnippet>545</a>            <span class="self">self</span>.changed = <span class="bool-val">true</span>;
+<a href=#546 id=546 data-nosnippet>546</a>        }
+<a href=#547 id=547 data-nosnippet>547</a>        <span class="comment">// A suspicion that is no black hole any more has not stood.
+<a href=#548 id=548 data-nosnippet>548</a>        </span><span class="self">self</span>.suspected
+<a href=#549 id=549 data-nosnippet>549</a>            .retain(|key, suspicion| suspicion.pseudonym != pseudonym || black_holes.contains(key));
+<a href=#550 id=550 data-nosnippet>550</a>        outstanding
+<a href=#551 id=551 data-nosnippet>551</a>    }
+<a href=#552 id=552 data-nosnippet>552</a>
+<a href=#553 id=553 data-nosnippet>553</a>    <span class="doccomment">/// Publishes the verdicts for the planner, if they changed.
+<a href=#554 id=554 data-nosnippet>554</a>    </span><span class="kw">fn </span>publish(<span class="kw-2">&amp;mut </span><span class="self">self</span>, excluded: <span class="kw-2">&amp;</span>RwLock&lt;HashMap&lt;Key, Vec&lt;Key&gt;&gt;&gt;, any_verdict: <span class="kw-2">&amp;</span>AtomicBool) {
+<a href=#555 id=555 data-nosnippet>555</a>        <span class="kw">if </span>!std::mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.changed) {
+<a href=#556 id=556 data-nosnippet>556</a>            <span class="kw">return</span>;
+<a href=#557 id=557 data-nosnippet>557</a>        }
+<a href=#558 id=558 data-nosnippet>558</a>        <span class="kw">let </span><span class="kw-2">mut </span>view: HashMap&lt;Key, Vec&lt;Key&gt;&gt; = HashMap::new();
+<a href=#559 id=559 data-nosnippet>559</a>        <span class="kw">for </span>(exit, relayer) <span class="kw">in </span><span class="self">self</span>.verdicts.keys() {
+<a href=#560 id=560 data-nosnippet>560</a>            view.entry(<span class="kw-2">*</span>exit).or_default().push(<span class="kw-2">*</span>relayer);
+<a href=#561 id=561 data-nosnippet>561</a>        }
+<a href=#562 id=562 data-nosnippet>562</a>        <span class="kw-2">*</span>excluded.write() = view;
+<a href=#563 id=563 data-nosnippet>563</a>        any_verdict.store(!<span class="self">self</span>.verdicts.is_empty(), Ordering::Relaxed);
+<a href=#564 id=564 data-nosnippet>564</a>    }
+<a href=#565 id=565 data-nosnippet>565</a>}
+<a href=#566 id=566 data-nosnippet>566</a>
+<a href=#567 id=567 data-nosnippet>567</a><span class="doccomment">/// The record of a tag, in the form `explain_away` keys its replies by.
+<a href=#568 id=568 data-nosnippet>568</a></span><span class="kw">fn </span>id_of(tag: u32) -&gt; HoprSurbId {
+<a href=#569 id=569 data-nosnippet>569</a>    <span class="kw">let </span><span class="kw-2">mut </span>id = [<span class="number">0u8</span>; SURB_ID_SIZE];
+<a href=#570 id=570 data-nosnippet>570</a>    id[..size_of::&lt;u32&gt;()].copy_from_slice(<span class="kw-2">&amp;</span>tag.to_be_bytes());
+<a href=#571 id=571 data-nosnippet>571</a>    id
+<a href=#572 id=572 data-nosnippet>572</a>}
+<a href=#573 id=573 data-nosnippet>573</a>
+<a href=#574 id=574 data-nosnippet>574</a><span class="kw">impl </span>ForwardReceiptSink <span class="kw">for </span>ForwardReceipts {
+<a href=#575 id=575 data-nosnippet>575</a>    <span class="kw">fn </span>receipts(<span class="kw-2">&amp;</span><span class="self">self</span>, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: <span class="kw-2">&amp;</span>[u32]) {
+<a href=#576 id=576 data-nosnippet>576</a>        <span class="self">self</span>.receipts_at(pseudonym, seq, first_seq, tags, Instant::now());
+<a href=#577 id=577 data-nosnippet>577</a>    }
+<a href=#578 id=578 data-nosnippet>578</a>
+<a href=#579 id=579 data-nosnippet>579</a>    <span class="kw">fn </span>session_started(<span class="kw-2">&amp;</span><span class="self">self</span>, pseudonym: HoprPseudonym, instance: u64) {
+<a href=#580 id=580 data-nosnippet>580</a>        <span class="self">self</span>.start_session(pseudonym, instance);
+<a href=#581 id=581 data-nosnippet>581</a>    }
+<a href=#582 id=582 data-nosnippet>582</a>
+<a href=#583 id=583 data-nosnippet>583</a>    <span class="kw">fn </span>session_ended(<span class="kw-2">&amp;</span><span class="self">self</span>, pseudonym: HoprPseudonym, instance: u64) {
+<a href=#584 id=584 data-nosnippet>584</a>        <span class="self">self</span>.active.remove_if(<span class="kw-2">&amp;</span>pseudonym, |<span class="kw">_</span>, current| <span class="kw-2">*</span>current == instance);
+<a href=#585 id=585 data-nosnippet>585</a>    }
+<a href=#586 id=586 data-nosnippet>586</a>}
+<a href=#587 id=587 data-nosnippet>587</a>
+<a href=#588 id=588 data-nosnippet>588</a><span class="attr">#[cfg(test)]
+<a href=#589 id=589 data-nosnippet>589</a></span><span class="kw">mod </span>tests {
+<a href=#590 id=590 data-nosnippet>590</a>    <span class="kw">use </span>std::{fmt::Write <span class="kw">as _</span>, sync::Arc};
+<a href=#591 id=591 data-nosnippet>591</a>
+<a href=#592 id=592 data-nosnippet>592</a>    <span class="kw">use </span>anyhow::Context;
+<a href=#593 id=593 data-nosnippet>593</a>    <span class="kw">use </span>hopr_api::types::crypto::{
+<a href=#594 id=594 data-nosnippet>594</a>        crypto_traits::Randomizable,
+<a href=#595 id=595 data-nosnippet>595</a>        prelude::{Keypair, OffchainKeypair},
+<a href=#596 id=596 data-nosnippet>596</a>    };
+<a href=#597 id=597 data-nosnippet>597</a>
+<a href=#598 id=598 data-nosnippet>598</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#599 id=599 data-nosnippet>599</a>
+<a href=#600 id=600 data-nosnippet>600</a>    <span class="kw">fn </span>key() -&gt; Key {
+<a href=#601 id=601 data-nosnippet>601</a>        <span class="kw-2">*</span>OffchainKeypair::random().public()
+<a href=#602 id=602 data-nosnippet>602</a>    }
+<a href=#603 id=603 data-nosnippet>603</a>
+<a href=#604 id=604 data-nosnippet>604</a>    <span class="doccomment">/// Collects the events of a test as `LEVEL field=value ...` lines.
+<a href=#605 id=605 data-nosnippet>605</a>    </span><span class="attr">#[derive(Default, Clone)]
+<a href=#606 id=606 data-nosnippet>606</a>    </span><span class="kw">struct </span>Logs(Arc&lt;Mutex&lt;Vec&lt;String&gt;&gt;&gt;);
+<a href=#607 id=607 data-nosnippet>607</a>
+<a href=#608 id=608 data-nosnippet>608</a>    <span class="kw">struct </span>Fields(String);
+<a href=#609 id=609 data-nosnippet>609</a>
+<a href=#610 id=610 data-nosnippet>610</a>    <span class="kw">impl </span>tracing::field::Visit <span class="kw">for </span>Fields {
+<a href=#611 id=611 data-nosnippet>611</a>        <span class="kw">fn </span>record_debug(<span class="kw-2">&amp;mut </span><span class="self">self</span>, field: <span class="kw-2">&amp;</span>tracing::field::Field, value: <span class="kw-2">&amp;</span><span class="kw">dyn </span>std::fmt::Debug) {
+<a href=#612 id=612 data-nosnippet>612</a>            <span class="kw">let _ </span>= <span class="macro">write!</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="string">"{}={:?} "</span>, field.name(), value);
+<a href=#613 id=613 data-nosnippet>613</a>        }
+<a href=#614 id=614 data-nosnippet>614</a>    }
+<a href=#615 id=615 data-nosnippet>615</a>
+<a href=#616 id=616 data-nosnippet>616</a>    <span class="kw">impl </span>tracing::Subscriber <span class="kw">for </span>Logs {
+<a href=#617 id=617 data-nosnippet>617</a>        <span class="kw">fn </span>enabled(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>tracing::Metadata&lt;<span class="lifetime">'_</span>&gt;) -&gt; bool {
+<a href=#618 id=618 data-nosnippet>618</a>            <span class="bool-val">true
+<a href=#619 id=619 data-nosnippet>619</a>        </span>}
+<a href=#620 id=620 data-nosnippet>620</a>
+<a href=#621 id=621 data-nosnippet>621</a>        <span class="kw">fn </span>register_callsite(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>tracing::Metadata&lt;<span class="lifetime">'static</span>&gt;) -&gt; tracing::subscriber::Interest {
+<a href=#622 id=622 data-nosnippet>622</a>            tracing::subscriber::Interest::always()
+<a href=#623 id=623 data-nosnippet>623</a>        }
+<a href=#624 id=624 data-nosnippet>624</a>
+<a href=#625 id=625 data-nosnippet>625</a>        <span class="kw">fn </span>max_level_hint(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;tracing::metadata::LevelFilter&gt; {
+<a href=#626 id=626 data-nosnippet>626</a>            <span class="prelude-val">Some</span>(tracing::metadata::LevelFilter::TRACE)
+<a href=#627 id=627 data-nosnippet>627</a>        }
+<a href=#628 id=628 data-nosnippet>628</a>
+<a href=#629 id=629 data-nosnippet>629</a>        <span class="kw">fn </span>new_span(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>tracing::span::Attributes&lt;<span class="lifetime">'_</span>&gt;) -&gt; tracing::span::Id {
+<a href=#630 id=630 data-nosnippet>630</a>            tracing::span::Id::from_u64(<span class="number">1</span>)
+<a href=#631 id=631 data-nosnippet>631</a>        }
+<a href=#632 id=632 data-nosnippet>632</a>
+<a href=#633 id=633 data-nosnippet>633</a>        <span class="kw">fn </span>record(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>tracing::span::Id, <span class="kw">_</span>: <span class="kw-2">&amp;</span>tracing::span::Record&lt;<span class="lifetime">'_</span>&gt;) {}
+<a href=#634 id=634 data-nosnippet>634</a>
+<a href=#635 id=635 data-nosnippet>635</a>        <span class="kw">fn </span>record_follows_from(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>tracing::span::Id, <span class="kw">_</span>: <span class="kw-2">&amp;</span>tracing::span::Id) {}
+<a href=#636 id=636 data-nosnippet>636</a>
+<a href=#637 id=637 data-nosnippet>637</a>        <span class="kw">fn </span>event(<span class="kw-2">&amp;</span><span class="self">self</span>, event: <span class="kw-2">&amp;</span>tracing::Event&lt;<span class="lifetime">'_</span>&gt;) {
+<a href=#638 id=638 data-nosnippet>638</a>            <span class="kw">let </span><span class="kw-2">mut </span>fields = Fields(String::new());
+<a href=#639 id=639 data-nosnippet>639</a>            event.record(<span class="kw-2">&amp;mut </span>fields);
+<a href=#640 id=640 data-nosnippet>640</a>            <span class="self">self</span>.<span class="number">0</span>.lock().push(<span class="macro">format!</span>(<span class="string">"{} {}"</span>, event.metadata().level(), fields.<span class="number">0</span>));
+<a href=#641 id=641 data-nosnippet>641</a>        }
+<a href=#642 id=642 data-nosnippet>642</a>
+<a href=#643 id=643 data-nosnippet>643</a>        <span class="kw">fn </span>enter(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>tracing::span::Id) {}
+<a href=#644 id=644 data-nosnippet>644</a>
+<a href=#645 id=645 data-nosnippet>645</a>        <span class="kw">fn </span>exit(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>tracing::span::Id) {}
+<a href=#646 id=646 data-nosnippet>646</a>    }
+<a href=#647 id=647 data-nosnippet>647</a>
+<a href=#648 id=648 data-nosnippet>648</a>    <span class="doccomment">/// A Session sending a packet every 10 ms and receipted every 250 ms, with the Exit's view of time in
+<a href=#649 id=649 data-nosnippet>649</a>    /// milliseconds from `t0`.
+<a href=#650 id=650 data-nosnippet>650</a>    </span><span class="kw">struct </span>Sim {
+<a href=#651 id=651 data-nosnippet>651</a>        fr: ForwardReceipts,
+<a href=#652 id=652 data-nosnippet>652</a>        pseudonym: HoprPseudonym,
+<a href=#653 id=653 data-nosnippet>653</a>        exit: Key,
+<a href=#654 id=654 data-nosnippet>654</a>        t0: Instant,
+<a href=#655 id=655 data-nosnippet>655</a>        next_tag: u32,
+<a href=#656 id=656 data-nosnippet>656</a>        seq: u32,
+<a href=#657 id=657 data-nosnippet>657</a>        <span class="doccomment">/// (tag, arrival at the Exit in ms, if it arrives)
+<a href=#658 id=658 data-nosnippet>658</a>        </span>sent: Vec&lt;(u32, <span class="prelude-ty">Option</span>&lt;u64&gt;)&gt;,
+<a href=#659 id=659 data-nosnippet>659</a>        <span class="doccomment">/// When the receipts were made, the lost ones included.
+<a href=#660 id=660 data-nosnippet>660</a>        </span>receipted: Vec&lt;u64&gt;,
+<a href=#661 id=661 data-nosnippet>661</a>        <span class="doccomment">/// How many intervals a receipt covers.
+<a href=#662 id=662 data-nosnippet>662</a>        </span>cover: usize,
+<a href=#663 id=663 data-nosnippet>663</a>        <span class="doccomment">/// The seq of the last overflow jump, and when the receipt before it was made: older intervals are not
+<a href=#664 id=664 data-nosnippet>664</a>        /// repeated.
+<a href=#665 id=665 data-nosnippet>665</a>        </span>jump_base: (u32, u64),
+<a href=#666 id=666 data-nosnippet>666</a>        verdict_ms: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+<a href=#667 id=667 data-nosnippet>667</a>        <span class="doccomment">/// How long the receipt with a `seq` is delayed, and the receipts delayed: (release in ms, seq, first seq,
+<a href=#668 id=668 data-nosnippet>668</a>        /// tags).
+<a href=#669 id=669 data-nosnippet>669</a>        </span>late: Vec&lt;(u32, u64)&gt;,
+<a href=#670 id=670 data-nosnippet>670</a>        held: Vec&lt;(u64, u32, u32, Vec&lt;u32&gt;)&gt;,
+<a href=#671 id=671 data-nosnippet>671</a>    }
+<a href=#672 id=672 data-nosnippet>672</a>
+<a href=#673 id=673 data-nosnippet>673</a>    <span class="kw">impl </span>Sim {
+<a href=#674 id=674 data-nosnippet>674</a>        <span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
+<a href=#675 id=675 data-nosnippet>675</a>            <span class="self">Self</span>::sharing(ForwardReceipts::default(), key(), Instant::now())
+<a href=#676 id=676 data-nosnippet>676</a>        }
+<a href=#677 id=677 data-nosnippet>677</a>
+<a href=#678 id=678 data-nosnippet>678</a>        <span class="kw">fn </span>sharing(fr: ForwardReceipts, exit: Key, t0: Instant) -&gt; <span class="self">Self </span>{
+<a href=#679 id=679 data-nosnippet>679</a>            <span class="self">Self </span>{
+<a href=#680 id=680 data-nosnippet>680</a>                fr,
+<a href=#681 id=681 data-nosnippet>681</a>                pseudonym: HoprPseudonym::random(),
+<a href=#682 id=682 data-nosnippet>682</a>                exit,
+<a href=#683 id=683 data-nosnippet>683</a>                t0,
+<a href=#684 id=684 data-nosnippet>684</a>                next_tag: <span class="number">0</span>,
+<a href=#685 id=685 data-nosnippet>685</a>                seq: <span class="number">0</span>,
+<a href=#686 id=686 data-nosnippet>686</a>                sent: Vec::new(),
+<a href=#687 id=687 data-nosnippet>687</a>                receipted: Vec::new(),
+<a href=#688 id=688 data-nosnippet>688</a>                cover: <span class="number">2</span>,
+<a href=#689 id=689 data-nosnippet>689</a>                jump_base: (<span class="number">0</span>, <span class="number">0</span>),
+<a href=#690 id=690 data-nosnippet>690</a>                verdict_ms: <span class="prelude-val">None</span>,
+<a href=#691 id=691 data-nosnippet>691</a>                late: Vec::new(),
+<a href=#692 id=692 data-nosnippet>692</a>                held: Vec::new(),
+<a href=#693 id=693 data-nosnippet>693</a>            }
+<a href=#694 id=694 data-nosnippet>694</a>        }
+<a href=#695 id=695 data-nosnippet>695</a>
+<a href=#696 id=696 data-nosnippet>696</a>        <span class="kw">fn </span>at(<span class="kw-2">&amp;</span><span class="self">self</span>, ms: u64) -&gt; Instant {
+<a href=#697 id=697 data-nosnippet>697</a>            <span class="self">self</span>.t0 + Duration::from_millis(ms)
+<a href=#698 id=698 data-nosnippet>698</a>        }
+<a href=#699 id=699 data-nosnippet>699</a>
+<a href=#700 id=700 data-nosnippet>700</a>        <span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ms: u64, relayers: <span class="kw-2">&amp;</span>[Key], delay: <span class="prelude-ty">Option</span>&lt;u64&gt;) {
+<a href=#701 id=701 data-nosnippet>701</a>            <span class="kw">let </span><span class="kw-2">mut </span>path = relayers.to_vec();
+<a href=#702 id=702 data-nosnippet>702</a>            path.push(<span class="self">self</span>.exit);
+<a href=#703 id=703 data-nosnippet>703</a>            <span class="self">self</span>.fr.record_at(<span class="self">self</span>.pseudonym, <span class="self">self</span>.next_tag, <span class="kw-2">&amp;</span>path, <span class="self">self</span>.at(ms));
+<a href=#704 id=704 data-nosnippet>704</a>            <span class="self">self</span>.sent.push((<span class="self">self</span>.next_tag, delay.map(|delay| ms + delay)));
+<a href=#705 id=705 data-nosnippet>705</a>            <span class="self">self</span>.next_tag += <span class="number">1</span>;
+<a href=#706 id=706 data-nosnippet>706</a>        }
+<a href=#707 id=707 data-nosnippet>707</a>
+<a href=#708 id=708 data-nosnippet>708</a>        <span class="doccomment">/// Makes the receipt at `ms` with the next `seq` plus `jump`, covering `cover` intervals but none from before
+<a href=#709 id=709 data-nosnippet>709</a>        /// an Exit overflow (a jump), which repeats nothing.
+<a href=#710 id=710 data-nosnippet>710</a>        </span><span class="kw">fn </span>receipt(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ms: u64, jump: u32) {
+<a href=#711 id=711 data-nosnippet>711</a>            <span class="self">self</span>.seq += <span class="number">1 </span>+ jump;
+<a href=#712 id=712 data-nosnippet>712</a>            <span class="kw">let </span>covered = <span class="kw">if </span>jump &gt; <span class="number">0 </span>{ <span class="number">1 </span>} <span class="kw">else </span>{ <span class="self">self</span>.cover };
+<a href=#713 id=713 data-nosnippet>713</a>            <span class="kw">if </span>jump &gt; <span class="number">0 </span>{
+<a href=#714 id=714 data-nosnippet>714</a>                <span class="self">self</span>.jump_base = (<span class="self">self</span>.seq, <span class="self">self</span>.receipted.last().copied().unwrap_or(<span class="number">0</span>));
+<a href=#715 id=715 data-nosnippet>715</a>            }
+<a href=#716 id=716 data-nosnippet>716</a>            <span class="kw">let </span>first_seq = <span class="self">self</span>.seq.saturating_sub(covered <span class="kw">as </span>u32 - <span class="number">1</span>).max(<span class="number">1</span>).max(<span class="self">self</span>.jump_base.<span class="number">0</span>);
+<a href=#717 id=717 data-nosnippet>717</a>            <span class="kw">let </span>cut = <span class="self">self
+<a href=#718 id=718 data-nosnippet>718</a>                </span>.receipted
+<a href=#719 id=719 data-nosnippet>719</a>                .len()
+<a href=#720 id=720 data-nosnippet>720</a>                .checked_sub(covered)
+<a href=#721 id=721 data-nosnippet>721</a>                .map_or(<span class="number">0</span>, |i| <span class="self">self</span>.receipted[i])
+<a href=#722 id=722 data-nosnippet>722</a>                .max(<span class="self">self</span>.jump_base.<span class="number">1</span>);
+<a href=#723 id=723 data-nosnippet>723</a>            <span class="kw">let </span>tags: Vec&lt;u32&gt; = <span class="self">self
+<a href=#724 id=724 data-nosnippet>724</a>                </span>.sent
+<a href=#725 id=725 data-nosnippet>725</a>                .iter()
+<a href=#726 id=726 data-nosnippet>726</a>                .filter(|(<span class="kw">_</span>, arrival)| arrival.is_some_and(|a| a &lt;= ms &amp;&amp; a &gt; cut))
+<a href=#727 id=727 data-nosnippet>727</a>                .map(|(tag, <span class="kw">_</span>)| <span class="kw-2">*</span>tag)
+<a href=#728 id=728 data-nosnippet>728</a>                .collect();
+<a href=#729 id=729 data-nosnippet>729</a>            <span class="self">self</span>.receipted.push(ms);
+<a href=#730 id=730 data-nosnippet>730</a>            <span class="kw">match </span><span class="self">self</span>.late.iter().find(|(seq, <span class="kw">_</span>)| <span class="kw-2">*</span>seq == <span class="self">self</span>.seq) {
+<a href=#731 id=731 data-nosnippet>731</a>                <span class="prelude-val">Some</span>((<span class="kw">_</span>, delay)) =&gt; <span class="self">self</span>.held.push((ms + delay, <span class="self">self</span>.seq, first_seq, tags)),
+<a href=#732 id=732 data-nosnippet>732</a>                <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.deliver(ms, <span class="self">self</span>.seq, first_seq, <span class="kw-2">&amp;</span>tags),
+<a href=#733 id=733 data-nosnippet>733</a>            }
+<a href=#734 id=734 data-nosnippet>734</a>        }
+<a href=#735 id=735 data-nosnippet>735</a>
+<a href=#736 id=736 data-nosnippet>736</a>        <span class="kw">fn </span>deliver(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ms: u64, seq: u32, first_seq: u32, tags: <span class="kw-2">&amp;</span>[u32]) {
+<a href=#737 id=737 data-nosnippet>737</a>            <span class="self">self</span>.fr.receipts_at(<span class="self">self</span>.pseudonym, seq, first_seq, tags, <span class="self">self</span>.at(ms));
+<a href=#738 id=738 data-nosnippet>738</a>            <span class="kw">if </span><span class="self">self</span>.verdict_ms.is_none() &amp;&amp; !<span class="self">self</span>.fr.excluded_relayers(<span class="kw-2">&amp;</span><span class="self">self</span>.exit).is_empty() {
+<a href=#739 id=739 data-nosnippet>739</a>                <span class="self">self</span>.verdict_ms = <span class="prelude-val">Some</span>(ms);
+<a href=#740 id=740 data-nosnippet>740</a>            }
+<a href=#741 id=741 data-nosnippet>741</a>        }
+<a href=#742 id=742 data-nosnippet>742</a>
+<a href=#743 id=743 data-nosnippet>743</a>        <span class="doccomment">/// Delivers the delayed receipts that are due at `ms`.
+<a href=#744 id=744 data-nosnippet>744</a>        </span><span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ms: u64) {
+<a href=#745 id=745 data-nosnippet>745</a>            <span class="kw">let </span>(due, held): (Vec&lt;<span class="kw">_</span>&gt;, Vec&lt;<span class="kw">_</span>&gt;) = std::mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.held)
+<a href=#746 id=746 data-nosnippet>746</a>                .into_iter()
+<a href=#747 id=747 data-nosnippet>747</a>                .partition(|(at, ..)| <span class="kw-2">*</span>at &lt;= ms);
+<a href=#748 id=748 data-nosnippet>748</a>            <span class="self">self</span>.held = held;
+<a href=#749 id=749 data-nosnippet>749</a>            <span class="kw">for </span>(<span class="kw">_</span>, seq, first_seq, tags) <span class="kw">in </span>due {
+<a href=#750 id=750 data-nosnippet>750</a>                <span class="self">self</span>.deliver(ms, seq, first_seq, <span class="kw-2">&amp;</span>tags);
+<a href=#751 id=751 data-nosnippet>751</a>            }
+<a href=#752 id=752 data-nosnippet>752</a>        }
+<a href=#753 id=753 data-nosnippet>753</a>
+<a href=#754 id=754 data-nosnippet>754</a>        <span class="doccomment">/// Runs from `from` to `to` ms: a packet every 10 ms over `route(i)` that arrives after `fate(path)`, and
+<a href=#755 id=755 data-nosnippet>755</a>        /// a receipt every 250 ms unless `lost(seq)`.
+<a href=#756 id=756 data-nosnippet>756</a>        </span><span class="kw">fn </span>run(
+<a href=#757 id=757 data-nosnippet>757</a>            <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#758 id=758 data-nosnippet>758</a>            from: u64,
+<a href=#759 id=759 data-nosnippet>759</a>            to: u64,
+<a href=#760 id=760 data-nosnippet>760</a>            route: <span class="kw">impl </span>Fn(usize, <span class="kw-2">&amp;</span>[Key]) -&gt; Vec&lt;Key&gt;,
+<a href=#761 id=761 data-nosnippet>761</a>            fate: <span class="kw">impl </span>Fn(<span class="kw-2">&amp;</span>[Key]) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt;,
+<a href=#762 id=762 data-nosnippet>762</a>            lost: <span class="kw">impl </span>Fn(u32) -&gt; bool,
+<a href=#763 id=763 data-nosnippet>763</a>        ) {
+<a href=#764 id=764 data-nosnippet>764</a>            <span class="kw">for </span>ms <span class="kw">in </span>(from..to).step_by(<span class="number">10</span>) {
+<a href=#765 id=765 data-nosnippet>765</a>                <span class="self">self</span>.release(ms);
+<a href=#766 id=766 data-nosnippet>766</a>                <span class="kw">let </span>excluded = <span class="self">self</span>.fr.excluded_relayers(<span class="kw-2">&amp;</span><span class="self">self</span>.exit);
+<a href=#767 id=767 data-nosnippet>767</a>                <span class="kw">let </span>path = route((ms / <span class="number">10</span>) <span class="kw">as </span>usize, <span class="kw-2">&amp;</span>excluded);
+<a href=#768 id=768 data-nosnippet>768</a>                <span class="kw">let </span>delay = fate(<span class="kw-2">&amp;</span>path);
+<a href=#769 id=769 data-nosnippet>769</a>                <span class="self">self</span>.send(ms, <span class="kw-2">&amp;</span>path, delay);
+<a href=#770 id=770 data-nosnippet>770</a>                <span class="kw">if </span>ms % <span class="number">250 </span>== <span class="number">0 </span>&amp;&amp; ms &gt; <span class="number">0 </span>{
+<a href=#771 id=771 data-nosnippet>771</a>                    <span class="kw">if </span>lost(<span class="self">self</span>.seq + <span class="number">1</span>) {
+<a href=#772 id=772 data-nosnippet>772</a>                        <span class="self">self</span>.seq += <span class="number">1</span>;
+<a href=#773 id=773 data-nosnippet>773</a>                        <span class="self">self</span>.receipted.push(ms);
+<a href=#774 id=774 data-nosnippet>774</a>                    } <span class="kw">else </span>{
+<a href=#775 id=775 data-nosnippet>775</a>                        <span class="self">self</span>.receipt(ms, <span class="number">0</span>);
+<a href=#776 id=776 data-nosnippet>776</a>                    }
+<a href=#777 id=777 data-nosnippet>777</a>                }
+<a href=#778 id=778 data-nosnippet>778</a>            }
+<a href=#779 id=779 data-nosnippet>779</a>        }
+<a href=#780 id=780 data-nosnippet>780</a>    }
+<a href=#781 id=781 data-nosnippet>781</a>
+<a href=#782 id=782 data-nosnippet>782</a>    <span class="doccomment">/// Round-robin over `paths`, skipping the paths through an excluded relayer.
+<a href=#783 id=783 data-nosnippet>783</a>    </span><span class="kw">fn </span>rotate(paths: Vec&lt;Vec&lt;Key&gt;&gt;) -&gt; <span class="kw">impl </span>Fn(usize, <span class="kw-2">&amp;</span>[Key]) -&gt; Vec&lt;Key&gt; {
+<a href=#784 id=784 data-nosnippet>784</a>        <span class="kw">move </span>|i, excluded| {
+<a href=#785 id=785 data-nosnippet>785</a>            <span class="kw">let </span>allowed: Vec&lt;<span class="kw-2">&amp;</span>Vec&lt;Key&gt;&gt; = paths
+<a href=#786 id=786 data-nosnippet>786</a>                .iter()
+<a href=#787 id=787 data-nosnippet>787</a>                .filter(|path| !path.iter().any(|relayer| excluded.contains(relayer)))
+<a href=#788 id=788 data-nosnippet>788</a>                .collect();
+<a href=#789 id=789 data-nosnippet>789</a>            <span class="kw">let </span>pool: Vec&lt;<span class="kw-2">&amp;</span>Vec&lt;Key&gt;&gt; = <span class="kw">if </span>allowed.is_empty() {
+<a href=#790 id=790 data-nosnippet>790</a>                paths.iter().collect()
+<a href=#791 id=791 data-nosnippet>791</a>            } <span class="kw">else </span>{
+<a href=#792 id=792 data-nosnippet>792</a>                allowed
+<a href=#793 id=793 data-nosnippet>793</a>            };
+<a href=#794 id=794 data-nosnippet>794</a>            pool[i % pool.len()].clone()
+<a href=#795 id=795 data-nosnippet>795</a>        }
+<a href=#796 id=796 data-nosnippet>796</a>    }
+<a href=#797 id=797 data-nosnippet>797</a>
+<a href=#798 id=798 data-nosnippet>798</a>    <span class="doccomment">/// Runs `scenario` under a capturing subscriber until its log has a line with `expect`. A scoped subscriber can
+<a href=#799 id=799 data-nosnippet>799</a>    /// miss events while other tests install theirs, so a miss runs the scenario again.
+<a href=#800 id=800 data-nosnippet>800</a>    </span><span class="kw">fn </span>logged&lt;T&gt;(expect: <span class="kw-2">&amp;</span>str, scenario: <span class="kw">impl </span>Fn() -&gt; anyhow::Result&lt;T&gt;) -&gt; anyhow::Result&lt;(T, Vec&lt;String&gt;)&gt; {
+<a href=#801 id=801 data-nosnippet>801</a>        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">20 </span>{
+<a href=#802 id=802 data-nosnippet>802</a>            <span class="kw">let </span>logs = Logs::default();
+<a href=#803 id=803 data-nosnippet>803</a>            <span class="kw">let </span>out = tracing::subscriber::with_default(logs.clone(), <span class="kw-2">&amp;</span>scenario)<span class="question-mark">?</span>;
+<a href=#804 id=804 data-nosnippet>804</a>            <span class="kw">let </span>lines = logs.<span class="number">0</span>.lock().clone();
+<a href=#805 id=805 data-nosnippet>805</a>            <span class="kw">if </span>lines.iter().any(|line| line.contains(expect)) {
+<a href=#806 id=806 data-nosnippet>806</a>                <span class="kw">return </span><span class="prelude-val">Ok</span>((out, lines));
+<a href=#807 id=807 data-nosnippet>807</a>            }
+<a href=#808 id=808 data-nosnippet>808</a>        }
+<a href=#809 id=809 data-nosnippet>809</a>        <span class="macro">anyhow::bail!</span>(<span class="string">"`{expect}` was never logged"</span>)
+<a href=#810 id=810 data-nosnippet>810</a>    }
+<a href=#811 id=811 data-nosnippet>811</a>
+<a href=#812 id=812 data-nosnippet>812</a>    <span class="kw">fn </span>lose_nothing(<span class="kw">_</span>: u32) -&gt; bool {
+<a href=#813 id=813 data-nosnippet>813</a>        <span class="bool-val">false
+<a href=#814 id=814 data-nosnippet>814</a>    </span>}
+<a href=#815 id=815 data-nosnippet>815</a>
+<a href=#816 id=816 data-nosnippet>816</a>    <span class="kw">const </span>FAST: <span class="prelude-ty">Option</span>&lt;u64&gt; = <span class="prelude-val">Some</span>(<span class="number">20</span>);
+<a href=#817 id=817 data-nosnippet>817</a>
+<a href=#818 id=818 data-nosnippet>818</a>    <span class="comment">// Expand the proc macro before `test`: the pinned nightly otherwise crashes while
+<a href=#819 id=819 data-nosnippet>819</a>    // tokenizing the compiler-generated test entrypoint attribute.
+<a href=#820 id=820 data-nosnippet>820</a>    </span><span class="attr">#[serial_test::serial(routing_logs)]
+<a href=#821 id=821 data-nosnippet>821</a>    #[test]
+<a href=#822 id=822 data-nosnippet>822</a>    </span><span class="kw">fn </span>a_dead_relayer_should_be_judged_after_the_confirmation_and_logged() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#823 id=823 data-nosnippet>823</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#824 id=824 data-nosnippet>824</a>        <span class="kw">let </span>(sim, lines) = logged(<span class="string">"relayer judged dead"</span>, || {
+<a href=#825 id=825 data-nosnippet>825</a>            <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#826 id=826 data-nosnippet>826</a>            sim.run(
+<a href=#827 id=827 data-nosnippet>827</a>                <span class="number">0</span>,
+<a href=#828 id=828 data-nosnippet>828</a>                <span class="number">4_000</span>,
+<a href=#829 id=829 data-nosnippet>829</a>                rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]),
+<a href=#830 id=830 data-nosnippet>830</a>                |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#831 id=831 data-nosnippet>831</a>                lose_nothing,
+<a href=#832 id=832 data-nosnippet>832</a>            );
+<a href=#833 id=833 data-nosnippet>833</a>            <span class="prelude-val">Ok</span>(sim)
+<a href=#834 id=834 data-nosnippet>834</a>        })<span class="question-mark">?</span>;
+<a href=#835 id=835 data-nosnippet>835</a>
+<a href=#836 id=836 data-nosnippet>836</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[a], sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit));
+<a href=#837 id=837 data-nosnippet>837</a>        <span class="comment">// The first receipt that finds it a black hole is at 1000 ms: it stands 500 ms after that.
+<a href=#838 id=838 data-nosnippet>838</a>        </span><span class="kw">let </span>verdict = sim.verdict_ms.context(<span class="string">"judged"</span>)<span class="question-mark">?</span>;
+<a href=#839 id=839 data-nosnippet>839</a>        <span class="macro">assert_eq!</span>(<span class="number">1_500</span>, verdict, <span class="string">"judged after 500 ms of standing, not before"</span>);
+<a href=#840 id=840 data-nosnippet>840</a>        <span class="kw">let </span>judged: Vec&lt;<span class="kw">_</span>&gt; = lines
+<a href=#841 id=841 data-nosnippet>841</a>            .iter()
+<a href=#842 id=842 data-nosnippet>842</a>            .filter(|line| line.contains(<span class="string">"relayer judged dead"</span>))
+<a href=#843 id=843 data-nosnippet>843</a>            .collect();
+<a href=#844 id=844 data-nosnippet>844</a>        <span class="macro">assert_eq!</span>(<span class="number">1</span>, judged.len(), <span class="string">"{lines:?}"</span>);
+<a href=#845 id=845 data-nosnippet>845</a>        <span class="macro">assert!</span>(
+<a href=#846 id=846 data-nosnippet>846</a>            judged[<span class="number">0</span>].starts_with(<span class="string">"INFO "</span>) &amp;&amp; judged[<span class="number">0</span>].contains(<span class="string">"over=\"forward\""</span>),
+<a href=#847 id=847 data-nosnippet>847</a>            <span class="string">"{}"</span>,
+<a href=#848 id=848 data-nosnippet>848</a>            judged[<span class="number">0</span>]
+<a href=#849 id=849 data-nosnippet>849</a>        );
+<a href=#850 id=850 data-nosnippet>850</a>        <span class="macro">assert!</span>(
+<a href=#851 id=851 data-nosnippet>851</a>            judged[<span class="number">0</span>].contains(<span class="string">"relayer="</span>) &amp;&amp; judged[<span class="number">0</span>].contains(<span class="string">"exit="</span>),
+<a href=#852 id=852 data-nosnippet>852</a>            <span class="string">"{}"</span>,
+<a href=#853 id=853 data-nosnippet>853</a>            judged[<span class="number">0</span>]
+<a href=#854 id=854 data-nosnippet>854</a>        );
+<a href=#855 id=855 data-nosnippet>855</a>        <span class="prelude-val">Ok</span>(())
+<a href=#856 id=856 data-nosnippet>856</a>    }
+<a href=#857 id=857 data-nosnippet>857</a>
+<a href=#858 id=858 data-nosnippet>858</a>    <span class="attr">#[test]
+<a href=#859 id=859 data-nosnippet>859</a>    </span><span class="kw">fn </span>a_stalling_relayer_should_be_judged_and_stay_excluded_despite_its_late_receipts() {
+<a href=#860 id=860 data-nosnippet>860</a>        <span class="kw">let </span>[s, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#861 id=861 data-nosnippet>861</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#862 id=862 data-nosnippet>862</a>        sim.run(
+<a href=#863 id=863 data-nosnippet>863</a>            <span class="number">0</span>,
+<a href=#864 id=864 data-nosnippet>864</a>            <span class="number">9_000</span>,
+<a href=#865 id=865 data-nosnippet>865</a>            rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[s], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]),
+<a href=#866 id=866 data-nosnippet>866</a>            |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>s) { <span class="prelude-val">Some</span>(<span class="number">3_000</span>) } <span class="kw">else </span>{ FAST },
+<a href=#867 id=867 data-nosnippet>867</a>            lose_nothing,
+<a href=#868 id=868 data-nosnippet>868</a>        );
+<a href=#869 id=869 data-nosnippet>869</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[s], sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit));
+<a href=#870 id=870 data-nosnippet>870</a>        <span class="macro">assert!</span>(
+<a href=#871 id=871 data-nosnippet>871</a>            sim.verdict_ms.is_some_and(|ms| ms &lt; <span class="number">3_000</span>),
+<a href=#872 id=872 data-nosnippet>872</a>            <span class="string">"judged before its first late receipt"
+<a href=#873 id=873 data-nosnippet>873</a>        </span>);
+<a href=#874 id=874 data-nosnippet>874</a>    }
+<a href=#875 id=875 data-nosnippet>875</a>
+<a href=#876 id=876 data-nosnippet>876</a>    <span class="attr">#[test]
+<a href=#877 id=877 data-nosnippet>877</a>    </span><span class="kw">fn </span>one_lost_receipt_should_lose_nothing() {
+<a href=#878 id=878 data-nosnippet>878</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#879 id=879 data-nosnippet>879</a>        <span class="kw">let </span>verdict_with = |lost_seq: u32| {
+<a href=#880 id=880 data-nosnippet>880</a>            <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#881 id=881 data-nosnippet>881</a>            sim.run(
+<a href=#882 id=882 data-nosnippet>882</a>                <span class="number">0</span>,
+<a href=#883 id=883 data-nosnippet>883</a>                <span class="number">4_000</span>,
+<a href=#884 id=884 data-nosnippet>884</a>                rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]),
+<a href=#885 id=885 data-nosnippet>885</a>                |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#886 id=886 data-nosnippet>886</a>                |seq| seq == lost_seq,
+<a href=#887 id=887 data-nosnippet>887</a>            );
+<a href=#888 id=888 data-nosnippet>888</a>            (sim.verdict_ms, sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit))
+<a href=#889 id=889 data-nosnippet>889</a>        };
+<a href=#890 id=890 data-nosnippet>890</a>        <span class="kw">let </span>(expected, <span class="kw">_</span>) = verdict_with(<span class="number">0</span>);
+<a href=#891 id=891 data-nosnippet>891</a>        <span class="kw">for </span>lost <span class="kw">in </span>[<span class="number">3</span>, <span class="number">5</span>] {
+<a href=#892 id=892 data-nosnippet>892</a>            <span class="macro">assert_eq!</span>((expected, <span class="macro">vec!</span>[a]), verdict_with(lost), <span class="string">"receipt {lost} lost"</span>);
+<a href=#893 id=893 data-nosnippet>893</a>        }
+<a href=#894 id=894 data-nosnippet>894</a>    }
+<a href=#895 id=895 data-nosnippet>895</a>
+<a href=#896 id=896 data-nosnippet>896</a>    <span class="doccomment">/// More receipts lost than a receipt covers, or an overflow at the Exit, make the evidence before them void: only
+<a href=#897 id=897 data-nosnippet>897</a>    /// the packets sent after it can judge, which takes until after 2 s here, against 1.5 s without the jump.
+<a href=#898 id=898 data-nosnippet>898</a>    </span><span class="attr">#[test]
+<a href=#899 id=899 data-nosnippet>899</a>    </span><span class="kw">fn </span>a_larger_gap_or_an_overflow_should_judge_nobody() {
+<a href=#900 id=900 data-nosnippet>900</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#901 id=901 data-nosnippet>901</a>        <span class="kw">let </span>judge_at_2000 = |jump: u32| {
+<a href=#902 id=902 data-nosnippet>902</a>            <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#903 id=903 data-nosnippet>903</a>            <span class="kw">let </span>route = rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]);
+<a href=#904 id=904 data-nosnippet>904</a>            <span class="kw">let </span>fate = |path: <span class="kw-2">&amp;</span>[Key]| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST };
+<a href=#905 id=905 data-nosnippet>905</a>            sim.run(<span class="number">0</span>, <span class="number">1_000</span>, <span class="kw-2">&amp;</span>route, fate, lose_nothing);
+<a href=#906 id=906 data-nosnippet>906</a>            sim.receipt(<span class="number">1_000</span>, jump);
+<a href=#907 id=907 data-nosnippet>907</a>            sim.run(<span class="number">1_010</span>, <span class="number">2_000</span>, <span class="kw-2">&amp;</span>route, fate, lose_nothing);
+<a href=#908 id=908 data-nosnippet>908</a>            sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit)
+<a href=#909 id=909 data-nosnippet>909</a>        };
+<a href=#910 id=910 data-nosnippet>910</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[a], judge_at_2000(<span class="number">0</span>), <span class="string">"the control run judges"</span>);
+<a href=#911 id=911 data-nosnippet>911</a>        <span class="kw">for </span>jump <span class="kw">in </span>[<span class="number">3</span>, <span class="number">5</span>] {
+<a href=#912 id=912 data-nosnippet>912</a>            <span class="macro">assert!</span>(judge_at_2000(jump).is_empty(), <span class="string">"jump {jump}"</span>);
+<a href=#913 id=913 data-nosnippet>913</a>        }
+<a href=#914 id=914 data-nosnippet>914</a>    }
+<a href=#915 id=915 data-nosnippet>915</a>
+<a href=#916 id=916 data-nosnippet>916</a>    <span class="attr">#[test]
+<a href=#917 id=917 data-nosnippet>917</a>    </span><span class="kw">fn </span>withholding_every_receipt_should_judge_nobody() {
+<a href=#918 id=918 data-nosnippet>918</a>        <span class="kw">let </span>[a, b] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#919 id=919 data-nosnippet>919</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#920 id=920 data-nosnippet>920</a>        sim.run(<span class="number">0</span>, <span class="number">5_000</span>, rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b]]), |<span class="kw">_</span>| <span class="prelude-val">None</span>, |<span class="kw">_</span>| <span class="bool-val">true</span>);
+<a href=#921 id=921 data-nosnippet>921</a>        sim.fr.receipts_at(sim.pseudonym, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], sim.at(<span class="number">5_000</span>));
+<a href=#922 id=922 data-nosnippet>922</a>        sim.fr.refresh_at(sim.at(<span class="number">5_000</span>));
+<a href=#923 id=923 data-nosnippet>923</a>        <span class="macro">assert!</span>(sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit).is_empty());
+<a href=#924 id=924 data-nosnippet>924</a>    }
+<a href=#925 id=925 data-nosnippet>925</a>
+<a href=#926 id=926 data-nosnippet>926</a>    <span class="attr">#[test]
+<a href=#927 id=927 data-nosnippet>927</a>    </span><span class="kw">fn </span>one_sessions_receipts_should_never_judge_another_sessions_packets() {
+<a href=#928 id=928 data-nosnippet>928</a>        <span class="kw">let </span>[a, b] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#929 id=929 data-nosnippet>929</a>        <span class="kw">let </span>exit = key();
+<a href=#930 id=930 data-nosnippet>930</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#931 id=931 data-nosnippet>931</a>        <span class="kw">let </span><span class="kw-2">mut </span>healthy = Sim::sharing(ForwardReceipts::default(), exit, t0);
+<a href=#932 id=932 data-nosnippet>932</a>        healthy.run(<span class="number">0</span>, <span class="number">100</span>, rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[b]]), |<span class="kw">_</span>| FAST, lose_nothing);
+<a href=#933 id=933 data-nosnippet>933</a>
+<a href=#934 id=934 data-nosnippet>934</a>        <span class="kw">let </span>other = HoprPseudonym::random();
+<a href=#935 id=935 data-nosnippet>935</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="number">100 </span>{
+<a href=#936 id=936 data-nosnippet>936</a>            healthy.fr.record_at(other, i, <span class="kw-2">&amp;</span>[a, exit], healthy.at(i <span class="kw">as </span>u64 * <span class="number">10</span>));
+<a href=#937 id=937 data-nosnippet>937</a>        }
+<a href=#938 id=938 data-nosnippet>938</a>        healthy.run(<span class="number">100</span>, <span class="number">5_000</span>, rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b]]), |<span class="kw">_</span>| FAST, lose_nothing);
+<a href=#939 id=939 data-nosnippet>939</a>        <span class="macro">assert!</span>(healthy.fr.excluded_relayers(<span class="kw-2">&amp;</span>exit).is_empty());
+<a href=#940 id=940 data-nosnippet>940</a>        <span class="macro">assert!</span>(
+<a href=#941 id=941 data-nosnippet>941</a>            healthy.fr.state.lock().records.contains_key(<span class="kw-2">&amp;</span>other),
+<a href=#942 id=942 data-nosnippet>942</a>            <span class="string">"the other Session's packets are only waited for"
+<a href=#943 id=943 data-nosnippet>943</a>        </span>);
+<a href=#944 id=944 data-nosnippet>944</a>    }
+<a href=#945 id=945 data-nosnippet>945</a>
+<a href=#946 id=946 data-nosnippet>946</a>    <span class="doccomment">/// `x -&gt; r` drops, while `x` and `r` each deliver other packets.
+<a href=#947 id=947 data-nosnippet>947</a>    </span><span class="attr">#[test]
+<a href=#948 id=948 data-nosnippet>948</a>    </span><span class="kw">fn </span>a_relayer_dropping_only_one_neighbours_packets_should_frame_nobody() {
+<a href=#949 id=949 data-nosnippet>949</a>        <span class="kw">let </span>[x, y, r, z] = [(); <span class="number">4</span>].map(|<span class="kw">_</span>| key());
+<a href=#950 id=950 data-nosnippet>950</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#951 id=951 data-nosnippet>951</a>        sim.run(
+<a href=#952 id=952 data-nosnippet>952</a>            <span class="number">0</span>,
+<a href=#953 id=953 data-nosnippet>953</a>            <span class="number">6_000</span>,
+<a href=#954 id=954 data-nosnippet>954</a>            rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[x, r], <span class="macro">vec!</span>[y, r], <span class="macro">vec!</span>[y, z], <span class="macro">vec!</span>[x, z]]),
+<a href=#955 id=955 data-nosnippet>955</a>            |path| <span class="kw">if </span>path == [x, r] { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#956 id=956 data-nosnippet>956</a>            lose_nothing,
+<a href=#957 id=957 data-nosnippet>957</a>        );
+<a href=#958 id=958 data-nosnippet>958</a>        <span class="macro">assert!</span>(sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit).is_empty());
+<a href=#959 id=959 data-nosnippet>959</a>    }
+<a href=#960 id=960 data-nosnippet>960</a>
+<a href=#961 id=961 data-nosnippet>961</a>    <span class="attr">#[test]
+<a href=#962 id=962 data-nosnippet>962</a>    </span><span class="kw">fn </span>a_true_tie_should_wait() {
+<a href=#963 id=963 data-nosnippet>963</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#964 id=964 data-nosnippet>964</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#965 id=965 data-nosnippet>965</a>        sim.run(
+<a href=#966 id=966 data-nosnippet>966</a>            <span class="number">0</span>,
+<a href=#967 id=967 data-nosnippet>967</a>            <span class="number">6_000</span>,
+<a href=#968 id=968 data-nosnippet>968</a>            rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a, b], <span class="macro">vec!</span>[b, a], <span class="macro">vec!</span>[c]]),
+<a href=#969 id=969 data-nosnippet>969</a>            |path| <span class="kw">if </span>path == [c] { FAST } <span class="kw">else </span>{ <span class="prelude-val">None </span>},
+<a href=#970 id=970 data-nosnippet>970</a>            lose_nothing,
+<a href=#971 id=971 data-nosnippet>971</a>        );
+<a href=#972 id=972 data-nosnippet>972</a>        <span class="macro">assert!</span>(sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit).is_empty());
+<a href=#973 id=973 data-nosnippet>973</a>    }
+<a href=#974 id=974 data-nosnippet>974</a>
+<a href=#975 id=975 data-nosnippet>975</a>    <span class="attr">#[test]
+<a href=#976 id=976 data-nosnippet>976</a>    </span><span class="kw">fn </span>the_relayer_downstream_of_a_dead_one_should_not_be_judged() {
+<a href=#977 id=977 data-nosnippet>977</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#978 id=978 data-nosnippet>978</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#979 id=979 data-nosnippet>979</a>        sim.run(
+<a href=#980 id=980 data-nosnippet>980</a>            <span class="number">0</span>,
+<a href=#981 id=981 data-nosnippet>981</a>            <span class="number">6_000</span>,
+<a href=#982 id=982 data-nosnippet>982</a>            rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a, b], <span class="macro">vec!</span>[c]]),
+<a href=#983 id=983 data-nosnippet>983</a>            |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#984 id=984 data-nosnippet>984</a>            lose_nothing,
+<a href=#985 id=985 data-nosnippet>985</a>        );
+<a href=#986 id=986 data-nosnippet>986</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[a], sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit));
+<a href=#987 id=987 data-nosnippet>987</a>    }
+<a href=#988 id=988 data-nosnippet>988</a>
+<a href=#989 id=989 data-nosnippet>989</a>    <span class="attr">#[test]
+<a href=#990 id=990 data-nosnippet>990</a>    </span><span class="kw">fn </span>a_loss_answered_by_a_later_delivery_should_not_count() {
+<a href=#991 id=991 data-nosnippet>991</a>        <span class="kw">let </span>[a, b] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#992 id=992 data-nosnippet>992</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#993 id=993 data-nosnippet>993</a>        <span class="kw">let </span>lost = std::cell::Cell::new(<span class="number">0</span>);
+<a href=#994 id=994 data-nosnippet>994</a>        sim.run(
+<a href=#995 id=995 data-nosnippet>995</a>            <span class="number">0</span>,
+<a href=#996 id=996 data-nosnippet>996</a>            <span class="number">6_000</span>,
+<a href=#997 id=997 data-nosnippet>997</a>            rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b]]),
+<a href=#998 id=998 data-nosnippet>998</a>            |path| {
+<a href=#999 id=999 data-nosnippet>999</a>                <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) {
+<a href=#1000 id=1000 data-nosnippet>1000</a>                    lost.set(lost.get() + <span class="number">1</span>);
+<a href=#1001 id=1001 data-nosnippet>1001</a>                    <span class="comment">// Every fifth packet through it is lost; the ones after it get home.
+<a href=#1002 id=1002 data-nosnippet>1002</a>                    </span>(lost.get() % <span class="number">5 </span>!= <span class="number">0</span>).then_some(<span class="number">20</span>)
+<a href=#1003 id=1003 data-nosnippet>1003</a>                } <span class="kw">else </span>{
+<a href=#1004 id=1004 data-nosnippet>1004</a>                    FAST
+<a href=#1005 id=1005 data-nosnippet>1005</a>                }
+<a href=#1006 id=1006 data-nosnippet>1006</a>            },
+<a href=#1007 id=1007 data-nosnippet>1007</a>            lose_nothing,
+<a href=#1008 id=1008 data-nosnippet>1008</a>        );
+<a href=#1009 id=1009 data-nosnippet>1009</a>        <span class="macro">assert!</span>(lost.get() &gt; <span class="number">100</span>);
+<a href=#1010 id=1010 data-nosnippet>1010</a>        <span class="macro">assert!</span>(sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit).is_empty());
+<a href=#1011 id=1011 data-nosnippet>1011</a>    }
+<a href=#1012 id=1012 data-nosnippet>1012</a>
+<a href=#1013 id=1013 data-nosnippet>1013</a>    <span class="attr">#[test]
+<a href=#1014 id=1014 data-nosnippet>1014</a>    </span><span class="kw">fn </span>a_verdict_should_be_per_exit_and_at_most_two_at_once() {
+<a href=#1015 id=1015 data-nosnippet>1015</a>        <span class="kw">let </span>[a, b, c, d] = [(); <span class="number">4</span>].map(|<span class="kw">_</span>| key());
+<a href=#1016 id=1016 data-nosnippet>1016</a>        <span class="kw">let </span>[e1, e2] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#1017 id=1017 data-nosnippet>1017</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1018 id=1018 data-nosnippet>1018</a>        <span class="kw">let </span><span class="kw-2">mut </span>one = Sim::sharing(ForwardReceipts::default(), e1, t0);
+<a href=#1019 id=1019 data-nosnippet>1019</a>        one.run(
+<a href=#1020 id=1020 data-nosnippet>1020</a>            <span class="number">0</span>,
+<a href=#1021 id=1021 data-nosnippet>1021</a>            <span class="number">6_000</span>,
+<a href=#1022 id=1022 data-nosnippet>1022</a>            rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c], <span class="macro">vec!</span>[d]]),
+<a href=#1023 id=1023 data-nosnippet>1023</a>            |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>d) { FAST } <span class="kw">else </span>{ <span class="prelude-val">None </span>},
+<a href=#1024 id=1024 data-nosnippet>1024</a>            lose_nothing,
+<a href=#1025 id=1025 data-nosnippet>1025</a>        );
+<a href=#1026 id=1026 data-nosnippet>1026</a>        <span class="kw">let </span>excluded = one.fr.excluded_relayers(<span class="kw-2">&amp;</span>e1);
+<a href=#1027 id=1027 data-nosnippet>1027</a>        <span class="macro">assert_eq!</span>(<span class="number">2</span>, excluded.len(), <span class="string">"{excluded:?}"</span>);
+<a href=#1028 id=1028 data-nosnippet>1028</a>        <span class="macro">assert!</span>(!excluded.contains(<span class="kw-2">&amp;</span>d));
+<a href=#1029 id=1029 data-nosnippet>1029</a>        <span class="macro">assert!</span>(one.fr.excluded_relayers(<span class="kw-2">&amp;</span>e2).is_empty(), <span class="string">"other exits are unaffected"</span>);
+<a href=#1030 id=1030 data-nosnippet>1030</a>    }
+<a href=#1031 id=1031 data-nosnippet>1031</a>
+<a href=#1032 id=1032 data-nosnippet>1032</a>    <span class="attr">#[serial_test::serial(routing_logs)]
+<a href=#1033 id=1033 data-nosnippet>1033</a>    #[test]
+<a href=#1034 id=1034 data-nosnippet>1034</a>    </span><span class="kw">fn </span>a_verdict_should_lapse_after_its_ttl_without_a_stale_rejudgement() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#1035 id=1035 data-nosnippet>1035</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1036 id=1036 data-nosnippet>1036</a>        logged(<span class="string">"forward verdict lifted"</span>, || {
+<a href=#1037 id=1037 data-nosnippet>1037</a>            <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#1038 id=1038 data-nosnippet>1038</a>            <span class="kw">let </span>fate = |path: <span class="kw-2">&amp;</span>[Key]| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST };
+<a href=#1039 id=1039 data-nosnippet>1039</a>            <span class="kw">let </span>healthy = rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]);
+<a href=#1040 id=1040 data-nosnippet>1040</a>            sim.run(<span class="number">0</span>, <span class="number">4_000</span>, rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]), fate, lose_nothing);
+<a href=#1041 id=1041 data-nosnippet>1041</a>            <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[a], sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit));
+<a href=#1042 id=1042 data-nosnippet>1042</a>            <span class="kw">let </span>lapse = sim.verdict_ms.context(<span class="string">"judged"</span>)<span class="question-mark">? </span>+ FORWARD_VERDICT_TTL.as_millis() <span class="kw">as </span>u64;
+<a href=#1043 id=1043 data-nosnippet>1043</a>
+<a href=#1044 id=1044 data-nosnippet>1044</a>            <span class="comment">// Packets through it, lost, within 10 s of the lift, which has to drop them
+<a href=#1045 id=1045 data-nosnippet>1045</a>            </span>sim.run(<span class="number">4_000</span>, lapse - <span class="number">1_100</span>, <span class="kw-2">&amp;</span>healthy, fate, lose_nothing);
+<a href=#1046 id=1046 data-nosnippet>1046</a>            <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="number">5 </span>{
+<a href=#1047 id=1047 data-nosnippet>1047</a>                sim.send(lapse - <span class="number">1_100 </span>+ i, <span class="kw-2">&amp;</span>[a], <span class="prelude-val">None</span>);
+<a href=#1048 id=1048 data-nosnippet>1048</a>            }
+<a href=#1049 id=1049 data-nosnippet>1049</a>            sim.run(lapse - <span class="number">1_000</span>, lapse, <span class="kw-2">&amp;</span>healthy, fate, lose_nothing);
+<a href=#1050 id=1050 data-nosnippet>1050</a>            <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[a], sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit));
+<a href=#1051 id=1051 data-nosnippet>1051</a>
+<a href=#1052 id=1052 data-nosnippet>1052</a>            sim.fr.refresh_at(sim.at(lapse));
+<a href=#1053 id=1053 data-nosnippet>1053</a>            <span class="macro">assert!</span>(sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit).is_empty());
+<a href=#1054 id=1054 data-nosnippet>1054</a>            <span class="macro">assert!</span>(
+<a href=#1055 id=1055 data-nosnippet>1055</a>                !sim.fr
+<a href=#1056 id=1056 data-nosnippet>1056</a>                    .state
+<a href=#1057 id=1057 data-nosnippet>1057</a>                    .lock()
+<a href=#1058 id=1058 data-nosnippet>1058</a>                    .records
+<a href=#1059 id=1059 data-nosnippet>1059</a>                    .values()
+<a href=#1060 id=1060 data-nosnippet>1060</a>                    .flatten()
+<a href=#1061 id=1061 data-nosnippet>1061</a>                    .any(|(<span class="kw">_</span>, r)| r.relayers().any(|r| <span class="kw-2">*</span>r == a))
+<a href=#1062 id=1062 data-nosnippet>1062</a>            );
+<a href=#1063 id=1063 data-nosnippet>1063</a>
+<a href=#1064 id=1064 data-nosnippet>1064</a>            <span class="comment">// Without the drop, those packets would be judged again at once
+<a href=#1065 id=1065 data-nosnippet>1065</a>            </span>sim.run(lapse + <span class="number">10</span>, lapse + <span class="number">2_000</span>, <span class="kw-2">&amp;</span>healthy, fate, lose_nothing);
+<a href=#1066 id=1066 data-nosnippet>1066</a>            <span class="macro">assert!</span>(sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit).is_empty());
+<a href=#1067 id=1067 data-nosnippet>1067</a>            <span class="prelude-val">Ok</span>(())
+<a href=#1068 id=1068 data-nosnippet>1068</a>        })<span class="question-mark">?</span>;
+<a href=#1069 id=1069 data-nosnippet>1069</a>        <span class="prelude-val">Ok</span>(())
+<a href=#1070 id=1070 data-nosnippet>1070</a>    }
+<a href=#1071 id=1071 data-nosnippet>1071</a>
+<a href=#1072 id=1072 data-nosnippet>1072</a>    <span class="attr">#[serial_test::serial(routing_logs)]
+<a href=#1073 id=1073 data-nosnippet>1073</a>    #[test]
+<a href=#1074 id=1074 data-nosnippet>1074</a>    </span><span class="kw">fn </span>a_receipt_for_a_packet_sent_after_the_verdict_should_lift_it_early_and_a_relapse_skips_the_wait()
+<a href=#1075 id=1075 data-nosnippet>1075</a>    -&gt; anyhow::Result&lt;()&gt; {
+<a href=#1076 id=1076 data-nosnippet>1076</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1077 id=1077 data-nosnippet>1077</a>        logged(<span class="string">"forward verdict lifted"</span>, || {
+<a href=#1078 id=1078 data-nosnippet>1078</a>            <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#1079 id=1079 data-nosnippet>1079</a>            <span class="kw">let </span>route = rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]);
+<a href=#1080 id=1080 data-nosnippet>1080</a>            sim.run(
+<a href=#1081 id=1081 data-nosnippet>1081</a>                <span class="number">0</span>,
+<a href=#1082 id=1082 data-nosnippet>1082</a>                <span class="number">4_000</span>,
+<a href=#1083 id=1083 data-nosnippet>1083</a>                <span class="kw-2">&amp;</span>route,
+<a href=#1084 id=1084 data-nosnippet>1084</a>                |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#1085 id=1085 data-nosnippet>1085</a>                lose_nothing,
+<a href=#1086 id=1086 data-nosnippet>1086</a>            );
+<a href=#1087 id=1087 data-nosnippet>1087</a>            <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[a], sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit));
+<a href=#1088 id=1088 data-nosnippet>1088</a>
+<a href=#1089 id=1089 data-nosnippet>1089</a>            <span class="comment">// The fallback draw sent a packet through it after the verdict, and it got home.
+<a href=#1090 id=1090 data-nosnippet>1090</a>            </span>sim.send(<span class="number">4_000</span>, <span class="kw-2">&amp;</span>[a], FAST);
+<a href=#1091 id=1091 data-nosnippet>1091</a>            sim.receipt(<span class="number">4_250</span>, <span class="number">0</span>);
+<a href=#1092 id=1092 data-nosnippet>1092</a>            <span class="macro">assert!</span>(sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit).is_empty());
+<a href=#1093 id=1093 data-nosnippet>1093</a>
+<a href=#1094 id=1094 data-nosnippet>1094</a>            <span class="comment">// The packets from before the lift are not judged again, and it is judged without the wait when it
+<a href=#1095 id=1095 data-nosnippet>1095</a>            // fails again: an overdue packet needs 500 ms and a receipt, nothing more.
+<a href=#1096 id=1096 data-nosnippet>1096</a>            </span>sim.run(<span class="number">4_250</span>, <span class="number">4_750</span>, <span class="kw-2">&amp;</span>route, |<span class="kw">_</span>| FAST, lose_nothing);
+<a href=#1097 id=1097 data-nosnippet>1097</a>            <span class="macro">assert!</span>(sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit).is_empty());
+<a href=#1098 id=1098 data-nosnippet>1098</a>            sim.verdict_ms = <span class="prelude-val">None</span>;
+<a href=#1099 id=1099 data-nosnippet>1099</a>            sim.run(
+<a href=#1100 id=1100 data-nosnippet>1100</a>                <span class="number">4_750</span>,
+<a href=#1101 id=1101 data-nosnippet>1101</a>                <span class="number">7_000</span>,
+<a href=#1102 id=1102 data-nosnippet>1102</a>                <span class="kw-2">&amp;</span>route,
+<a href=#1103 id=1103 data-nosnippet>1103</a>                |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#1104 id=1104 data-nosnippet>1104</a>                lose_nothing,
+<a href=#1105 id=1105 data-nosnippet>1105</a>            );
+<a href=#1106 id=1106 data-nosnippet>1106</a>            <span class="kw">let </span>relapse = sim.verdict_ms.context(<span class="string">"judged again"</span>)<span class="question-mark">?</span>;
+<a href=#1107 id=1107 data-nosnippet>1107</a>            <span class="macro">assert!</span>(relapse &lt;= <span class="number">4_750 </span>+ <span class="number">1_000</span>, <span class="string">"judged at {relapse} ms"</span>);
+<a href=#1108 id=1108 data-nosnippet>1108</a>            <span class="prelude-val">Ok</span>(())
+<a href=#1109 id=1109 data-nosnippet>1109</a>        })<span class="question-mark">?</span>;
+<a href=#1110 id=1110 data-nosnippet>1110</a>        <span class="prelude-val">Ok</span>(())
+<a href=#1111 id=1111 data-nosnippet>1111</a>    }
+<a href=#1112 id=1112 data-nosnippet>1112</a>
+<a href=#1113 id=1113 data-nosnippet>1113</a>    <span class="doccomment">/// A relayer that delays packets drawn just before its verdict must not lift it with their late delivery.
+<a href=#1114 id=1114 data-nosnippet>1114</a>    </span><span class="attr">#[test]
+<a href=#1115 id=1115 data-nosnippet>1115</a>    </span><span class="kw">fn </span>a_late_packet_sent_after_the_verdict_should_not_lift_it() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#1116 id=1116 data-nosnippet>1116</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1117 id=1117 data-nosnippet>1117</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#1118 id=1118 data-nosnippet>1118</a>        <span class="kw">let </span>fate = |path: <span class="kw-2">&amp;</span>[Key]| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST };
+<a href=#1119 id=1119 data-nosnippet>1119</a>        sim.run(<span class="number">0</span>, <span class="number">2_010</span>, rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]), fate, lose_nothing);
+<a href=#1120 id=1120 data-nosnippet>1120</a>        <span class="kw">let </span>verdict = sim.verdict_ms.context(<span class="string">"judged"</span>)<span class="question-mark">?</span>;
+<a href=#1121 id=1121 data-nosnippet>1121</a>        sim.send(verdict + <span class="number">1</span>, <span class="kw-2">&amp;</span>[a], <span class="prelude-val">Some</span>(<span class="number">3_000</span>));
+<a href=#1122 id=1122 data-nosnippet>1122</a>        sim.run(<span class="number">2_010</span>, <span class="number">7_000</span>, rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]), fate, lose_nothing);
+<a href=#1123 id=1123 data-nosnippet>1123</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[a], sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit));
+<a href=#1124 id=1124 data-nosnippet>1124</a>        <span class="prelude-val">Ok</span>(())
+<a href=#1125 id=1125 data-nosnippet>1125</a>    }
+<a href=#1126 id=1126 data-nosnippet>1126</a>
+<a href=#1127 id=1127 data-nosnippet>1127</a>    <span class="doccomment">/// Receipts 5 and 6 are overtaken by 7. Arriving within the grace, they delay the verdict by one receipt; arriving
+<a href=#1128 id=1128 data-nosnippet>1128</a>    /// long after it, with a coverage of 3, the same: neither floors the evidence, which would take until after 2.2 s.
+<a href=#1129 id=1129 data-nosnippet>1129</a>    </span><span class="attr">#[test]
+<a href=#1130 id=1130 data-nosnippet>1130</a>    </span><span class="kw">fn </span>overtaken_receipts_should_delay_the_verdict_by_a_receipt_and_not_floor_the_evidence() {
+<a href=#1131 id=1131 data-nosnippet>1131</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1132 id=1132 data-nosnippet>1132</a>        <span class="kw">let </span>verdict = |late: Vec&lt;(u32, u64)&gt;, cover: usize| {
+<a href=#1133 id=1133 data-nosnippet>1133</a>            <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#1134 id=1134 data-nosnippet>1134</a>            sim.late = late;
+<a href=#1135 id=1135 data-nosnippet>1135</a>            sim.cover = cover;
+<a href=#1136 id=1136 data-nosnippet>1136</a>            sim.run(
+<a href=#1137 id=1137 data-nosnippet>1137</a>                <span class="number">0</span>,
+<a href=#1138 id=1138 data-nosnippet>1138</a>                <span class="number">4_000</span>,
+<a href=#1139 id=1139 data-nosnippet>1139</a>                rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]),
+<a href=#1140 id=1140 data-nosnippet>1140</a>                |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#1141 id=1141 data-nosnippet>1141</a>                lose_nothing,
+<a href=#1142 id=1142 data-nosnippet>1142</a>            );
+<a href=#1143 id=1143 data-nosnippet>1143</a>            (sim.verdict_ms, sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit))
+<a href=#1144 id=1144 data-nosnippet>1144</a>        };
+<a href=#1145 id=1145 data-nosnippet>1145</a>        <span class="comment">// The receipts that carry the verdict (6 at 1.5 s) arrive late or are overtaken: judged a receipt later, not
+<a href=#1146 id=1146 data-nosnippet>1146</a>        // floored (which would take until after 2.2 s)
+<a href=#1147 id=1147 data-nosnippet>1147</a>        </span><span class="kw">let </span>(in_order, <span class="kw">_</span>) = verdict(<span class="macro">vec!</span>[], <span class="number">2</span>);
+<a href=#1148 id=1148 data-nosnippet>1148</a>        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="number">1_500</span>), in_order);
+<a href=#1149 id=1149 data-nosnippet>1149</a>        <span class="kw">let </span>(reordered, excluded) = verdict(<span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">600</span>), (<span class="number">6</span>, <span class="number">300</span>)], <span class="number">2</span>);
+<a href=#1150 id=1150 data-nosnippet>1150</a>        <span class="macro">assert_eq!</span>((<span class="prelude-val">Some</span>(<span class="number">1_800</span>), <span class="macro">vec!</span>[a]), (reordered, excluded));
+<a href=#1151 id=1151 data-nosnippet>1151</a>
+<a href=#1152 id=1152 data-nosnippet>1152</a>        <span class="comment">// Receipts that arrive long after the grace are still covered by the one that overtook them
+<a href=#1153 id=1153 data-nosnippet>1153</a>        </span><span class="kw">let </span>(stalled, excluded) = verdict(<span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">2_000</span>), (<span class="number">6</span>, <span class="number">2_000</span>)], <span class="number">3</span>);
+<a href=#1154 id=1154 data-nosnippet>1154</a>        <span class="macro">assert_eq!</span>((<span class="prelude-val">Some</span>(<span class="number">1_750</span>), <span class="macro">vec!</span>[a]), (stalled, excluded));
+<a href=#1155 id=1155 data-nosnippet>1155</a>    }
+<a href=#1156 id=1156 data-nosnippet>1156</a>
+<a href=#1157 id=1157 data-nosnippet>1157</a>    <span class="attr">#[test]
+<a href=#1158 id=1158 data-nosnippet>1158</a>    </span><span class="kw">fn </span>a_receipt_still_missing_after_the_grace_should_set_the_floor_to_the_jump() {
+<a href=#1159 id=1159 data-nosnippet>1159</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1160 id=1160 data-nosnippet>1160</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1161 id=1161 data-nosnippet>1161</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1162 id=1162 data-nosnippet>1162</a>        <span class="kw">let </span>at = |ms| t0 + Duration::from_millis(ms);
+<a href=#1163 id=1163 data-nosnippet>1163</a>        <span class="kw">for </span>seq <span class="kw">in </span><span class="number">1</span>..=<span class="number">3 </span>{
+<a href=#1164 id=1164 data-nosnippet>1164</a>            fr.receipts_at(session, seq, seq, <span class="kw-2">&amp;</span>[], at(<span class="number">0</span>));
+<a href=#1165 id=1165 data-nosnippet>1165</a>        }
+<a href=#1166 id=1166 data-nosnippet>1166</a>        fr.receipts_at(session, <span class="number">6</span>, <span class="number">6</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">100</span>));
+<a href=#1167 id=1167 data-nosnippet>1167</a>        <span class="macro">assert_eq!</span>(at(<span class="number">0</span>), fr.state.lock().streams[<span class="kw-2">&amp;</span>session].floor, <span class="string">"4 and 5 are awaited"</span>);
+<a href=#1168 id=1168 data-nosnippet>1168</a>        fr.receipts_at(session, <span class="number">7</span>, <span class="number">7</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">700</span>));
+<a href=#1169 id=1169 data-nosnippet>1169</a>        <span class="macro">assert_eq!</span>(at(<span class="number">100</span>), fr.state.lock().streams[<span class="kw-2">&amp;</span>session].floor, <span class="string">"4 and 5 never came"</span>);
+<a href=#1170 id=1170 data-nosnippet>1170</a>        <span class="macro">assert!</span>(fr.state.lock().streams[<span class="kw-2">&amp;</span>session].missing.is_empty());
+<a href=#1171 id=1171 data-nosnippet>1171</a>    }
+<a href=#1172 id=1172 data-nosnippet>1172</a>
+<a href=#1173 id=1173 data-nosnippet>1173</a>    <span class="doccomment">/// Two jumps whose missing receipts expire at the same arrival: what was sent before the second jump may have
+<a href=#1174 id=1174 data-nosnippet>1174</a>    /// been receipted by the receipt lost there, so it is no evidence.
+<a href=#1175 id=1175 data-nosnippet>1175</a>    </span><span class="attr">#[test]
+<a href=#1176 id=1176 data-nosnippet>1176</a>    </span><span class="kw">fn </span>the_floor_should_be_the_latest_lost_gap() {
+<a href=#1177 id=1177 data-nosnippet>1177</a>        <span class="kw">let </span>[x, y, exit] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1178 id=1178 data-nosnippet>1178</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1179 id=1179 data-nosnippet>1179</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1180 id=1180 data-nosnippet>1180</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1181 id=1181 data-nosnippet>1181</a>        <span class="kw">let </span>at = |ms| t0 + Duration::from_millis(ms);
+<a href=#1182 id=1182 data-nosnippet>1182</a>        <span class="kw">for </span>seq <span class="kw">in </span><span class="number">1</span>..=<span class="number">3 </span>{
+<a href=#1183 id=1183 data-nosnippet>1183</a>            fr.receipts_at(session, seq, seq, <span class="kw-2">&amp;</span>[], at(<span class="number">0</span>));
+<a href=#1184 id=1184 data-nosnippet>1184</a>        }
+<a href=#1185 id=1185 data-nosnippet>1185</a>        <span class="comment">// 4 and 5 go missing at 100 ms, and 7 and 8 at 300 ms
+<a href=#1186 id=1186 data-nosnippet>1186</a>        </span>fr.receipts_at(session, <span class="number">6</span>, <span class="number">6</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">100</span>));
+<a href=#1187 id=1187 data-nosnippet>1187</a>        <span class="kw">for </span>tag <span class="kw">in </span><span class="number">1</span>..=<span class="number">3 </span>{
+<a href=#1188 id=1188 data-nosnippet>1188</a>            fr.record_at(session, tag, <span class="kw-2">&amp;</span>[x, exit], at(<span class="number">200</span>));
+<a href=#1189 id=1189 data-nosnippet>1189</a>        }
+<a href=#1190 id=1190 data-nosnippet>1190</a>        fr.record_at(session, <span class="number">99</span>, <span class="kw-2">&amp;</span>[y, exit], at(<span class="number">850</span>));
+<a href=#1191 id=1191 data-nosnippet>1191</a>        fr.receipts_at(session, <span class="number">9</span>, <span class="number">9</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">300</span>));
+<a href=#1192 id=1192 data-nosnippet>1192</a>        fr.receipts_at(session, <span class="number">10</span>, <span class="number">10</span>, <span class="kw-2">&amp;</span>[<span class="number">99</span>], at(<span class="number">900</span>));
+<a href=#1193 id=1193 data-nosnippet>1193</a>
+<a href=#1194 id=1194 data-nosnippet>1194</a>        <span class="kw">let </span>state = fr.state.lock();
+<a href=#1195 id=1195 data-nosnippet>1195</a>        <span class="macro">assert_eq!</span>(at(<span class="number">300</span>), state.streams[<span class="kw-2">&amp;</span>session].floor);
+<a href=#1196 id=1196 data-nosnippet>1196</a>        <span class="macro">assert!</span>(
+<a href=#1197 id=1197 data-nosnippet>1197</a>            state.suspected.is_empty(),
+<a href=#1198 id=1198 data-nosnippet>1198</a>            <span class="string">"packets sent before the floor are no evidence"
+<a href=#1199 id=1199 data-nosnippet>1199</a>        </span>);
+<a href=#1200 id=1200 data-nosnippet>1200</a>    }
+<a href=#1201 id=1201 data-nosnippet>1201</a>
+<a href=#1202 id=1202 data-nosnippet>1202</a>    <span class="doccomment">/// 6 overtakes, and 5 arrives late and covers 4 as well: nothing is lost.
+<a href=#1203 id=1203 data-nosnippet>1203</a>    </span><span class="attr">#[test]
+<a href=#1204 id=1204 data-nosnippet>1204</a>    </span><span class="kw">fn </span>a_late_receipt_should_cover_the_intervals_it_repeats() {
+<a href=#1205 id=1205 data-nosnippet>1205</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1206 id=1206 data-nosnippet>1206</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1207 id=1207 data-nosnippet>1207</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1208 id=1208 data-nosnippet>1208</a>        <span class="kw">let </span>at = |ms| t0 + Duration::from_millis(ms);
+<a href=#1209 id=1209 data-nosnippet>1209</a>        <span class="kw">for </span>seq <span class="kw">in </span><span class="number">1</span>..=<span class="number">3 </span>{
+<a href=#1210 id=1210 data-nosnippet>1210</a>            fr.receipts_at(session, seq, seq, <span class="kw-2">&amp;</span>[], at(<span class="number">0</span>));
+<a href=#1211 id=1211 data-nosnippet>1211</a>        }
+<a href=#1212 id=1212 data-nosnippet>1212</a>        fr.receipts_at(session, <span class="number">6</span>, <span class="number">6</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">100</span>));
+<a href=#1213 id=1213 data-nosnippet>1213</a>        fr.receipts_at(session, <span class="number">5</span>, <span class="number">4</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">200</span>));
+<a href=#1214 id=1214 data-nosnippet>1214</a>        fr.receipts_at(session, <span class="number">7</span>, <span class="number">7</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">800</span>));
+<a href=#1215 id=1215 data-nosnippet>1215</a>        <span class="kw">let </span>state = fr.state.lock();
+<a href=#1216 id=1216 data-nosnippet>1216</a>        <span class="macro">assert_eq!</span>(at(<span class="number">0</span>), state.streams[<span class="kw-2">&amp;</span>session].floor);
+<a href=#1217 id=1217 data-nosnippet>1217</a>        <span class="macro">assert!</span>(state.streams[<span class="kw-2">&amp;</span>session].missing.is_empty());
+<a href=#1218 id=1218 data-nosnippet>1218</a>    }
+<a href=#1219 id=1219 data-nosnippet>1219</a>
+<a href=#1220 id=1220 data-nosnippet>1220</a>    <span class="doccomment">/// Every receipt repeats the two intervals before it, so up to two lost receipts in a row lose nothing: the
+<a href=#1221 id=1221 data-nosnippet>1221</a>    /// floor stays and the receipt after them judges.
+<a href=#1222 id=1222 data-nosnippet>1222</a>    </span><span class="attr">#[test]
+<a href=#1223 id=1223 data-nosnippet>1223</a>    </span><span class="kw">fn </span>as_many_lost_receipts_as_a_receipt_covers_should_lose_nothing() {
+<a href=#1224 id=1224 data-nosnippet>1224</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1225 id=1225 data-nosnippet>1225</a>        <span class="kw">let </span>run = |lost: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>[u32]| {
+<a href=#1226 id=1226 data-nosnippet>1226</a>            <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#1227 id=1227 data-nosnippet>1227</a>            sim.cover = <span class="number">3</span>;
+<a href=#1228 id=1228 data-nosnippet>1228</a>            sim.run(
+<a href=#1229 id=1229 data-nosnippet>1229</a>                <span class="number">0</span>,
+<a href=#1230 id=1230 data-nosnippet>1230</a>                <span class="number">4_000</span>,
+<a href=#1231 id=1231 data-nosnippet>1231</a>                rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]),
+<a href=#1232 id=1232 data-nosnippet>1232</a>                |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#1233 id=1233 data-nosnippet>1233</a>                |seq| lost.contains(<span class="kw-2">&amp;</span>seq),
+<a href=#1234 id=1234 data-nosnippet>1234</a>            );
+<a href=#1235 id=1235 data-nosnippet>1235</a>            <span class="kw">let </span>floor = sim.fr.state.lock().streams[<span class="kw-2">&amp;</span>sim.pseudonym].floor;
+<a href=#1236 id=1236 data-nosnippet>1236</a>            (
+<a href=#1237 id=1237 data-nosnippet>1237</a>                sim.verdict_ms,
+<a href=#1238 id=1238 data-nosnippet>1238</a>                sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit),
+<a href=#1239 id=1239 data-nosnippet>1239</a>                floor == sim.at(<span class="number">250</span>),
+<a href=#1240 id=1240 data-nosnippet>1240</a>            )
+<a href=#1241 id=1241 data-nosnippet>1241</a>        };
+<a href=#1242 id=1242 data-nosnippet>1242</a>        <span class="macro">assert_eq!</span>((<span class="prelude-val">Some</span>(<span class="number">1_500</span>), <span class="macro">vec!</span>[a], <span class="bool-val">true</span>), run(<span class="kw-2">&amp;</span>[]));
+<a href=#1243 id=1243 data-nosnippet>1243</a>        <span class="comment">// 5 and 6 lost: the verdict waits for 7 (1.75 s), which covers 5 to 7
+<a href=#1244 id=1244 data-nosnippet>1244</a>        </span><span class="macro">assert_eq!</span>((<span class="prelude-val">Some</span>(<span class="number">1_750</span>), <span class="macro">vec!</span>[a], <span class="bool-val">true</span>), run(<span class="kw-2">&amp;</span>[<span class="number">5</span>, <span class="number">6</span>]));
+<a href=#1245 id=1245 data-nosnippet>1245</a>    }
+<a href=#1246 id=1246 data-nosnippet>1246</a>
+<a href=#1247 id=1247 data-nosnippet>1247</a>    <span class="doccomment">/// More receipts lost than a receipt covers hold judgement, and then floor at the jump.
+<a href=#1248 id=1248 data-nosnippet>1248</a>    </span><span class="attr">#[test]
+<a href=#1249 id=1249 data-nosnippet>1249</a>    </span><span class="kw">fn </span>more_lost_receipts_than_a_receipt_covers_should_floor_at_the_jump() {
+<a href=#1250 id=1250 data-nosnippet>1250</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1251 id=1251 data-nosnippet>1251</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#1252 id=1252 data-nosnippet>1252</a>        sim.cover = <span class="number">3</span>;
+<a href=#1253 id=1253 data-nosnippet>1253</a>        <span class="kw">let </span>route = rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]);
+<a href=#1254 id=1254 data-nosnippet>1254</a>        <span class="kw">let </span>fate = |path: <span class="kw-2">&amp;</span>[Key]| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST };
+<a href=#1255 id=1255 data-nosnippet>1255</a>        <span class="kw">let </span>lost = |seq: u32| (<span class="number">6</span>..=<span class="number">9</span>).contains(<span class="kw-2">&amp;</span>seq);
+<a href=#1256 id=1256 data-nosnippet>1256</a>        <span class="comment">// Receipt 10 at 2500 ms is the first to arrive after the four, and covers 8 to 10: 6 and 7 are missing
+<a href=#1257 id=1257 data-nosnippet>1257</a>        </span>sim.run(<span class="number">0</span>, <span class="number">2_510</span>, <span class="kw-2">&amp;</span>route, fate, lost);
+<a href=#1258 id=1258 data-nosnippet>1258</a>        <span class="kw">let </span>missing: Vec&lt;u32&gt; = sim.fr.state.lock().streams[<span class="kw-2">&amp;</span>sim.pseudonym]
+<a href=#1259 id=1259 data-nosnippet>1259</a>            .missing
+<a href=#1260 id=1260 data-nosnippet>1260</a>            .iter()
+<a href=#1261 id=1261 data-nosnippet>1261</a>            .map(|(seq, <span class="kw">_</span>)| <span class="kw-2">*</span>seq)
+<a href=#1262 id=1262 data-nosnippet>1262</a>            .collect();
+<a href=#1263 id=1263 data-nosnippet>1263</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[<span class="number">6</span>, <span class="number">7</span>], missing);
+<a href=#1264 id=1264 data-nosnippet>1264</a>        sim.run(<span class="number">2_510</span>, <span class="number">3_600</span>, <span class="kw-2">&amp;</span>route, fate, lost);
+<a href=#1265 id=1265 data-nosnippet>1265</a>        <span class="macro">assert_eq!</span>(sim.at(<span class="number">2_500</span>), sim.fr.state.lock().streams[<span class="kw-2">&amp;</span>sim.pseudonym].floor);
+<a href=#1266 id=1266 data-nosnippet>1266</a>    }
+<a href=#1267 id=1267 data-nosnippet>1267</a>
+<a href=#1268 id=1268 data-nosnippet>1268</a>    <span class="doccomment">/// A gap of 16 is held, a larger one floors at once.
+<a href=#1269 id=1269 data-nosnippet>1269</a>    </span><span class="attr">#[test]
+<a href=#1270 id=1270 data-nosnippet>1270</a>    </span><span class="kw">fn </span>a_gap_of_sixteen_should_be_held_and_a_larger_one_should_floor() {
+<a href=#1271 id=1271 data-nosnippet>1271</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1272 id=1272 data-nosnippet>1272</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1273 id=1273 data-nosnippet>1273</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1274 id=1274 data-nosnippet>1274</a>        <span class="kw">let </span>at = |ms| t0 + Duration::from_millis(ms);
+<a href=#1275 id=1275 data-nosnippet>1275</a>        <span class="kw">for </span>seq <span class="kw">in </span><span class="number">1</span>..=<span class="number">9 </span>{
+<a href=#1276 id=1276 data-nosnippet>1276</a>            fr.receipts_at(session, seq, seq, <span class="kw-2">&amp;</span>[], at(<span class="number">0</span>));
+<a href=#1277 id=1277 data-nosnippet>1277</a>        }
+<a href=#1278 id=1278 data-nosnippet>1278</a>        fr.receipts_at(session, <span class="number">40</span>, <span class="number">26</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">100</span>));
+<a href=#1279 id=1279 data-nosnippet>1279</a>        {
+<a href=#1280 id=1280 data-nosnippet>1280</a>            <span class="kw">let </span>state = fr.state.lock();
+<a href=#1281 id=1281 data-nosnippet>1281</a>            <span class="macro">assert_eq!</span>(
+<a href=#1282 id=1282 data-nosnippet>1282</a>                (<span class="number">16</span>, at(<span class="number">0</span>)),
+<a href=#1283 id=1283 data-nosnippet>1283</a>                (state.streams[<span class="kw-2">&amp;</span>session].missing.len(), state.streams[<span class="kw-2">&amp;</span>session].floor)
+<a href=#1284 id=1284 data-nosnippet>1284</a>            );
+<a href=#1285 id=1285 data-nosnippet>1285</a>        }
+<a href=#1286 id=1286 data-nosnippet>1286</a>        fr.receipts_at(session, <span class="number">60</span>, <span class="number">60</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">200</span>));
+<a href=#1287 id=1287 data-nosnippet>1287</a>        <span class="macro">assert_eq!</span>(at(<span class="number">200</span>), fr.state.lock().streams[<span class="kw-2">&amp;</span>session].floor);
+<a href=#1288 id=1288 data-nosnippet>1288</a>    }
+<a href=#1289 id=1289 data-nosnippet>1289</a>
+<a href=#1290 id=1290 data-nosnippet>1290</a>    <span class="doccomment">/// A seq of `u32::MAX` must not overflow the next receipt.
+<a href=#1291 id=1291 data-nosnippet>1291</a>    </span><span class="attr">#[test]
+<a href=#1292 id=1292 data-nosnippet>1292</a>    </span><span class="kw">fn </span>a_receipt_after_the_largest_seq_should_not_overflow() {
+<a href=#1293 id=1293 data-nosnippet>1293</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1294 id=1294 data-nosnippet>1294</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1295 id=1295 data-nosnippet>1295</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1296 id=1296 data-nosnippet>1296</a>        fr.receipts_at(session, u32::MAX, u32::MAX, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1297 id=1297 data-nosnippet>1297</a>        fr.receipts_at(session, u32::MAX, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1298 id=1298 data-nosnippet>1298</a>        <span class="macro">assert!</span>(fr.state.lock().streams[<span class="kw-2">&amp;</span>session].missing.is_empty());
+<a href=#1299 id=1299 data-nosnippet>1299</a>    }
+<a href=#1300 id=1300 data-nosnippet>1300</a>
+<a href=#1301 id=1301 data-nosnippet>1301</a>    <span class="attr">#[test]
+<a href=#1302 id=1302 data-nosnippet>1302</a>    </span><span class="kw">fn </span>a_receipt_should_leave_only_the_seqs_before_its_first_seq_missing() {
+<a href=#1303 id=1303 data-nosnippet>1303</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1304 id=1304 data-nosnippet>1304</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1305 id=1305 data-nosnippet>1305</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1306 id=1306 data-nosnippet>1306</a>        <span class="kw">for </span>seq <span class="kw">in </span><span class="number">1</span>..=<span class="number">3 </span>{
+<a href=#1307 id=1307 data-nosnippet>1307</a>            fr.receipts_at(session, seq, seq, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1308 id=1308 data-nosnippet>1308</a>        }
+<a href=#1309 id=1309 data-nosnippet>1309</a>        fr.receipts_at(session, <span class="number">9</span>, <span class="number">7</span>, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1310 id=1310 data-nosnippet>1310</a>        <span class="kw">let </span>missing = |fr: <span class="kw-2">&amp;</span>ForwardReceipts| -&gt; Vec&lt;u32&gt; {
+<a href=#1311 id=1311 data-nosnippet>1311</a>            fr.state.lock().streams[<span class="kw-2">&amp;</span>session]
+<a href=#1312 id=1312 data-nosnippet>1312</a>                .missing
+<a href=#1313 id=1313 data-nosnippet>1313</a>                .iter()
+<a href=#1314 id=1314 data-nosnippet>1314</a>                .map(|(seq, <span class="kw">_</span>)| <span class="kw-2">*</span>seq)
+<a href=#1315 id=1315 data-nosnippet>1315</a>                .collect()
+<a href=#1316 id=1316 data-nosnippet>1316</a>        };
+<a href=#1317 id=1317 data-nosnippet>1317</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>], missing(<span class="kw-2">&amp;</span>fr));
+<a href=#1318 id=1318 data-nosnippet>1318</a>        fr.receipts_at(session, <span class="number">5</span>, <span class="number">4</span>, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1319 id=1319 data-nosnippet>1319</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[<span class="number">6</span>], missing(<span class="kw-2">&amp;</span>fr), <span class="string">"5 covers 4 and 5"</span>);
+<a href=#1320 id=1320 data-nosnippet>1320</a>
+<a href=#1321 id=1321 data-nosnippet>1321</a>        <span class="comment">// A gap beyond what is held is a loss at once
+<a href=#1322 id=1322 data-nosnippet>1322</a>        </span>fr.receipts_at(session, <span class="number">40</span>, <span class="number">40</span>, <span class="kw-2">&amp;</span>[], t0 + Duration::from_millis(<span class="number">10</span>));
+<a href=#1323 id=1323 data-nosnippet>1323</a>        <span class="macro">assert_eq!</span>(t0 + Duration::from_millis(<span class="number">10</span>), fr.state.lock().streams[<span class="kw-2">&amp;</span>session].floor);
+<a href=#1324 id=1324 data-nosnippet>1324</a>    }
+<a href=#1325 id=1325 data-nosnippet>1325</a>
+<a href=#1326 id=1326 data-nosnippet>1326</a>    <span class="attr">#[test]
+<a href=#1327 id=1327 data-nosnippet>1327</a>    </span><span class="kw">fn </span>a_receipt_three_places_late_should_not_reset_the_stream() {
+<a href=#1328 id=1328 data-nosnippet>1328</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1329 id=1329 data-nosnippet>1329</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1330 id=1330 data-nosnippet>1330</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1331 id=1331 data-nosnippet>1331</a>        <span class="kw">for </span>seq <span class="kw">in </span><span class="number">1</span>..=<span class="number">10 </span>{
+<a href=#1332 id=1332 data-nosnippet>1332</a>            fr.receipts_at(session, seq, seq, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1333 id=1333 data-nosnippet>1333</a>        }
+<a href=#1334 id=1334 data-nosnippet>1334</a>        fr.receipts_at(session, <span class="number">7</span>, <span class="number">7</span>, <span class="kw-2">&amp;</span>[], t0 + Duration::from_millis(<span class="number">10</span>));
+<a href=#1335 id=1335 data-nosnippet>1335</a>        <span class="macro">assert_eq!</span>((<span class="number">10</span>, t0), {
+<a href=#1336 id=1336 data-nosnippet>1336</a>            <span class="kw">let </span>state = fr.state.lock();
+<a href=#1337 id=1337 data-nosnippet>1337</a>            (state.streams[<span class="kw-2">&amp;</span>session].last_seq, state.streams[<span class="kw-2">&amp;</span>session].floor)
+<a href=#1338 id=1338 data-nosnippet>1338</a>        });
+<a href=#1339 id=1339 data-nosnippet>1339</a>    }
+<a href=#1340 id=1340 data-nosnippet>1340</a>
+<a href=#1341 id=1341 data-nosnippet>1341</a>    <span class="doccomment">/// A stream with nothing receipted yet cannot tell a timely packet from a late one.
+<a href=#1342 id=1342 data-nosnippet>1342</a>    </span><span class="attr">#[test]
+<a href=#1343 id=1343 data-nosnippet>1343</a>    </span><span class="kw">fn </span>a_delivery_on_a_stream_without_a_watermark_should_not_lift_a_verdict() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#1344 id=1344 data-nosnippet>1344</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1345 id=1345 data-nosnippet>1345</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#1346 id=1346 data-nosnippet>1346</a>        sim.run(
+<a href=#1347 id=1347 data-nosnippet>1347</a>            <span class="number">0</span>,
+<a href=#1348 id=1348 data-nosnippet>1348</a>            <span class="number">2_010</span>,
+<a href=#1349 id=1349 data-nosnippet>1349</a>            rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]),
+<a href=#1350 id=1350 data-nosnippet>1350</a>            |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#1351 id=1351 data-nosnippet>1351</a>            lose_nothing,
+<a href=#1352 id=1352 data-nosnippet>1352</a>        );
+<a href=#1353 id=1353 data-nosnippet>1353</a>        <span class="kw">let </span>verdict = sim.verdict_ms.context(<span class="string">"judged"</span>)<span class="question-mark">?</span>;
+<a href=#1354 id=1354 data-nosnippet>1354</a>        <span class="comment">// Another Session through the same Exit: its stream has no watermark yet
+<a href=#1355 id=1355 data-nosnippet>1355</a>        </span><span class="kw">let </span>other = HoprPseudonym::random();
+<a href=#1356 id=1356 data-nosnippet>1356</a>        sim.fr.record_at(other, <span class="number">1</span>, <span class="kw-2">&amp;</span>[a, sim.exit], sim.at(verdict + <span class="number">1</span>));
+<a href=#1357 id=1357 data-nosnippet>1357</a>        sim.fr.receipts_at(other, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[<span class="number">1</span>], sim.at(verdict + <span class="number">300</span>));
+<a href=#1358 id=1358 data-nosnippet>1358</a>        <span class="macro">assert_eq!</span>(<span class="macro">vec!</span>[a], sim.fr.excluded_relayers(<span class="kw-2">&amp;</span>sim.exit));
+<a href=#1359 id=1359 data-nosnippet>1359</a>        <span class="prelude-val">Ok</span>(())
+<a href=#1360 id=1360 data-nosnippet>1360</a>    }
+<a href=#1361 id=1361 data-nosnippet>1361</a>
+<a href=#1362 id=1362 data-nosnippet>1362</a>    <span class="attr">#[test]
+<a href=#1363 id=1363 data-nosnippet>1363</a>    </span><span class="kw">fn </span>records_should_be_bounded_and_expire() {
+<a href=#1364 id=1364 data-nosnippet>1364</a>        <span class="kw">let </span>[a, exit] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#1365 id=1365 data-nosnippet>1365</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1366 id=1366 data-nosnippet>1366</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1367 id=1367 data-nosnippet>1367</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1368 id=1368 data-nosnippet>1368</a>        <span class="kw">for </span>tag <span class="kw">in </span><span class="number">0</span>..(MAX_RECORDS <span class="kw">as </span>u32 + <span class="number">5_000</span>) {
+<a href=#1369 id=1369 data-nosnippet>1369</a>            fr.record_at(session, tag, <span class="kw-2">&amp;</span>[a, exit], t0);
+<a href=#1370 id=1370 data-nosnippet>1370</a>        }
+<a href=#1371 id=1371 data-nosnippet>1371</a>        {
+<a href=#1372 id=1372 data-nosnippet>1372</a>            <span class="kw">let </span>state = fr.state.lock();
+<a href=#1373 id=1373 data-nosnippet>1373</a>            <span class="macro">assert_eq!</span>(MAX_RECORDS, state.count);
+<a href=#1374 id=1374 data-nosnippet>1374</a>            <span class="macro">assert!</span>(state.order.len() &lt;= <span class="number">2 </span>* MAX_RECORDS);
+<a href=#1375 id=1375 data-nosnippet>1375</a>            <span class="macro">assert!</span>(!state.records[<span class="kw-2">&amp;</span>session].contains_key(<span class="kw-2">&amp;</span><span class="number">0</span>), <span class="string">"the oldest goes first"</span>);
+<a href=#1376 id=1376 data-nosnippet>1376</a>        }
+<a href=#1377 id=1377 data-nosnippet>1377</a>        fr.refresh_at(t0 + RECORD_TTL + Duration::from_secs(<span class="number">1</span>));
+<a href=#1378 id=1378 data-nosnippet>1378</a>        <span class="macro">assert!</span>(fr.state.lock().records.is_empty());
+<a href=#1379 id=1379 data-nosnippet>1379</a>        <span class="macro">assert!</span>(fr.state.lock().order.is_empty());
+<a href=#1380 id=1380 data-nosnippet>1380</a>    }
+<a href=#1381 id=1381 data-nosnippet>1381</a>
+<a href=#1382 id=1382 data-nosnippet>1382</a>    <span class="attr">#[test]
+<a href=#1383 id=1383 data-nosnippet>1383</a>    </span><span class="kw">fn </span>two_packets_with_one_tag_should_be_ambiguous_and_credit_nobody() {
+<a href=#1384 id=1384 data-nosnippet>1384</a>        <span class="kw">let </span>[a, b, exit] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1385 id=1385 data-nosnippet>1385</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1386 id=1386 data-nosnippet>1386</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1387 id=1387 data-nosnippet>1387</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1388 id=1388 data-nosnippet>1388</a>        fr.receipts_at(session, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1389 id=1389 data-nosnippet>1389</a>        fr.record_at(session, <span class="number">7</span>, <span class="kw-2">&amp;</span>[a, exit], t0 + Duration::from_millis(<span class="number">10</span>));
+<a href=#1390 id=1390 data-nosnippet>1390</a>        fr.record_at(session, <span class="number">7</span>, <span class="kw-2">&amp;</span>[b, exit], t0 + Duration::from_millis(<span class="number">20</span>));
+<a href=#1391 id=1391 data-nosnippet>1391</a>        <span class="macro">assert_eq!</span>(<span class="number">1</span>, fr.recorded(), <span class="string">"one record stays, marked"</span>);
+<a href=#1392 id=1392 data-nosnippet>1392</a>        <span class="macro">assert_eq!</span>(<span class="number">1</span>, fr.state.lock().order.len());
+<a href=#1393 id=1393 data-nosnippet>1393</a>
+<a href=#1394 id=1394 data-nosnippet>1394</a>        <span class="comment">// A later packet is receipted: the ambiguous ones would be overdue, if they counted
+<a href=#1395 id=1395 data-nosnippet>1395</a>        </span>fr.record_at(session, <span class="number">8</span>, <span class="kw-2">&amp;</span>[a, exit], t0 + Duration::from_secs(<span class="number">2</span>));
+<a href=#1396 id=1396 data-nosnippet>1396</a>        fr.receipts_at(session, <span class="number">2</span>, <span class="number">2</span>, <span class="kw-2">&amp;</span>[<span class="number">8</span>], t0 + Duration::from_secs(<span class="number">3</span>));
+<a href=#1397 id=1397 data-nosnippet>1397</a>        fr.receipts_at(session, <span class="number">3</span>, <span class="number">3</span>, <span class="kw-2">&amp;</span>[<span class="number">7</span>], t0 + Duration::from_secs(<span class="number">4</span>));
+<a href=#1398 id=1398 data-nosnippet>1398</a>        <span class="kw">let </span>state = fr.state.lock();
+<a href=#1399 id=1399 data-nosnippet>1399</a>        <span class="macro">assert!</span>(state.records.is_empty(), <span class="string">"the receipt for the tag consumed the record"</span>);
+<a href=#1400 id=1400 data-nosnippet>1400</a>        <span class="macro">assert!</span>(state.suspected.is_empty() &amp;&amp; state.verdicts.is_empty());
+<a href=#1401 id=1401 data-nosnippet>1401</a>        <span class="macro">assert!</span>(
+<a href=#1402 id=1402 data-nosnippet>1402</a>            !state.delivered.contains_key(<span class="kw-2">&amp;</span>(exit, b)),
+<a href=#1403 id=1403 data-nosnippet>1403</a>            <span class="string">"a receipt for an ambiguous tag credits nobody"
+<a href=#1404 id=1404 data-nosnippet>1404</a>        </span>);
+<a href=#1405 id=1405 data-nosnippet>1405</a>        <span class="macro">assert_eq!</span>(
+<a href=#1406 id=1406 data-nosnippet>1406</a>            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>(t0 + Duration::from_secs(<span class="number">2</span>))),
+<a href=#1407 id=1407 data-nosnippet>1407</a>            state.delivered.get(<span class="kw-2">&amp;</span>(exit, a)),
+<a href=#1408 id=1408 data-nosnippet>1408</a>            <span class="string">"only the packet sent later credits a"
+<a href=#1409 id=1409 data-nosnippet>1409</a>        </span>);
+<a href=#1410 id=1410 data-nosnippet>1410</a>    }
+<a href=#1411 id=1411 data-nosnippet>1411</a>
+<a href=#1412 id=1412 data-nosnippet>1412</a>    <span class="attr">#[test]
+<a href=#1413 id=1413 data-nosnippet>1413</a>    </span><span class="kw">fn </span>only_a_session_that_started_should_be_recorded_and_a_restart_should_forget_the_last() {
+<a href=#1414 id=1414 data-nosnippet>1414</a>        <span class="kw">let </span>[a, exit] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#1415 id=1415 data-nosnippet>1415</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1416 id=1416 data-nosnippet>1416</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1417 id=1417 data-nosnippet>1417</a>        fr.record(session, <span class="number">1</span>, <span class="kw-2">&amp;</span>[a, exit]);
+<a href=#1418 id=1418 data-nosnippet>1418</a>        <span class="macro">assert_eq!</span>(<span class="number">0</span>, fr.recorded(), <span class="string">"no Session asked for receipts"</span>);
+<a href=#1419 id=1419 data-nosnippet>1419</a>
+<a href=#1420 id=1420 data-nosnippet>1420</a>        fr.session_started(session, <span class="number">1</span>);
+<a href=#1421 id=1421 data-nosnippet>1421</a>        fr.record(session, <span class="number">1</span>, <span class="kw-2">&amp;</span>[a, exit]);
+<a href=#1422 id=1422 data-nosnippet>1422</a>        fr.receipts(session, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[]);
+<a href=#1423 id=1423 data-nosnippet>1423</a>        <span class="macro">assert_eq!</span>(<span class="number">1</span>, fr.recorded());
+<a href=#1424 id=1424 data-nosnippet>1424</a>        <span class="macro">assert!</span>(fr.state.lock().streams.contains_key(<span class="kw-2">&amp;</span>session));
+<a href=#1425 id=1425 data-nosnippet>1425</a>
+<a href=#1426 id=1426 data-nosnippet>1426</a>        <span class="comment">// A new Session under the pseudonym starts clean
+<a href=#1427 id=1427 data-nosnippet>1427</a>        </span>fr.session_started(session, <span class="number">2</span>);
+<a href=#1428 id=1428 data-nosnippet>1428</a>        <span class="macro">assert_eq!</span>(<span class="number">0</span>, fr.recorded());
+<a href=#1429 id=1429 data-nosnippet>1429</a>        <span class="macro">assert!</span>(!fr.state.lock().streams.contains_key(<span class="kw-2">&amp;</span>session));
+<a href=#1430 id=1430 data-nosnippet>1430</a>    }
+<a href=#1431 id=1431 data-nosnippet>1431</a>
+<a href=#1432 id=1432 data-nosnippet>1432</a>    <span class="attr">#[test]
+<a href=#1433 id=1433 data-nosnippet>1433</a>    </span><span class="kw">fn </span>a_session_idle_for_longer_than_the_stream_ttl_should_still_be_recorded() {
+<a href=#1434 id=1434 data-nosnippet>1434</a>        <span class="kw">let </span>[a, exit] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#1435 id=1435 data-nosnippet>1435</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1436 id=1436 data-nosnippet>1436</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1437 id=1437 data-nosnippet>1437</a>        fr.session_started(session, <span class="number">1</span>);
+<a href=#1438 id=1438 data-nosnippet>1438</a>        fr.refresh_at(Instant::now() + STREAM_TTL + Duration::from_secs(<span class="number">1</span>));
+<a href=#1439 id=1439 data-nosnippet>1439</a>        fr.refresh_at(Instant::now() + <span class="number">2 </span>* STREAM_TTL);
+<a href=#1440 id=1440 data-nosnippet>1440</a>        fr.record(session, <span class="number">1</span>, <span class="kw-2">&amp;</span>[a, exit]);
+<a href=#1441 id=1441 data-nosnippet>1441</a>        <span class="macro">assert_eq!</span>(<span class="number">1</span>, fr.recorded());
+<a href=#1442 id=1442 data-nosnippet>1442</a>    }
+<a href=#1443 id=1443 data-nosnippet>1443</a>
+<a href=#1444 id=1444 data-nosnippet>1444</a>    <span class="doccomment">/// A late end of an instance that was replaced must not deregister the instance that replaced it.
+<a href=#1445 id=1445 data-nosnippet>1445</a>    </span><span class="attr">#[test]
+<a href=#1446 id=1446 data-nosnippet>1446</a>    </span><span class="kw">fn </span>session_ended_should_deregister_only_its_own_instance() {
+<a href=#1447 id=1447 data-nosnippet>1447</a>        <span class="kw">let </span>[a, exit] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#1448 id=1448 data-nosnippet>1448</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1449 id=1449 data-nosnippet>1449</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1450 id=1450 data-nosnippet>1450</a>        fr.session_started(session, <span class="number">1</span>);
+<a href=#1451 id=1451 data-nosnippet>1451</a>        fr.session_started(session, <span class="number">2</span>);
+<a href=#1452 id=1452 data-nosnippet>1452</a>        fr.session_ended(session, <span class="number">1</span>);
+<a href=#1453 id=1453 data-nosnippet>1453</a>        fr.record(session, <span class="number">1</span>, <span class="kw-2">&amp;</span>[a, exit]);
+<a href=#1454 id=1454 data-nosnippet>1454</a>        <span class="macro">assert_eq!</span>(<span class="number">1</span>, fr.recorded(), <span class="string">"the successor is still recorded"</span>);
+<a href=#1455 id=1455 data-nosnippet>1455</a>
+<a href=#1456 id=1456 data-nosnippet>1456</a>        fr.session_ended(session, <span class="number">2</span>);
+<a href=#1457 id=1457 data-nosnippet>1457</a>        fr.record(session, <span class="number">2</span>, <span class="kw-2">&amp;</span>[a, exit]);
+<a href=#1458 id=1458 data-nosnippet>1458</a>        <span class="macro">assert_eq!</span>(<span class="number">1</span>, fr.recorded(), <span class="string">"nothing is recorded once it has ended"</span>);
+<a href=#1459 id=1459 data-nosnippet>1459</a>    }
+<a href=#1460 id=1460 data-nosnippet>1460</a>
+<a href=#1461 id=1461 data-nosnippet>1461</a>    <span class="attr">#[test]
+<a href=#1462 id=1462 data-nosnippet>1462</a>    </span><span class="kw">fn </span>a_reused_pseudonym_should_reset_its_stream() {
+<a href=#1463 id=1463 data-nosnippet>1463</a>        <span class="kw">let </span>[a, exit] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#1464 id=1464 data-nosnippet>1464</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1465 id=1465 data-nosnippet>1465</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1466 id=1466 data-nosnippet>1466</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1467 id=1467 data-nosnippet>1467</a>        <span class="kw">for </span>seq <span class="kw">in </span><span class="number">1</span>..=<span class="number">5 </span>{
+<a href=#1468 id=1468 data-nosnippet>1468</a>            fr.receipts_at(session, seq, seq, <span class="kw-2">&amp;</span>[], t0 + Duration::from_millis(<span class="number">250 </span>* seq <span class="kw">as </span>u64));
+<a href=#1469 id=1469 data-nosnippet>1469</a>        }
+<a href=#1470 id=1470 data-nosnippet>1470</a>        fr.record_at(session, <span class="number">1</span>, <span class="kw-2">&amp;</span>[a, exit], t0);
+<a href=#1471 id=1471 data-nosnippet>1471</a>        fr.receipts_at(session, <span class="number">6</span>, <span class="number">6</span>, <span class="kw-2">&amp;</span>[<span class="number">1</span>], t0 + Duration::from_secs(<span class="number">2</span>));
+<a href=#1472 id=1472 data-nosnippet>1472</a>        <span class="macro">assert!</span>(fr.state.lock().streams[<span class="kw-2">&amp;</span>session].watermark.is_some());
+<a href=#1473 id=1473 data-nosnippet>1473</a>
+<a href=#1474 id=1474 data-nosnippet>1474</a>        <span class="kw">let </span>again = t0 + Duration::from_secs(<span class="number">11</span>);
+<a href=#1475 id=1475 data-nosnippet>1475</a>        fr.receipts_at(session, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], again);
+<a href=#1476 id=1476 data-nosnippet>1476</a>        <span class="kw">let </span>state = fr.state.lock();
+<a href=#1477 id=1477 data-nosnippet>1477</a>        <span class="kw">let </span>stream = <span class="kw-2">&amp;</span>state.streams[<span class="kw-2">&amp;</span>session];
+<a href=#1478 id=1478 data-nosnippet>1478</a>        <span class="macro">assert_eq!</span>((<span class="number">1</span>, <span class="prelude-val">None</span>, again), (stream.last_seq, stream.watermark, stream.floor));
+<a href=#1479 id=1479 data-nosnippet>1479</a>    }
+<a href=#1480 id=1480 data-nosnippet>1480</a>
+<a href=#1481 id=1481 data-nosnippet>1481</a>    <span class="attr">#[test]
+<a href=#1482 id=1482 data-nosnippet>1482</a>    </span><span class="kw">fn </span>a_stream_a_new_session_would_start_with_should_reset() {
+<a href=#1483 id=1483 data-nosnippet>1483</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1484 id=1484 data-nosnippet>1484</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1485 id=1485 data-nosnippet>1485</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1486 id=1486 data-nosnippet>1486</a>        <span class="kw">for </span>seq <span class="kw">in </span><span class="number">1</span>..=<span class="number">10 </span>{
+<a href=#1487 id=1487 data-nosnippet>1487</a>            fr.receipts_at(session, seq, seq, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1488 id=1488 data-nosnippet>1488</a>        }
+<a href=#1489 id=1489 data-nosnippet>1489</a>        fr.receipts_at(session, <span class="number">9</span>, <span class="number">9</span>, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1490 id=1490 data-nosnippet>1490</a>        <span class="macro">assert_eq!</span>(
+<a href=#1491 id=1491 data-nosnippet>1491</a>            <span class="number">10</span>,
+<a href=#1492 id=1492 data-nosnippet>1492</a>            fr.state.lock().streams[<span class="kw-2">&amp;</span>session].last_seq,
+<a href=#1493 id=1493 data-nosnippet>1493</a>            <span class="string">"a late receipt is no reset"
+<a href=#1494 id=1494 data-nosnippet>1494</a>        </span>);
+<a href=#1495 id=1495 data-nosnippet>1495</a>        <span class="kw">let </span>later = t0 + Duration::from_secs(<span class="number">11</span>);
+<a href=#1496 id=1496 data-nosnippet>1496</a>        fr.receipts_at(
+<a href=#1497 id=1497 data-nosnippet>1497</a>            session,
+<a href=#1498 id=1498 data-nosnippet>1498</a>            NEW_SESSION_SEQ_MAX,
+<a href=#1499 id=1499 data-nosnippet>1499</a>            NEW_SESSION_SEQ_MAX,
+<a href=#1500 id=1500 data-nosnippet>1500</a>            <span class="kw-2">&amp;</span>[],
+<a href=#1501 id=1501 data-nosnippet>1501</a>            t0 + Duration::from_secs(<span class="number">1</span>),
+<a href=#1502 id=1502 data-nosnippet>1502</a>        );
+<a href=#1503 id=1503 data-nosnippet>1503</a>        <span class="macro">assert_eq!</span>(
+<a href=#1504 id=1504 data-nosnippet>1504</a>            <span class="number">10</span>,
+<a href=#1505 id=1505 data-nosnippet>1505</a>            fr.state.lock().streams[<span class="kw-2">&amp;</span>session].last_seq,
+<a href=#1506 id=1506 data-nosnippet>1506</a>            <span class="string">"a young stream is not reset"
+<a href=#1507 id=1507 data-nosnippet>1507</a>        </span>);
+<a href=#1508 id=1508 data-nosnippet>1508</a>        fr.receipts_at(session, NEW_SESSION_SEQ_MAX, NEW_SESSION_SEQ_MAX, <span class="kw-2">&amp;</span>[], later);
+<a href=#1509 id=1509 data-nosnippet>1509</a>        <span class="macro">assert_eq!</span>(NEW_SESSION_SEQ_MAX, fr.state.lock().streams[<span class="kw-2">&amp;</span>session].last_seq);
+<a href=#1510 id=1510 data-nosnippet>1510</a>    }
+<a href=#1511 id=1511 data-nosnippet>1511</a>
+<a href=#1512 id=1512 data-nosnippet>1512</a>    <span class="doccomment">/// 150 s without traffic: the stream continues, so the evidence of the first packets after it is usable at
+<a href=#1513 id=1513 data-nosnippet>1513</a>    /// once, which is faster than a run that has just started.
+<a href=#1514 id=1514 data-nosnippet>1514</a>    </span><span class="attr">#[test]
+<a href=#1515 id=1515 data-nosnippet>1515</a>    </span><span class="kw">fn </span>the_receipt_stream_should_survive_an_idle() {
+<a href=#1516 id=1516 data-nosnippet>1516</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1517 id=1517 data-nosnippet>1517</a>        <span class="kw">let </span>route = rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]);
+<a href=#1518 id=1518 data-nosnippet>1518</a>        <span class="kw">let </span>healthy = |<span class="kw">_</span>: <span class="kw-2">&amp;</span>[Key]| FAST;
+<a href=#1519 id=1519 data-nosnippet>1519</a>        <span class="kw">let </span>dead = |path: <span class="kw-2">&amp;</span>[Key]| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST };
+<a href=#1520 id=1520 data-nosnippet>1520</a>
+<a href=#1521 id=1521 data-nosnippet>1521</a>        <span class="kw">let </span><span class="kw-2">mut </span>fresh = Sim::new();
+<a href=#1522 id=1522 data-nosnippet>1522</a>        fresh.run(<span class="number">0</span>, <span class="number">3_000</span>, <span class="kw-2">&amp;</span>route, dead, lose_nothing);
+<a href=#1523 id=1523 data-nosnippet>1523</a>
+<a href=#1524 id=1524 data-nosnippet>1524</a>        <span class="kw">let </span><span class="kw-2">mut </span>idle = Sim::new();
+<a href=#1525 id=1525 data-nosnippet>1525</a>        idle.run(<span class="number">0</span>, <span class="number">1_000</span>, <span class="kw-2">&amp;</span>route, healthy, lose_nothing);
+<a href=#1526 id=1526 data-nosnippet>1526</a>        <span class="comment">// Off the receipts' 250 ms grid, so that the first receipt after the idle comes 150 ms in
+<a href=#1527 id=1527 data-nosnippet>1527</a>        </span><span class="kw">let </span>start = <span class="number">150_100</span>;
+<a href=#1528 id=1528 data-nosnippet>1528</a>        idle.fr.refresh_at(idle.at(start));
+<a href=#1529 id=1529 data-nosnippet>1529</a>        idle.verdict_ms = <span class="prelude-val">None</span>;
+<a href=#1530 id=1530 data-nosnippet>1530</a>        idle.run(start, start + <span class="number">3_000</span>, <span class="kw-2">&amp;</span>route, dead, lose_nothing);
+<a href=#1531 id=1531 data-nosnippet>1531</a>
+<a href=#1532 id=1532 data-nosnippet>1532</a>        <span class="kw">let </span>(fresh, idle_verdict) = (fresh.verdict_ms, idle.verdict_ms.map(|ms| ms - start));
+<a href=#1533 id=1533 data-nosnippet>1533</a>        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="number">1_500</span>), fresh);
+<a href=#1534 id=1534 data-nosnippet>1534</a>        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="number">1_150</span>), idle_verdict, <span class="string">"no floor from the idle"</span>);
+<a href=#1535 id=1535 data-nosnippet>1535</a>        <span class="macro">assert_eq!</span>(idle.at(<span class="number">250</span>), idle.fr.state.lock().streams[<span class="kw-2">&amp;</span>idle.pseudonym].floor);
+<a href=#1536 id=1536 data-nosnippet>1536</a>    }
+<a href=#1537 id=1537 data-nosnippet>1537</a>
+<a href=#1538 id=1538 data-nosnippet>1538</a>    <span class="attr">#[test]
+<a href=#1539 id=1539 data-nosnippet>1539</a>    </span><span class="kw">fn </span>a_stream_should_be_gone_after_its_ttl() {
+<a href=#1540 id=1540 data-nosnippet>1540</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1541 id=1541 data-nosnippet>1541</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1542 id=1542 data-nosnippet>1542</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1543 id=1543 data-nosnippet>1543</a>        fr.receipts_at(session, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], t0);
+<a href=#1544 id=1544 data-nosnippet>1544</a>        fr.refresh_at(t0 + STREAM_TTL);
+<a href=#1545 id=1545 data-nosnippet>1545</a>        <span class="macro">assert!</span>(fr.state.lock().streams.contains_key(<span class="kw-2">&amp;</span>session));
+<a href=#1546 id=1546 data-nosnippet>1546</a>        fr.refresh_at(t0 + STREAM_TTL + Duration::from_secs(<span class="number">1</span>));
+<a href=#1547 id=1547 data-nosnippet>1547</a>        <span class="macro">assert!</span>(!fr.state.lock().streams.contains_key(<span class="kw-2">&amp;</span>session));
+<a href=#1548 id=1548 data-nosnippet>1548</a>    }
+<a href=#1549 id=1549 data-nosnippet>1549</a>
+<a href=#1550 id=1550 data-nosnippet>1550</a>    <span class="attr">#[test]
+<a href=#1551 id=1551 data-nosnippet>1551</a>    </span><span class="kw">fn </span>a_duplicate_receipt_should_change_nothing() {
+<a href=#1552 id=1552 data-nosnippet>1552</a>        <span class="kw">let </span>[x, exit] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#1553 id=1553 data-nosnippet>1553</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1554 id=1554 data-nosnippet>1554</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1555 id=1555 data-nosnippet>1555</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1556 id=1556 data-nosnippet>1556</a>        <span class="kw">let </span>at = |ms| t0 + Duration::from_millis(ms);
+<a href=#1557 id=1557 data-nosnippet>1557</a>        fr.record_at(session, <span class="number">7</span>, <span class="kw-2">&amp;</span>[x, exit], at(<span class="number">0</span>));
+<a href=#1558 id=1558 data-nosnippet>1558</a>        fr.receipts_at(session, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[<span class="number">7</span>], at(<span class="number">100</span>));
+<a href=#1559 id=1559 data-nosnippet>1559</a>        fr.receipts_at(session, <span class="number">2</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">200</span>));
+<a href=#1560 id=1560 data-nosnippet>1560</a>        <span class="kw">let </span>snapshot = |fr: <span class="kw-2">&amp;</span>ForwardReceipts| {
+<a href=#1561 id=1561 data-nosnippet>1561</a>            <span class="kw">let </span>state = fr.state.lock();
+<a href=#1562 id=1562 data-nosnippet>1562</a>            <span class="kw">let </span>stream = <span class="kw-2">&amp;</span>state.streams[<span class="kw-2">&amp;</span>session];
+<a href=#1563 id=1563 data-nosnippet>1563</a>            (
+<a href=#1564 id=1564 data-nosnippet>1564</a>                stream.last_seq,
+<a href=#1565 id=1565 data-nosnippet>1565</a>                stream.floor,
+<a href=#1566 id=1566 data-nosnippet>1566</a>                stream.watermark,
+<a href=#1567 id=1567 data-nosnippet>1567</a>                stream.missing.len(),
+<a href=#1568 id=1568 data-nosnippet>1568</a>                state.count,
+<a href=#1569 id=1569 data-nosnippet>1569</a>            )
+<a href=#1570 id=1570 data-nosnippet>1570</a>        };
+<a href=#1571 id=1571 data-nosnippet>1571</a>        <span class="kw">let </span>before = snapshot(<span class="kw-2">&amp;</span>fr);
+<a href=#1572 id=1572 data-nosnippet>1572</a>        fr.receipts_at(session, <span class="number">2</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[<span class="number">7</span>], at(<span class="number">210</span>));
+<a href=#1573 id=1573 data-nosnippet>1573</a>        <span class="macro">assert_eq!</span>(before, snapshot(<span class="kw-2">&amp;</span>fr));
+<a href=#1574 id=1574 data-nosnippet>1574</a>    }
+<a href=#1575 id=1575 data-nosnippet>1575</a>
+<a href=#1576 id=1576 data-nosnippet>1576</a>    <span class="doccomment">/// A copy of receipt 1 (sent twice in a burst window) that arrives after higher seqs is no reused pseudonym.
+<a href=#1577 id=1577 data-nosnippet>1577</a>    </span><span class="attr">#[test]
+<a href=#1578 id=1578 data-nosnippet>1578</a>    </span><span class="kw">fn </span>a_late_copy_of_the_first_receipt_should_not_reset_the_stream() {
+<a href=#1579 id=1579 data-nosnippet>1579</a>        <span class="kw">let </span>[x, exit] = [(); <span class="number">2</span>].map(|<span class="kw">_</span>| key());
+<a href=#1580 id=1580 data-nosnippet>1580</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1581 id=1581 data-nosnippet>1581</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1582 id=1582 data-nosnippet>1582</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1583 id=1583 data-nosnippet>1583</a>        <span class="kw">let </span>at = |ms| t0 + Duration::from_millis(ms);
+<a href=#1584 id=1584 data-nosnippet>1584</a>        fr.record_at(session, <span class="number">7</span>, <span class="kw-2">&amp;</span>[x, exit], at(<span class="number">0</span>));
+<a href=#1585 id=1585 data-nosnippet>1585</a>        fr.receipts_at(session, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[<span class="number">7</span>], at(<span class="number">100</span>));
+<a href=#1586 id=1586 data-nosnippet>1586</a>        fr.receipts_at(session, <span class="number">2</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">200</span>));
+<a href=#1587 id=1587 data-nosnippet>1587</a>        fr.receipts_at(session, <span class="number">3</span>, <span class="number">2</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">300</span>));
+<a href=#1588 id=1588 data-nosnippet>1588</a>        fr.receipts_at(session, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">3_000</span>));
+<a href=#1589 id=1589 data-nosnippet>1589</a>        <span class="kw">let </span>state = fr.state.lock();
+<a href=#1590 id=1590 data-nosnippet>1590</a>        <span class="kw">let </span>stream = <span class="kw-2">&amp;</span>state.streams[<span class="kw-2">&amp;</span>session];
+<a href=#1591 id=1591 data-nosnippet>1591</a>        <span class="macro">assert_eq!</span>(
+<a href=#1592 id=1592 data-nosnippet>1592</a>            (<span class="number">3</span>, at(<span class="number">100</span>), <span class="prelude-val">Some</span>(at(<span class="number">0</span>))),
+<a href=#1593 id=1593 data-nosnippet>1593</a>            (stream.last_seq, stream.floor, stream.watermark)
+<a href=#1594 id=1594 data-nosnippet>1594</a>        );
+<a href=#1595 id=1595 data-nosnippet>1595</a>    }
+<a href=#1596 id=1596 data-nosnippet>1596</a>
+<a href=#1597 id=1597 data-nosnippet>1597</a>    <span class="doccomment">/// A copy of a receipt must not let the confirmation mature ahead of the next real receipt, which may answer
+<a href=#1598 id=1598 data-nosnippet>1598</a>    /// the suspect.
+<a href=#1599 id=1599 data-nosnippet>1599</a>    </span><span class="attr">#[test]
+<a href=#1600 id=1600 data-nosnippet>1600</a>    </span><span class="kw">fn </span>a_duplicate_receipt_should_not_run_the_judgement() {
+<a href=#1601 id=1601 data-nosnippet>1601</a>        <span class="kw">let </span>[a, b, exit] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1602 id=1602 data-nosnippet>1602</a>        <span class="kw">let </span>fr = ForwardReceipts::default();
+<a href=#1603 id=1603 data-nosnippet>1603</a>        <span class="kw">let </span>session = HoprPseudonym::random();
+<a href=#1604 id=1604 data-nosnippet>1604</a>        <span class="kw">let </span>t0 = Instant::now();
+<a href=#1605 id=1605 data-nosnippet>1605</a>        <span class="kw">let </span>at = |ms| t0 + Duration::from_millis(ms);
+<a href=#1606 id=1606 data-nosnippet>1606</a>        fr.receipts_at(session, <span class="number">1</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span>[], at(<span class="number">0</span>));
+<a href=#1607 id=1607 data-nosnippet>1607</a>        <span class="kw">for </span>tag <span class="kw">in </span><span class="number">1</span>..=<span class="number">3 </span>{
+<a href=#1608 id=1608 data-nosnippet>1608</a>            fr.record_at(session, tag, <span class="kw-2">&amp;</span>[a, exit], at(<span class="number">10</span>));
+<a href=#1609 id=1609 data-nosnippet>1609</a>        }
+<a href=#1610 id=1610 data-nosnippet>1610</a>        <span class="kw">for </span>(tag, ms) <span class="kw">in </span>[(<span class="number">50</span>, <span class="number">700</span>), (<span class="number">51</span>, <span class="number">1_300</span>)] {
+<a href=#1611 id=1611 data-nosnippet>1611</a>            fr.record_at(session, tag, <span class="kw-2">&amp;</span>[b, exit], at(ms));
+<a href=#1612 id=1612 data-nosnippet>1612</a>        }
+<a href=#1613 id=1613 data-nosnippet>1613</a>        <span class="comment">// A suspect from 1210 ms: three overdue packets through it, none delivered
+<a href=#1614 id=1614 data-nosnippet>1614</a>        </span>fr.receipts_at(session, <span class="number">2</span>, <span class="number">2</span>, <span class="kw-2">&amp;</span>[<span class="number">50</span>], at(<span class="number">1_210</span>));
+<a href=#1615 id=1615 data-nosnippet>1615</a>        <span class="comment">// The copy at 1750 ms would mature the 500 ms confirmation, but tells nothing new
+<a href=#1616 id=1616 data-nosnippet>1616</a>        </span>fr.receipts_at(session, <span class="number">2</span>, <span class="number">2</span>, <span class="kw-2">&amp;</span>[<span class="number">50</span>], at(<span class="number">1_750</span>));
+<a href=#1617 id=1617 data-nosnippet>1617</a>        <span class="macro">assert!</span>(fr.excluded_relayers(<span class="kw-2">&amp;</span>exit).is_empty(), <span class="string">"not judged by a copy"</span>);
+<a href=#1618 id=1618 data-nosnippet>1618</a>        <span class="comment">// The next real receipt answers the suspect
+<a href=#1619 id=1619 data-nosnippet>1619</a>        </span>fr.record_at(session, <span class="number">60</span>, <span class="kw-2">&amp;</span>[a, exit], at(<span class="number">1_500</span>));
+<a href=#1620 id=1620 data-nosnippet>1620</a>        fr.receipts_at(session, <span class="number">3</span>, <span class="number">3</span>, <span class="kw-2">&amp;</span>[<span class="number">60</span>, <span class="number">51</span>], at(<span class="number">1_800</span>));
+<a href=#1621 id=1621 data-nosnippet>1621</a>        <span class="macro">assert!</span>(fr.excluded_relayers(<span class="kw-2">&amp;</span>exit).is_empty());
+<a href=#1622 id=1622 data-nosnippet>1622</a>    }
+<a href=#1623 id=1623 data-nosnippet>1623</a>
+<a href=#1624 id=1624 data-nosnippet>1624</a>    <span class="attr">#[test]
+<a href=#1625 id=1625 data-nosnippet>1625</a>    </span><span class="kw">fn </span>the_judged_pairs_should_be_the_verdicts_per_exit() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#1626 id=1626 data-nosnippet>1626</a>        <span class="kw">let </span>[a, b, c] = [(); <span class="number">3</span>].map(|<span class="kw">_</span>| key());
+<a href=#1627 id=1627 data-nosnippet>1627</a>        <span class="kw">let </span><span class="kw-2">mut </span>sim = Sim::new();
+<a href=#1628 id=1628 data-nosnippet>1628</a>        <span class="macro">assert!</span>(sim.fr.judged_pairs().is_empty());
+<a href=#1629 id=1629 data-nosnippet>1629</a>        sim.run(
+<a href=#1630 id=1630 data-nosnippet>1630</a>            <span class="number">0</span>,
+<a href=#1631 id=1631 data-nosnippet>1631</a>            <span class="number">2_000</span>,
+<a href=#1632 id=1632 data-nosnippet>1632</a>            rotate(<span class="macro">vec!</span>[<span class="macro">vec!</span>[a], <span class="macro">vec!</span>[b], <span class="macro">vec!</span>[c]]),
+<a href=#1633 id=1633 data-nosnippet>1633</a>            |path| <span class="kw">if </span>path.contains(<span class="kw-2">&amp;</span>a) { <span class="prelude-val">None </span>} <span class="kw">else </span>{ FAST },
+<a href=#1634 id=1634 data-nosnippet>1634</a>            lose_nothing,
+<a href=#1635 id=1635 data-nosnippet>1635</a>        );
+<a href=#1636 id=1636 data-nosnippet>1636</a>        <span class="macro">assert_eq!</span>(std::collections::HashSet::from([(sim.exit, a)]), sim.fr.judged_pairs());
+<a href=#1637 id=1637 data-nosnippet>1637</a>        <span class="prelude-val">Ok</span>(())
+<a href=#1638 id=1638 data-nosnippet>1638</a>    }
+<a href=#1639 id=1639 data-nosnippet>1639</a>
+<a href=#1640 id=1640 data-nosnippet>1640</a>    <span class="doccomment">/// The return side keeps its own, longer confirmation.
+<a href=#1641 id=1641 data-nosnippet>1641</a>    </span><span class="attr">#[test]
+<a href=#1642 id=1642 data-nosnippet>1642</a>    </span><span class="kw">fn </span>the_return_side_confirmation_should_stay_900_ms() {
+<a href=#1643 id=1643 data-nosnippet>1643</a>        <span class="macro">assert_eq!</span>(
+<a href=#1644 id=1644 data-nosnippet>1644</a>            Duration::from_millis(<span class="number">900</span>),
+<a href=#1645 id=1645 data-nosnippet>1645</a>            <span class="kw">super</span>::<span class="kw">super</span>::surb_telemetry::VERDICT_CONFIRMATION
+<a href=#1646 id=1646 data-nosnippet>1646</a>        );
+<a href=#1647 id=1647 data-nosnippet>1647</a>        <span class="macro">assert!</span>(FORWARD_CONFIRMATION &lt; <span class="kw">super</span>::<span class="kw">super</span>::surb_telemetry::VERDICT_CONFIRMATION);
+<a href=#1648 id=1648 data-nosnippet>1648</a>    }
+<a href=#1649 id=1649 data-nosnippet>1649</a>}
+</code></pre></div></section></main></body></html>

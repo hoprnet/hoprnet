@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_PENDING_PONGS","PONG_SEND_TIMEOUT"],"enum":["ProbeDispatch"],"fn":["pong_pending_limit_drop_count","pong_timeout_drop_count"],"static":["PONG_PENDING_LIMIT_DROPS","PONG_TIMEOUT_DROPS"],"struct":["Probe","ProbeClassifierState"],"type":["CacheNeighborKey","CacheNeighborValue"]};
