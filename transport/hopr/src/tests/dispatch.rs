@@ -103,10 +103,21 @@ async fn dispatch_preserves_context_and_continues_after_drops_and_errors() -> an
         assert_eq!(delivered.len(), 1);
         assert_eq!(delivered[0].data, payload);
         futures::pin_mut!(out_rx);
-        let reply = tokio::time::timeout(Duration::from_secs(2), out_rx.next())
-            .await
-            .context("probe reply timed out")?
-            .context("probe must produce a pong")?;
+        // The pong is sent asynchronously, so other egress items may come first.
+        let reply = tokio::time::timeout(Duration::from_secs(2), async {
+            while let Some(item) = out_rx.next().await {
+                if matches!(
+                    Message::try_from(item.value.1.data.clone()),
+                    Ok(Message::Probe(NeighborProbe::Pong(_)))
+                ) {
+                    return Some(item);
+                }
+            }
+            None
+        })
+        .await
+        .context("probe reply timed out")?
+        .context("probe must produce a pong")?;
         let reply_context = reply.span().id();
         assert_eq!(reply.value.0, DestinationRouting::Return(id.into()));
         assert_eq!(
@@ -193,6 +204,41 @@ async fn dispatch_keeps_serving_probes_after_the_application_receiver_closes() -
         Message::try_from(replies[0].value.1.data.clone())?,
         Message::Probe(NeighborProbe::Pong(_))
     ));
+    Ok(())
+}
+
+/// A ping must not hold up the packets behind it while the egress lane is full (#8772).
+#[tokio::test]
+#[serial_test::serial(routing_logs)]
+async fn dispatch_does_not_wait_for_a_pong_while_the_egress_lane_is_full() -> anyhow::Result<()> {
+    let id = HoprPseudonym::random();
+    // One slot that nobody drains: one pong fills it, and the next one cannot be placed.
+    let (out_tx, _out_rx) = bounded_sink_channel(1);
+    let (app_tx, app_rx) = bounded_sink_channel(1);
+    let payload = ApplicationData::new(1234u64, b"behind the pings")?;
+    let input = [
+        Message::Probe(NeighborProbe::random_nonce()).try_into()?,
+        Message::Probe(NeighborProbe::random_nonce()).try_into()?,
+        payload.clone(),
+    ]
+    .into_iter()
+    .map(|data| WithContext::new((id, incoming(data)), tracing::Span::none()));
+    let classifier = classifier().await?;
+    tokio::time::timeout(
+        Duration::from_secs(1),
+        dispatch_incoming_messages(
+            futures::stream::iter(input),
+            classifier,
+            HoprMessageSender::new(out_tx),
+            Arc::new(HoprSessionManager::new(Default::default())),
+            app_tx,
+        ),
+    )
+    .await
+    .context("the dispatch waited for a pong that could not be placed")?;
+    let delivered = app_rx.collect::<Vec<_>>().await;
+    assert_eq!(delivered.len(), 1);
+    assert_eq!(delivered[0].data, payload);
     Ok(())
 }
 
