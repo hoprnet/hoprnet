@@ -139,6 +139,13 @@ flagset::flags! {
 /// Set of Session [capabilities](Capability).
 pub type Capabilities = flagset::FlagSet<Capability>;
 
+/// Default maximum number of SURBs piggybacked on outgoing Session data packets.
+///
+/// Matches [`hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET`]; every finite value
+/// (`< usize::MAX`) is bounded by the remaining payload space of the packet beside application
+/// data and (when SURB balancing is enabled) by the balancer's remaining SURB deficit.
+pub const DEFAULT_MAX_SURBS_PER_DATA_PACKET: usize = hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET;
+
 /// Configuration for the session.
 ///
 /// Relevant primarily for the client, since the server is only
@@ -177,22 +184,33 @@ pub struct SessionClientConfig {
     pub surb_management: Option<SurbBalancerConfig>,
     /// Sets the maximum number of SURBs sent with Session data packets (if they fit).
     ///
-    /// This does not affect `KeepAlive` messages used with SURB balancing, as they will always
-    /// carry the maximum number of SURBs possible. Setting this to a higher number will put additional CPU
-    /// pressure on the local node as it will generate the given number of SURBs for each data packet.
+    /// Balancer-driven `KeepAlive` messages share the same remaining SURB deficit with outgoing
+    /// data packets and are capped to a partial grant (or `0` refill SURBs when data packets have
+    /// already filled the effective target) while still forwarding control flags. Setting this to
+    /// a higher number will put additional CPU pressure on the local node as it will generate more
+    /// SURBs per data packet while below target.
     ///
-    /// Every finite value follows the balancer's target: data packets carry no SURBs while the
-    /// counterparty is estimated to have a full buffer, and this many while it is below its target.
-    /// A value greater than `1` therefore only saves the balancer work while the counterparty is
-    /// short; it cannot keep the counterparty more than one packet's SURBs above its target. Use it only if the
-    /// underlying traffic is highly asymmetric. Setting this to `0` leaves all SURB production to the SURB
-    /// balancer (if configured). `usize::MAX` is the one value that is not gated: every packet
-    /// carries as many SURBs as fit, whatever the balancer estimates.
+    /// When SURB balancing is enabled (`surb_management` is `Some` with a non-zero
+    /// `target_surb_buffer_size`), every finite value follows the balancer's target: data packets
+    /// carry no SURBs once the counterparty is estimated to have reached its effective target
+    /// (except a 1-SURB/packet floor while the counterparty signals distress or during silence
+    /// sustain), and up to `min(max_surbs_per_data_packet, remaining_deficit)` while it is below
+    /// target, counted down per packet within each balancer tick so bursts cannot overflow the
+    /// counterparty's store. When SURB balancing is disabled (`surb_management` is `None` or has
+    /// `target_surb_buffer_size == 0`), the explicit finite limit applies verbatim to each data
+    /// packet (bounded by remaining packet payload space); because [`SessionClientConfig::default`]
+    /// sets this field to `8`, callers disabling balancing via `..Default::default()` inherit up to
+    /// 8 SURBs per data packet with no balancer bound and should set `max_surbs_per_data_packet`
+    /// explicitly (for example, `1`) when a lower unbalanced cap is desired. Setting this to `0`
+    /// leaves all SURB production to the SURB balancer (if configured). `usize::MAX` bypasses both
+    /// the balancer gate and per-packet cap: every packet carries as many SURBs as fit, whatever
+    /// the balancer estimates.
     ///
-    /// The maximum number is naturally limited by the maximum payload size of a HOPR packet.
+    /// The maximum number is naturally limited by the remaining payload space of the HOPR packet
+    /// beside the packet's own application data.
     ///
-    /// Default is `1`.
-    #[default(1)]
+    /// Default is [`DEFAULT_MAX_SURBS_PER_DATA_PACKET`] (8).
+    #[default(DEFAULT_MAX_SURBS_PER_DATA_PACKET)]
     pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session.
     ///

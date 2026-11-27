@@ -162,15 +162,21 @@ pub struct HoprSessionClientConfig {
     /// Sets the maximum number of SURBs sent with session data packets.
     ///
     /// Higher values add CPU strain, but reduce the workload of the SURB balancer (if configured).
-    /// The value is bounded by the packet size and will saturate there.
-    /// Every finite value follows the balancer's target: packets carry this many SURBs while the
-    /// counterparty is below its target and none once it is at or above it, so a value greater than `1`
-    /// cannot keep the counterparty more than one packet's SURBs above its target. Only `usize::MAX` is
-    /// not gated.
-    /// Setting to 0 will leave all the work to SURB balancer. If in that case no SURB balancer is
-    /// configured, there will be no SURBs produced at all, making the traffic only possible in
-    /// one direction.
-    #[default(1)]
+    /// The value is bounded by the remaining payload space of the packet beside the application
+    /// data and will saturate there.
+    /// When SURB balancing is enabled (`surb_management` is `Some`), every finite value follows
+    /// the balancer's target: packets carry no SURBs once the counterparty is estimated to be at
+    /// or above its target (except a 1-SURB/packet floor during distress or silence sustain), and
+    /// up to `min(max_surbs_per_data_packet, remaining_deficit)` while below target, counted down
+    /// per packet within each balancer tick so bursts cannot overflow the counterparty's store.
+    /// When balancing is disabled (`surb_management` is `None` or has `target_surb_buffer_size == 0`),
+    /// the explicit limit applies verbatim (bounded by remaining packet payload space). Only
+    /// `usize::MAX` bypasses both the balancer gate and per-packet cap.
+    /// Setting to 0 leaves all SURB production to the SURB balancer. If in that case no SURB
+    /// balancer is configured, no SURBs are produced, making traffic possible only in one direction.
+    /// Default matches [`hopr_transport::DEFAULT_MAX_SURBS_PER_DATA_PACKET`] (up to packet SURB
+    /// capacity, clamped by the balancer's remaining SURB deficit).
+    #[default(hopr_transport::DEFAULT_MAX_SURBS_PER_DATA_PACKET)]
     pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
     /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
@@ -210,7 +216,13 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the session.
     pub surb_management: Option<SurbBalancerConfig>,
-    /// Sets the maximum number of possible SURBs which will always be sent with Session data packets (if they fit).
+    /// Sets the maximum number of SURBs sent with session data packets.
+    ///
+    /// Bounded by the remaining packet space beside the application data. When SURB balancing is
+    /// enabled, finite values follow the balancer's target (carrying no SURBs once the counterparty
+    /// is estimated to be at or above its target, except a 1-SURB/packet floor during distress or
+    /// silence sustain); when balancing is disabled, the explicit limit applies verbatim.
+    /// `usize::MAX` is never gated.
     pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
@@ -228,7 +240,7 @@ impl Default for HoprSessionClientExplicitPathConfig {
             capabilities: SessionCapability::Segmentation.into(),
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
-            max_surbs_per_data_packet: 1,
+            max_surbs_per_data_packet: hopr_transport::DEFAULT_MAX_SURBS_PER_DATA_PACKET,
             flow_control: None,
             max_frames_behind_gap: None,
         }

@@ -5082,50 +5082,140 @@ fn initialize_session_telemetry(
     }
 }
 
-/// Caps how many SURBs an outgoing Session data packet may carry, per the SURB balancer.
+/// Records produced SURBs into the session's monotonic estimator and telemetry.
+fn record_surb_produced(estimator: &AtomicSurbFlowEstimator, _session_id: &SessionId, produced: u64) {
+    if produced > 0 {
+        estimator
+            .produced
+            .fetch_add(produced, std::sync::atomic::Ordering::Release);
+    }
+    #[cfg(feature = "telemetry")]
+    telemetry::record_session_surb_produced(_session_id, produced);
+}
+
+/// Applies the explicit per-packet SURB limit for a Session without SURB balancing
+/// (`surb_management = None`).
 ///
-/// Every finite `max_surbs` is gated by the balancer's target: the packet carries the client's number
-/// of SURBs while the counterparty is estimated to be below its target, and none once it is at or above
-/// it. The default of `1` is the plain case. A larger client value, which exists to save the balancer
-/// work on highly asymmetric traffic, is gated the same way, so no setting but `usize::MAX` can hold
-/// the counterparty more than one packet's SURBs above the target. An explicit `0` always wins, whatever
-/// the estimate. `usize::MAX` leaves the packet's existing limit untouched and is the one way to opt out
-/// of the gate.
-///
-/// The gate is [`BalancerStateValues::organic_surbs_per_packet`], which yields `0` once the
-/// counterparty is estimated to be at its target. That zero is the whole point of the function:
-/// without it, the balancer can silence its keep-alives and still have organic SURBs pouring into a
-/// full buffer, where each one evicts an older SURB and destroys the PIX share it carried. It also
-/// bounds the stock the counterparty holds, which is what lets a SURB generation change wipe it at a
-/// cost the PIX surplus can absorb.
-///
-/// One exception: while data goes out into a silence (see [`BalancerStateValues::silence_sustain`]),
-/// a closed gate gives exactly one SURB per packet, whatever the client asked for. The estimate that
-/// closed it is fed by the counterparty, and the counterparty has not been heard from for a while, so
-/// the estimate cannot see the stock draining and would hold the gate shut until it is empty. One SURB
-/// per data packet is about what the counterparty spends answering it: no burst, bounded by the data
-/// rate, and it ends with the first report or reply.
-///
-/// Nothing else has to change to keep the SURB accounting straight. This runs in front of the
-/// counting sink, so `estimate_surbs_with_msg` reports the capped figure; and the PIX share for a
-/// SURB is drawn per SURB while it is built, so a cap of `0` draws no share at all and leaves it
-/// queued for a packet that can actually deliver it.
-fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt: &BalancerStateValues) {
+/// Unlike balanced sessions, there is no balancer keeping the counterparty topped up, so an
+/// explicit finite limit (such as `max_surbs_per_data_packet = 4`) is preserved verbatim; only
+/// `usize::MAX` leaves `packet_info` untouched.
+fn cap_unbalanced_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize) {
     if max_surbs == usize::MAX {
         return;
     }
-    // This packet is going out, which is what a silence is measured against.
-    surb_mgmt.note_sent();
-    let cap = if max_surbs == 0 {
-        0
-    } else if surb_mgmt.organic_surbs_per_packet() > 0 {
-        max_surbs
-    } else if surb_mgmt.silence_sustain() {
-        1
-    } else {
-        0
-    };
-    data.packet_info.get_or_insert_default().max_surbs_in_packet = cap;
+    data.packet_info.get_or_insert_default().max_surbs_in_packet = max_surbs;
+}
+
+/// Outcome of applying the balanced organic SURB capping policy to one outgoing Session data
+/// packet.
+enum OrganicCapOutcome {
+    /// `max_surbs == usize::MAX` bypassed the gate; caller must record `produced` SURBs.
+    Bypassed(usize),
+    /// Gate chose `cap` SURBs and `claim_organic_surbs` already incremented the shared `produced`
+    /// counter atomically under the checkpoint lock.
+    Claimed(usize),
+    /// Gate was closed, but `silence_sustain()` granted 1 SURB (not yet added to `produced`).
+    SilenceSustain,
+    /// Zero SURBs attached (`max_surbs == 0`, no payload room, or target reached).
+    Zero,
+}
+
+/// Applies the organic SURB capping policy to `data` and returns how many SURBs were assigned and
+/// whether the shared `produced` counter was already incremented inside `claim_organic_surbs`.
+fn apply_organic_surb_cap(
+    data: &mut ApplicationDataOut,
+    max_surbs: usize,
+    surb_mgmt: &BalancerStateValues,
+) -> OrganicCapOutcome {
+    match max_surbs {
+        usize::MAX => OrganicCapOutcome::Bypassed(data.estimate_surbs_with_msg()),
+        0 => {
+            surb_mgmt.note_sent();
+            data.packet_info.get_or_insert_default().max_surbs_in_packet = 0;
+            OrganicCapOutcome::Zero
+        }
+        _ => {
+            // This packet is going out, which is what a silence is measured against.
+            surb_mgmt.note_sent();
+            let fittable = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(data.data.total_len());
+            let limit = max_surbs.min(fittable);
+            let (cap, outcome) = if limit == 0 {
+                (0, OrganicCapOutcome::Zero)
+            } else {
+                let claimed = surb_mgmt.claim_organic_surbs(limit);
+                if claimed > 0 {
+                    (claimed, OrganicCapOutcome::Claimed(claimed))
+                } else if surb_mgmt.silence_sustain() {
+                    (1, OrganicCapOutcome::SilenceSustain)
+                } else {
+                    (0, OrganicCapOutcome::Zero)
+                }
+            };
+            data.packet_info.get_or_insert_default().max_surbs_in_packet = cap;
+            outcome
+        }
+    }
+}
+
+#[cfg(test)]
+fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt: &BalancerStateValues) -> usize {
+    match apply_organic_surb_cap(data, max_surbs, surb_mgmt) {
+        OrganicCapOutcome::Bypassed(n) | OrganicCapOutcome::Claimed(n) => n,
+        OrganicCapOutcome::SilenceSustain => 1,
+        OrganicCapOutcome::Zero => 0,
+    }
+}
+
+/// Caps SURBs on a balancer-driven KeepAlive packet against the shared remaining SURB deficit and
+/// records the granted count into the session's monotonic estimator and telemetry.
+///
+/// Shares the same `organic_budget` lock and monotonic `produced` counter as outgoing Session data
+/// packets so a KeepAlive firing right after data packets filled the target cannot push the
+/// counterparty above its target buffer size. The KeepAlive control packet still sends (carrying
+/// `0` refill SURBs when the deficit is already exhausted) so target notifications continue to
+/// reach the counterparty.
+fn cap_and_record_keep_alive_surbs(
+    data: &mut ApplicationDataOut,
+    surb_mgmt: &BalancerStateValues,
+    _session_id: &SessionId,
+) -> usize {
+    let fittable = data.estimate_surbs_with_msg();
+    let claimed = surb_mgmt.claim_organic_surbs(fittable);
+    if claimed < fittable {
+        data.packet_info.get_or_insert_default().max_surbs_in_packet = claimed;
+    }
+    #[cfg(feature = "telemetry")]
+    telemetry::record_session_surb_produced(_session_id, claimed as u64);
+    claimed
+}
+
+/// Caps organic SURBs on a balanced outgoing Session data packet and records the resulting
+/// production into the shared estimator and telemetry.
+fn cap_and_record_organic_surbs(
+    data: &mut ApplicationDataOut,
+    max_surbs: usize,
+    surb_mgmt: &BalancerStateValues,
+    estimator: &AtomicSurbFlowEstimator,
+    session_id: &SessionId,
+) {
+    match apply_organic_surb_cap(data, max_surbs, surb_mgmt) {
+        OrganicCapOutcome::Bypassed(produced) => {
+            record_surb_produced(estimator, session_id, produced as u64);
+        }
+        OrganicCapOutcome::Claimed(_claimed) => {
+            // `claim_organic_surbs` already incremented the shared `estimator.produced`
+            // counter atomically under the checkpoint lock.
+            #[cfg(feature = "telemetry")]
+            telemetry::record_session_surb_produced(session_id, _claimed as u64);
+        }
+        OrganicCapOutcome::SilenceSustain => {
+            record_surb_produced(estimator, session_id, 1);
+        }
+        OrganicCapOutcome::Zero => {
+            #[cfg(feature = "telemetry")]
+            telemetry::record_session_surb_produced(session_id, 0);
+        }
+    }
 }
 
 /// Books what a Start-protocol packet did to an incoming Session's SURB store: the SURBs it carried and
@@ -7006,51 +7096,52 @@ where
                     let surb_estimator = AtomicSurbFlowEstimator::default();
                     let surbs_per_keep_alive = KeepAliveMessage::from(session_id).max_surbs()? as u32;
 
-                    // Sender responsible for keep-alive and Session data will be counting produced SURBs
-                    let surb_estimator_clone = surb_estimator.clone();
-                    let full_surb_scoring_sender =
-                        msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                            let produced = data.estimate_surbs_with_msg() as u64;
-                            // Count how many SURBs we sent with each packet
-                            surb_estimator_clone
-                                .produced
-                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            telemetry::record_session_surb_produced(&session_id, produced);
-                            futures::future::ok::<_, S::Error>((routing, data))
-                        });
-
                     let surb_mgmt = Arc::new(BalancerStateValues::from(balancer_config));
+                    surb_mgmt.attach_estimator(&surb_estimator);
                     // The counterparty's store is the same bounded ring buffer as ours, so its
                     // capacity bounds what our `produced - consumed` estimate can legitimately
                     // claim it is holding.
                     surb_mgmt.set_counterparty_buffer_capacity(self.cfg.maximum_surb_buffer_size as u64);
 
-                    // For standard Session data we first reduce the number of SURBs we want to produce,
-                    // unless requested to always max them out
+                    // Sender responsible for keep-alives claims SURBs from the same shared deficit
+                    // and monotonic `produced` counter as outgoing data packets, capping the packet
+                    // when data traffic has already filled the target while still forwarding the
+                    // keep-alive control message.
+                    let surb_mgmt_for_ka = surb_mgmt.clone();
+                    let full_surb_scoring_sender = msg_sender.clone().with(
+                        move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                            cap_and_record_keep_alive_surbs(&mut data, &surb_mgmt_for_ka, &session_id);
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        },
+                    );
+
+                    // For standard Session data, cap organic SURBs and record production atomically
+                    // against the shared estimator counter after verifying this instance still owns
+                    // egress.
                     let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
+                    let surb_estimator_for_tx = surb_estimator.clone();
                     let egress_instance = instance.clone();
                     let egress_sessions = self.sessions.clone();
                     let egress_touch_period = self.cfg.idle_timeout / 4;
-                    let reduced_surb_scoring_sender = full_surb_scoring_sender
-                        .clone()
-                        .sink_map_err(std::io::Error::other)
-                        .with(
-                            // NOTE: this is put in-front of the `full_surb_scoring_sender`,
-                            // so that its estimate of SURBs gets automatically updated based on
-                            // the `max_surbs_in_packets` set here.
-                            move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                                // Ahead of the count behind it: a Session whose slot is gone sends
-                                // nothing, and produces no SURBs the Exit would answer on.
-                                if egress_instance.is_superseded() {
-                                    return futures::future::err(superseded_write_error());
-                                }
-                                egress_instance.touch_slot_on_write(&egress_sessions, &session_id, egress_touch_period);
-                                cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
-                                futures::future::ok::<_, std::io::Error>((routing, data))
-                            },
-                        );
+                    let reduced_surb_scoring_sender = msg_sender.sink_map_err(std::io::Error::other).with(
+                        move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                            // Ahead of the count behind it: a Session whose slot is gone sends
+                            // nothing, and produces no SURBs the Exit would answer on.
+                            if egress_instance.is_superseded() {
+                                return futures::future::err(superseded_write_error());
+                            }
+                            egress_instance.touch_slot_on_write(&egress_sessions, &session_id, egress_touch_period);
+                            cap_and_record_organic_surbs(
+                                &mut data,
+                                max_surbs_in_packet,
+                                &surb_mgmt_for_tx,
+                                &surb_estimator_for_tx,
+                                &session_id,
+                            );
+                            futures::future::ok::<_, std::io::Error>((routing, data))
+                        },
+                    );
 
                     // Spawn the SURB-bearing keep alive stream towards the Exit. Suspended until the
                     // balancer below gives the controller a rate.
@@ -7332,10 +7423,9 @@ where
                     #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_NUM_INITIATED_SESSIONS.increment();
 
-                    // For standard Session data we first reduce the number of SURBs we want to produce,
-                    // unless requested to always max them out
+                    // For standard Session data without SURB balancing, preserve the client's
+                    // explicit per-packet SURB limit verbatim (leaving `usize::MAX` untouched).
                     let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
-                    let surb_mgmt_for_tx = surb_mgmt.clone();
                     let egress_instance = instance.clone();
                     let egress_sessions = self.sessions.clone();
                     let egress_touch_period = self.cfg.idle_timeout / 4;
@@ -7345,7 +7435,7 @@ where
                                 return futures::future::err(superseded_write_error());
                             }
                             egress_instance.touch_slot_on_write(&egress_sessions, &session_id, egress_touch_period);
-                            cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
+                            cap_unbalanced_organic_surbs(&mut data, max_surbs_in_packet);
                             futures::future::ok::<_, std::io::Error>((routing, data))
                         },
                     );
@@ -13303,12 +13393,176 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn cap_organic_surbs_clamps_to_exact_deficit_without_overshooting() -> anyhow::Result<()> {
+        assert_eq!(
+            hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET,
+            crate::SessionClientConfig::default().max_surbs_per_data_packet,
+            "default SessionClientConfig must piggyback up to packet SURB capacity when below target"
+        );
+
+        for (buffer_level, expected) in [(50, 8), (97, 3), (99, 1), (100, 0), (150, 0)] {
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 8, &gate_state(100, buffer_level));
+            assert_eq!(
+                Some(expected),
+                data.packet_info.map(|info| info.max_surbs_in_packet),
+                "level {buffer_level} against target 100"
+            );
+        }
+        Ok(())
+    }
+
+    fn full_mtu_outgoing_packet() -> anyhow::Result<ApplicationDataOut> {
+        Ok(ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+            SESSION_APPLICATION_TAG,
+            vec![0u8; crate::SESSION_MTU],
+        )?))
+    }
+
+    #[test]
+    fn cap_organic_surbs_counts_down_across_burst_within_one_tick() -> anyhow::Result<()> {
+        // Deficit is 15 within a single balancer tick (before `update()` refreshes `buffer_level`).
+        // Five consecutive small packets must grant 8 + 7 + 0 + 0 + 0 = 15 (never 5 × 8 = 40).
+        let state = gate_state(100, 85);
+        let mut grants = Vec::new();
+        for _ in 0..5 {
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 8, &state);
+            grants.push(data.packet_info.context("packet_info must be set")?.max_surbs_in_packet);
+        }
+        assert_eq!([8, 7, 0, 0, 0].as_slice(), grants.as_slice());
+        assert_eq!(Some(0), state.organic_surbs_deficit());
+
+        // Full-MTU datagrams only debit what physically fits beside their payload (4 SURBs beside
+        // `SESSION_MTU`), so 10 SURBs of deficit span 4 + 4 + 2 + 0 across four full-MTU packets.
+        let mtu_state = gate_state(100, 90);
+        let mtu_estimator = AtomicSurbFlowEstimator::default();
+        mtu_state.attach_estimator(&mtu_estimator);
+        let mut mtu_grants = Vec::new();
+        for _ in 0..4 {
+            let mut data = full_mtu_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 8, &mtu_state);
+            mtu_grants.push(data.packet_info.context("packet_info must be set")?.max_surbs_in_packet);
+        }
+        assert_eq!([4, 4, 2, 0].as_slice(), mtu_grants.as_slice());
+        assert_eq!(10, mtu_estimator.estimate_surbs_produced());
+
+        // Committing a partial pre-snapshot level preserves post-snapshot in-tick production.
+        mtu_state.commit_buffer_level(94, 4);
+        assert_eq!(Some(0), mtu_state.organic_surbs_deficit());
+        mtu_state.commit_buffer_level(100, 10);
+        assert_eq!(Some(0), mtu_state.organic_surbs_deficit());
+        Ok(())
+    }
+
+    #[test]
+    fn cap_organic_surbs_preserves_explicit_limit_when_disabled_and_uses_deficit_floor_in_distress()
+    -> anyhow::Result<()> {
+        let disabled = BalancerStateValues::default();
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 4, &disabled);
+        assert_eq!(Some(4), data.packet_info.map(|info| info.max_surbs_in_packet));
+
+        // Unbalanced path (`surb_management = None`) preserves explicit limits verbatim.
+        let mut unbalanced = small_outgoing_packet()?;
+        cap_unbalanced_organic_surbs(&mut unbalanced, 4);
+        assert_eq!(Some(4), unbalanced.packet_info.map(|info| info.max_surbs_in_packet));
+        let mut unbalanced_max = small_outgoing_packet()?;
+        cap_unbalanced_organic_surbs(&mut unbalanced_max, usize::MAX);
+        assert_eq!(None, unbalanced_max.packet_info);
+
+        // Distressed and below target: uses full packet capacity against the remaining deficit.
+        let distressed_below = gate_state(100, 90);
+        distressed_below.observe_counterparty_signals(PacketSignal::SurbDistress.into());
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 8, &distressed_below);
+        assert_eq!(Some(8), data.packet_info.map(|info| info.max_surbs_in_packet));
+
+        // Distressed while estimate is already at target: floors at 1 SURB/packet (no 8× flood).
+        let distressed_at_target = gate_state(100, 100);
+        distressed_at_target.observe_counterparty_signals(PacketSignal::SurbDistress.into());
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 8, &distressed_at_target);
+        assert_eq!(Some(1), data.packet_info.map(|info| info.max_surbs_in_packet));
+        Ok(())
+    }
+
+    #[test]
+    fn cap_and_record_organic_surbs_shares_budget_with_keep_alives() -> anyhow::Result<()> {
+        let estimator = AtomicSurbFlowEstimator::default();
+        let state = gate_state(100, 92);
+        state.attach_estimator(&estimator);
+        let session_id = SessionId::random();
+
+        // Keep-alive sends 8 SURBs within the same tick.
+        record_surb_produced(&estimator, &session_id, 8);
+        assert_eq!(8, estimator.estimate_surbs_produced());
+
+        // Next data packet sees the keep-alive's 8 SURBs and attaches 0 (never overshooting to 108).
+        let mut data = small_outgoing_packet()?;
+        cap_and_record_organic_surbs(&mut data, 8, &state, &estimator, &session_id);
+        assert_eq!(Some(0), data.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(8, estimator.estimate_surbs_produced());
+
+        // Reverse order: data packet fills 92 -> 100/100, then a scheduled keep-alive fires in the
+        // same tick -> keep-alive is capped to 0 refill SURBs instead of overshooting to 107.
+        let estimator2 = AtomicSurbFlowEstimator::default();
+        let state2 = gate_state(100, 92);
+        state2.attach_estimator(&estimator2);
+
+        let mut data2 = small_outgoing_packet()?;
+        cap_and_record_organic_surbs(&mut data2, 8, &state2, &estimator2, &session_id);
+        assert_eq!(Some(8), data2.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(8, estimator2.estimate_surbs_produced());
+
+        let (tag, plain_text) = HoprStartProtocol::KeepAlive(KeepAliveMessage::from(session_id)).encode()?;
+        let mut ka_full = ApplicationDataOut::with_no_packet_info(ApplicationData::new(tag, plain_text.as_ref())?);
+        let ka_claimed = cap_and_record_keep_alive_surbs(&mut ka_full, &state2, &session_id);
+        assert_eq!(0, ka_claimed);
+        assert_eq!(Some(0), ka_full.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(8, estimator2.estimate_surbs_produced());
+
+        // Partial deficit (96/100): keep-alive claims only the 4 remaining SURBs, not its full
+        // capacity.
+        let estimator3 = AtomicSurbFlowEstimator::default();
+        let state3 = gate_state(100, 96);
+        state3.attach_estimator(&estimator3);
+
+        let (tag, plain_text) = HoprStartProtocol::KeepAlive(KeepAliveMessage::from(session_id)).encode()?;
+        let mut ka_partial = ApplicationDataOut::with_no_packet_info(ApplicationData::new(tag, plain_text.as_ref())?);
+        let ka_partial_claimed = cap_and_record_keep_alive_surbs(&mut ka_partial, &state3, &session_id);
+        assert_eq!(4, ka_partial_claimed);
+        assert_eq!(Some(4), ka_partial.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(4, estimator3.estimate_surbs_produced());
+        Ok(())
+    }
+
+    #[test]
+    fn cap_and_record_organic_surbs_counts_production_when_balancer_disabled() -> anyhow::Result<()> {
+        let estimator = AtomicSurbFlowEstimator::default();
+        let state = gate_state(0, 0);
+        assert!(state.is_disabled());
+        state.attach_estimator(&estimator);
+        let session_id = SessionId::random();
+
+        let mut data = small_outgoing_packet()?;
+        cap_and_record_organic_surbs(&mut data, 4, &state, &estimator, &session_id);
+        assert_eq!(Some(4), data.packet_info.map(|info| info.max_surbs_in_packet));
+        assert_eq!(
+            4,
+            estimator.estimate_surbs_produced(),
+            "disabled balancer (`target == 0`) must still record organically produced SURBs"
+        );
+        Ok(())
+    }
+
     /// A client that asks for more than one SURB per packet gets them only while the counterparty is
     /// below its target; at or above it the packet carries none, like the default. Otherwise the
     /// counterparty's stock is unbounded by the target, and so is what a generation wipe costs.
     #[test]
     fn a_larger_explicit_limit_should_be_gated_like_the_default_one() -> anyhow::Result<()> {
-        for (buffer_level, expected) in [(10, 2), (99, 2), (100, 0), (200, 0)] {
+        for (buffer_level, expected) in [(10, 2), (98, 2), (99, 1), (100, 0), (200, 0)] {
             let mut data = small_outgoing_packet()?;
             cap_organic_surbs(&mut data, 2, &gate_state(100, buffer_level));
 
