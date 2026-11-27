@@ -853,13 +853,14 @@ const MAX_CONCURRENT_START_SESSIONS: usize = 256;
 /// transport stops waiting, not when `admit` returns, so the server needs its own bound.
 pub const START_SESSION_ADMISSION_CONCURRENCY: usize = 64;
 
-/// Capacity of the control Start protocol lane (every variant but `StartSession`).
+/// Capacity of the commitment Start protocol lane (`SsaCommit`) and of the control lane (every other variant but
+/// `StartSession`).
 ///
 /// Fed by [`SessionManager::dispatch_message`] with `try_send`, and an overflow **drops** the
 /// message. For most Start messages that is recoverable, but a dropped `SsaCommit` is not: there is
 /// no NACK or retransmission, so the coefficient cell stays empty forever, the commitment never
 /// completes, and the cycle dies on the supervisor's `max_deposit_wait` deadline. It therefore keeps
-/// the whole PIX commitment term.
+/// the whole PIX commitment term. The control lane kept this capacity when `SsaCommit` moved off it.
 ///
 /// PIX load is the *entire* commitment set of an SSA cycle, chunked into packet-sized messages.
 /// Batching multiplies it: an Exit may ask for up to
@@ -4841,8 +4842,10 @@ pub struct SessionManager<S> {
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
     /// `StartSession` only: the lane that may park on admission.
     start_session_tx: StartProtocolMsgSink,
-    /// Every other Start variant: the lane a session flood must never delay.
+    /// Every other Start variant except `SsaCommit`: the lane a session flood must never delay.
     start_control_tx: StartProtocolMsgSink,
+    /// `SsaCommit` only: ingest queues on the PIX pool, so it must not hold up the control lane.
+    start_commit_tx: StartProtocolMsgSink,
     /// Authoritative session count for admission control.
     /// Incremented atomically inside `allocate_session_slot` before the cache insertion,
     /// and decremented at every removal path (explicit close, eviction, guard rollback).
@@ -4951,6 +4954,7 @@ impl<S> Clone for SessionManager<S> {
             session_notifiers: self.session_notifiers.clone(),
             start_session_tx: self.start_session_tx.clone(),
             start_control_tx: self.start_control_tx.clone(),
+            start_commit_tx: self.start_commit_tx.clone(),
             active_sessions: self.active_sessions.clone(),
             live_cycle_bytes: self.live_cycle_bytes.clone(),
             sessions: self.sessions.clone(),
@@ -6008,6 +6012,7 @@ where
             session_notifiers: Arc::new(OnceLock::new()),
             start_session_tx: Arc::new(OnceLock::new()),
             start_control_tx: Arc::new(OnceLock::new()),
+            start_commit_tx: Arc::new(OnceLock::new()),
             active_sessions,
             live_cycle_bytes: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cfg,
@@ -6130,6 +6135,10 @@ where
         let (start_control_tx, start_control_rx) =
             crossfire::mpsc::bounded_blocking_async(start_control_channel_capacity(&self.cfg));
         let _ = self.start_control_tx.set(start_control_tx);
+
+        let (start_commit_tx, start_commit_rx) =
+            crossfire::mpsc::bounded_blocking_async(start_control_channel_capacity(&self.cfg));
+        let _ = self.start_commit_tx.set(start_commit_tx);
 
         let myself = self.clone();
         let closure_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
@@ -6337,9 +6346,6 @@ where
                                         HoprStartProtocol::KeepAlive(msg) => {
                                             myself.handle_keep_alive(pseudonym, msg).await
                                         }
-                                        HoprStartProtocol::SsaCommit(client_commit_msg) => {
-                                            myself.handle_ssa_commit(pseudonym, client_commit_msg).await
-                                        }
                                         HoprStartProtocol::SsaRequest(server_commit_msg) => {
                                             myself.handle_ssa_request(pseudonym, server_commit_msg).await
                                         }
@@ -6349,6 +6355,46 @@ where
                                         HoprStartProtocol::StartSession(_) => {
                                             unreachable!("StartSession is never routed to the control lane")
                                         }
+                                        // Routing puts `SsaCommit` on the commitment lane.
+                                        HoprStartProtocol::SsaCommit(_) => {
+                                            unreachable!("SsaCommit is never routed to the control lane")
+                                        }
+                                    };
+
+                                    report_start_result(result);
+                                }
+                            })
+                            .instrument(tracing::debug_span!(parent: &span, "session.start_protocol"))
+                    }
+                )
+                .with_current_subscriber()
+        );
+
+        let myself = self.clone();
+        let commit_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+            "session_start_commit_for_each_concurrent",
+            module_path!(),
+            file!(),
+            line!(),
+        );
+        let ah_start_commit = hopr_utils::spawn_as_abortable_named!(
+            "session_start_commit_processor",
+            start_commit_rx
+                .into_stream()
+                .for_each_concurrent(
+                    Some(self.cfg.maximum_sessions + 10),
+                    move |(pseudonym, protocol_msg, _packet_info, _stored, span)| {
+                        let myself = myself.clone();
+                        let commit_diag = commit_diag.clone();
+                        commit_diag
+                            .wrap(|| {
+                                let myself = myself.clone();
+                                async move {
+                                    let result = match protocol_msg {
+                                        HoprStartProtocol::SsaCommit(client_commit_msg) => {
+                                            myself.handle_ssa_commit(pseudonym, client_commit_msg).await
+                                        }
+                                        _ => unreachable!("only SsaCommit is routed to the commitment lane"),
                                     };
 
                                     report_start_result(result);
@@ -6365,6 +6411,7 @@ where
             ah_session_expiration,
             ah_start_session,
             ah_start_control,
+            ah_start_commit,
         ])
     }
 
@@ -9575,9 +9622,13 @@ where
             // and what the packet did to the SURB store. `StartSession` parks on admission, so it
             // gets its own lane; a flood of it must not delay a live Session's control traffic.
             trace!("dispatching Start protocol message");
+            // `SsaCommit` waits on the PIX pool, so it gets a lane too: it must not delay the others.
             let is_session_lane = matches!(msg, HoprStartProtocol::StartSession(_));
+            let is_commit_lane = matches!(msg, HoprStartProtocol::SsaCommit(_));
             let lane = if is_session_lane {
                 self.start_session_tx.get()
+            } else if is_commit_lane {
+                self.start_commit_tx.get()
             } else {
                 self.start_control_tx.get()
             };
@@ -9596,7 +9647,13 @@ where
                         };
                         let prev = counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         if is_full_queue_warn_due(prev) {
-                            let lane = if is_session_lane { "session" } else { "control" };
+                            let lane = if is_session_lane {
+                                "session"
+                            } else if is_commit_lane {
+                                "commit"
+                            } else {
+                                "control"
+                            };
                             warn!(
                                 %pseudonym,
                                 lane,
@@ -9724,11 +9781,15 @@ where
     pub fn benchmark_start_queue(&self, capacity: usize) -> errors::Result<impl FnMut() -> usize + use<S>> {
         let (session_tx, session_rx) = crossfire::mpsc::bounded_blocking_async(capacity);
         let (control_tx, control_rx) = crossfire::mpsc::bounded_blocking_async(capacity);
+        let (commit_tx, commit_rx) = crossfire::mpsc::bounded_blocking_async(capacity);
         self.start_session_tx
             .set(session_tx)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
         self.start_control_tx
             .set(control_tx)
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        self.start_commit_tx
+            .set(commit_tx)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
         Ok(move || {
             let mut drained = 0;
@@ -9736,6 +9797,9 @@ where
                 drained += 1;
             }
             while control_rx.try_recv().is_ok() {
+                drained += 1;
+            }
+            while commit_rx.try_recv().is_ok() {
                 drained += 1;
             }
             drained
@@ -30734,6 +30798,150 @@ mod tests {
             "a packet decode waited {worst:?} during a {burst_time:?} commitment burst (median {median:?}): the burst \
              held every shared pool thread"
         );
+
+        sender.close_channel();
+        sender_handle.await??;
+        Ok(())
+    }
+
+    /// Commitment ingest must not hold up the control messages of other Sessions (hoprnet#8773).
+    ///
+    /// `SsaCommit` waits on the PIX pool, so a burst of them used up the control lane's width, and a
+    /// `KeepAlive` of another Session queued behind it. The PIX pool is held busy here, which is what
+    /// a long burst does on a one-thread pool, and more `SsaCommit`s than the control lane is wide are
+    /// dispatched. The `KeepAlive` must be handled while every one of them is still waiting.
+    #[test_log::test(tokio::test)]
+    async fn a_keep_alive_is_not_held_up_by_commitment_ingest() -> anyhow::Result<()> {
+        use std::{
+            collections::HashMap,
+            sync::{
+                Arc,
+                atomic::{AtomicBool, Ordering},
+            },
+        };
+
+        use hopr_crypto_packet::prelude::HoprPixGroupElement;
+        use hopr_protocol_pix::{PixGroup, PolynomialIndex, SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        // The control lane is `maximum_sessions + 10` wide.
+        const MAXIMUM_SESSIONS: usize = 2;
+        const COMMITS: usize = 3 * (MAXIMUM_SESSIONS + 10);
+
+        let pix_toolbox = pix_toolbox_with_pool(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+        let mgr: TestManager = SessionManager::new(SessionManagerConfig {
+            maximum_sessions: MAXIMUM_SESSIONS,
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut transport = MockMsgSender::new();
+        transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let (sender, sender_handle) = mock_packet_planning(transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while new_session_rx.next().await.is_some() {}
+        });
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox.clone()), None)?;
+
+        let entry = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            entry,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: small_pix_additional_data(),
+            },
+        )
+        .await?;
+
+        // Another Session, whose keep-alive leaves a mark once it has been handled.
+        let other = HoprPseudonym::random();
+        let _other_rx = mgr.pre_populate_session_with_receiver(
+            other,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(other),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+
+        // Hold the PIX pool: the jobs queue ahead of every commitment ingest, in order.
+        let release = Arc::new(AtomicBool::new(false));
+        // The pool is process-wide: release the holders on every exit, so a failure here cannot
+        // hang the other tests that need it.
+        struct ReleaseOnExit(Arc<AtomicBool>);
+        impl Drop for ReleaseOnExit {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::Relaxed);
+            }
+        }
+        let _release_on_exit = ReleaseOnExit(release.clone());
+        let holders: Vec<_> = (0..256)
+            .map(|_| {
+                let release = release.clone();
+                tokio::spawn(crate::pix_pool::spawn_pix_blocking(
+                    crate::pix_pool::PixPoolOperation::CommitmentIngest,
+                    move || {
+                        while !release.load(Ordering::Relaxed) {
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                    },
+                ))
+            })
+            .collect();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let identity = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())?;
+        let coefficient_commitments: HashMap<PolynomialIndex, _> = (0..2).map(|poly| (poly, identity)).collect();
+        for _ in 0..COMMITS {
+            let dispatched = mgr.dispatch_message(
+                entry,
+                start_packet(HoprStartProtocol::SsaCommit(SsaClientCommitmentMessage {
+                    session_id: entry,
+                    ssa_index: SsaIndex::MIN,
+                    coefficient_index: 1,
+                    commitment_proof: None,
+                    coefficient_commitments: coefficient_commitments.clone(),
+                }))?,
+            )?;
+            assert!(matches!(dispatched, DispatchResult::Processed));
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        mgr.dispatch_message(other, keep_alive_packet_signalling(other, PacketSignals::default())?)?;
+        let handled = tokio::time::timeout(Duration::from_secs(2), async {
+            while mgr
+                .sessions
+                .get(&other)
+                .is_none_or(|slot| slot.surb_mgmt.keep_alives_consumed() == 0)
+            {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await;
+
+        release.store(true, Ordering::Relaxed);
+        for holder in holders {
+            holder.await??;
+        }
+        handled.context("the keep-alive of another Session waited behind commitment ingest")?;
 
         sender.close_channel();
         sender_handle.await??;

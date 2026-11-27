@@ -2685,6 +2685,47 @@ mod tests {
         Ok(())
     }
 
+    /// An occupied slot is classified by its wire representation, without decoding what is offered:
+    /// an identical re-delivery is skipped, and anything else (here: bytes that could not even be
+    /// decoded) is a duplicate, not a decode error. Decoding is what a re-delivery must not cost.
+    #[test]
+    fn a_redelivery_for_an_occupied_slot_is_classified_without_decoding() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+        reconstructor.new_exit_commitment(ssa_id, test_params(3, 2))?;
+
+        let held = PixGroup::<TestSpec>::generator().to_bytes();
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, None, [(0 as PolynomialIndex, held)].into_iter())?;
+
+        let mut undecodable = PixGroupRepr::<TestSpec>::default();
+        AsMut::<[u8]>::as_mut(&mut undecodable).fill(0xff);
+        assert!(
+            crate::SsaPartCommitment::<TestSpec>::decode_commitment(&undecodable).is_err(),
+            "the fixture must not decode"
+        );
+
+        let result = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            None,
+            [(0 as PolynomialIndex, undecodable)].into_iter(),
+        );
+        assert!(
+            matches!(result, Err(PixError::DuplicateCommitment)),
+            "an occupied slot must be refused as a duplicate before any decoding, got {result:?}"
+        );
+
+        // The identical repr is still skipped, alongside a vacant slot that is decoded and inserted.
+        reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            None,
+            [(0 as PolynomialIndex, held), (1 as PolynomialIndex, held)].into_iter(),
+        )?;
+
+        Ok(())
+    }
+
     /// The missing-commitment scope is what the Exit puts on the wire to repair a lost packet, so it
     /// has to name the gaps exactly, compactly, and within one message.
     #[test]

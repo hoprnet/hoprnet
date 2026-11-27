@@ -745,6 +745,9 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
     ///
     /// Drained when the part builders are handed out.
     committed_polynomials: std::collections::HashMap<PolynomialIndex, PixGroup<S>>,
+    /// The wire representation of each entry of `committed_polynomials`, so that a re-delivered
+    /// commitment is recognised without decoding it. Drained together with it.
+    committed_reprs: std::collections::HashMap<PolynomialIndex, PixGroupRepr<S>>,
     /// Commitments received so far, counted across polynomials that have since been handed out.
     /// Used for `is_empty`, which would otherwise report empty again after the drain.
     total_committed: usize,
@@ -782,6 +785,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             exit_commitment_secret,
             exit_commitment_public,
             committed_polynomials: std::collections::HashMap::new(),
+            committed_reprs: std::collections::HashMap::new(),
             total_committed: 0,
             complete: false,
             commitment_proof: None,
@@ -896,28 +900,19 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             self.commitment_proof = proof;
         }
 
-        // Collect and validate all items before mutating state (transactional).
+        // Classify every entry against the slots, and decode only those for vacant slots, all before
+        // any insertion (transactional).
         //
-        // Decoding here is the *only* decode of each commitment: the resulting group element is
-        // what gets stored, so building the part builders below never decompresses again.
+        // Decoding is the *only* decode of each commitment: the resulting group element is what gets
+        // stored, so building the part builders below never decompresses again. It is also the
+        // dominant cost, so an entry for an occupied slot is classified by its wire representation
+        // and never decoded: a re-delivered chunk costs a lookup, not a decompression.
         //
         // The check is `decode_commitment` — decodable *and* inside the prime-order subgroup. It
         // must not be weaker: a commitment that passes here occupies its slot permanently, because
         // re-insertion is rejected as a duplicate. A weaker check would let a
         // decodable-but-small-order point take a slot and then fail unconditionally at completion,
         // with no way to retransmit a correction.
-        let mut validated: Vec<(PolynomialIndex, PixGroup<S>)> = Vec::new();
-        for (polynomial_index, polynomial_coeff_commitment) in polynomial_coeff_commitments {
-            if polynomial_index >= self.num_polys as PolynomialIndex {
-                return Err(errors::PixError::InvalidInput);
-            }
-            validated.push((
-                polynomial_index,
-                SsaPartCommitment::<S>::decode_commitment(&polynomial_coeff_commitment)?,
-            ));
-        }
-
-        // Classify every entry against the slots before any insertion (transactional).
         //
         // A slot re-offered the commitment it already holds is *skipped*, not rejected. The peer
         // re-sends parts of the set on request (see `missing_runs`), and those travel the same mixed
@@ -928,33 +923,37 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         // decoded and accepted can never be rebound.
         //
         // A repeat *within* the batch is classified the same way, and against `seen` rather than only
-        // against `committed_polynomials`: two entries sharing an index would both see a vacant slot,
+        // against `committed_reprs`: two entries sharing an index would both see a vacant slot,
         // the second insert would silently rebind the first, and `total_committed` would count two
         // occupants of one slot — so a batch of `num_polys` entries containing a repeat could never
         // complete the set. The wire decoder rejects intra-message duplicates today, but this builder
         // is not meant to depend on that.
-        let mut seen: std::collections::HashMap<PolynomialIndex, PixGroup<S>> =
-            std::collections::HashMap::with_capacity(validated.len());
-        let mut fresh: Vec<(PolynomialIndex, PixGroup<S>)> = Vec::with_capacity(validated.len());
-        for (polynomial_index, commitment) in validated {
+        let mut seen: std::collections::HashMap<PolynomialIndex, PixGroupRepr<S>> = std::collections::HashMap::new();
+        let mut fresh: Vec<(PolynomialIndex, PixGroupRepr<S>, PixGroup<S>)> = Vec::new();
+        for (polynomial_index, repr) in polynomial_coeff_commitments {
+            if polynomial_index >= self.num_polys as PolynomialIndex {
+                return Err(errors::PixError::InvalidInput);
+            }
             let occupant = self
-                .committed_polynomials
+                .committed_reprs
                 .get(&polynomial_index)
                 .or_else(|| seen.get(&polynomial_index));
             match occupant {
-                Some(held) if *held == commitment => {
+                Some(held) if held.as_ref() == repr.as_ref() => {
                     tracing::trace!(id = %self.id, polynomial_index, "ignoring a re-delivered commitment");
                 }
                 Some(_) => return Err(errors::PixError::DuplicateCommitment),
                 None => {
-                    seen.insert(polynomial_index, commitment);
-                    fresh.push((polynomial_index, commitment));
+                    let commitment = SsaPartCommitment::<S>::decode_commitment(&repr)?;
+                    seen.insert(polynomial_index, repr);
+                    fresh.push((polynomial_index, repr, commitment));
                 }
             }
         }
 
         // Second phase: insert into confirmed-vacant slots, maintaining the progress counter.
-        for (polynomial_index, polynomial_coeff_commitment) in fresh {
+        for (polynomial_index, repr, polynomial_coeff_commitment) in fresh {
+            self.committed_reprs.insert(polynomial_index, repr);
             self.committed_polynomials
                 .insert(polynomial_index, polynomial_coeff_commitment);
             self.total_committed += 1;
@@ -1024,6 +1023,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             // before this point were deferred by the reconstructor and are redeemed by the caller
             // right after these are installed.
             progress.new_verifiers.reserve(self.committed_polynomials.len());
+            self.committed_reprs = std::collections::HashMap::new();
             for (poly_index, constant_term) in self.committed_polynomials.drain() {
                 progress.new_verifiers.push(SsaPartBuilder::new(
                     SsaPartCommitment::from_decoded_commitment(
