@@ -98,13 +98,16 @@ flagset::flags! {
         ///
         /// Implies [`Segmentation`].
         RetransmissionNack = 0b000_1010,
-        /// UDP-like behavior: disable packet buffering, and — on stateless (non-retransmitting)
+        /// UDP-like behavior: disable frame-stream buffering, and — on stateless (non-retransmitting)
         /// sessions — preserve datagram boundaries by emitting each write as exactly one frame
         /// (delivered to the peer as exactly one read), regardless of `frame_mtu`. Use this for
         /// datagram-oriented targets (e.g. UDP/WireGuard) that must not have datagrams split or
-        /// coalesced. On reliable (retransmitting) sessions only the buffering behavior applies;
-        /// boundary preservation is stateless-only (the NACK missing-segment bitmap cannot address
-        /// the segments of an oversized datagram frame).
+        /// coalesced. When whole-message datagram packing is enabled (`datagram_pack_delay`),
+        /// non-PIX stateless sockets may still pack multiple complete datagram frames into one
+        /// HOPR packet during bursts without splitting frames or altering read boundaries. On
+        /// reliable (retransmitting) sessions only the buffering behavior applies; boundary
+        /// preservation is stateless-only (the NACK missing-segment bitmap cannot address the
+        /// segments of an oversized datagram frame).
         ///
         /// Boundary preservation holds only up to the reader's buffer: a single read cannot return
         /// more bytes than its buffer, so a datagram larger than the peer's read buffer is still

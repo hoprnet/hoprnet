@@ -988,6 +988,11 @@ fn default_session_surb_target_notify() -> bool {
     true
 }
 
+/// Transport-layer default for [`SessionGlobalConfig::datagram_pack_delay`]: 10ms.
+fn default_session_datagram_pack_delay() -> Option<Duration> {
+    Some(Duration::from_millis(10))
+}
+
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
@@ -1264,6 +1269,21 @@ pub struct SessionGlobalConfig {
     #[default(default_session_refusal_reply_budget())]
     #[cfg_attr(feature = "serde", serde(default = "default_session_refusal_reply_budget"))]
     pub refusal_reply_budget: Option<RefusalReplyBudget>,
+
+    /// Optional coalesce window for packing multiple complete datagrams into a single HOPR packet
+    /// payload on non-PIX stateless `NoDelay` sessions.
+    ///
+    /// Isolated datagrams arriving after an idle gap flush immediately with no added delay;
+    /// back-to-back burst datagrams pack up to one HOPR packet payload without splitting messages
+    /// across packets.
+    ///
+    /// Default is 10 milliseconds. Set to `null` to disable packing.
+    #[default(default_session_datagram_pack_delay())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_session_datagram_pack_delay", with = "humantime_serde::option")
+    )]
+    pub datagram_pack_delay: Option<Duration>,
 
     /// Tag allocator partition configuration.
     #[validate(nested)]
@@ -2723,6 +2743,46 @@ mod tests {
     #[test]
     fn refusal_reply_budget_rejects_unknown_fields() {
         assert!(serde_saphyr::from_str::<SessionGlobalConfig>("refusal_reply_budget: { burts: 5 }").is_err());
+    }
+
+    // --- datagram_pack_delay tests ---
+
+    #[test]
+    fn datagram_pack_delay_defaults_to_10_milliseconds() {
+        let cfg = SessionGlobalConfig::default();
+        assert_eq!(Some(Duration::from_millis(10)), cfg.datagram_pack_delay);
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn datagram_pack_delay_yaml_round_trip_handles_omitted_null_and_explicit_duration() -> anyhow::Result<()> {
+        // Omitted -> default Some(10ms).
+        let omitted: SessionGlobalConfig =
+            serde_saphyr::from_str("idle_timeout: 3m\n").context("omitted datagram_pack_delay must parse")?;
+        assert_eq!(Some(Duration::from_millis(10)), omitted.datagram_pack_delay);
+
+        // Explicit null -> None (disabled), and round-trips through YAML.
+        let disabled: SessionGlobalConfig =
+            serde_saphyr::from_str("datagram_pack_delay: null\n").context("null datagram_pack_delay must parse")?;
+        assert_eq!(None, disabled.datagram_pack_delay);
+        assert!(disabled.validate().is_ok());
+        let disabled_yaml = serde_saphyr::to_string(&disabled).context("serialize disabled config")?;
+        let disabled_rt: SessionGlobalConfig =
+            serde_saphyr::from_str(&disabled_yaml).context("deserialize disabled round-trip")?;
+        assert_eq!(None, disabled_rt.datagram_pack_delay);
+
+        // Explicit humantime duration -> Some(25ms), and round-trips through YAML.
+        let explicit: SessionGlobalConfig =
+            serde_saphyr::from_str("datagram_pack_delay: 25ms\n").context("explicit datagram_pack_delay must parse")?;
+        assert_eq!(Some(Duration::from_millis(25)), explicit.datagram_pack_delay);
+        assert!(explicit.validate().is_ok());
+        let explicit_yaml = serde_saphyr::to_string(&explicit).context("serialize explicit config")?;
+        let explicit_rt: SessionGlobalConfig =
+            serde_saphyr::from_str(&explicit_yaml).context("deserialize explicit round-trip")?;
+        assert_eq!(Some(Duration::from_millis(25)), explicit_rt.datagram_pack_delay);
+
+        Ok(())
     }
 
     #[test]

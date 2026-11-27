@@ -3,7 +3,10 @@
 pub mod ack_state;
 mod loss_report;
 pub mod loss_signal;
+mod packing;
 pub mod state;
+
+pub use packing::PackPayloadBudget;
 
 /// Contains socket statistics types.
 #[cfg(feature = "telemetry")]
@@ -31,7 +34,7 @@ use {
 use crate::{
     MAX_SESSION_MTU,
     errors::SessionError,
-    processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
+    processing::{ReassemblerExt, SegmenterExt, SequencerExt, UpstreamWriter, types::FrameInspector},
     protocol::{
         FrameId, OrderedFrame, Segment, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage,
         stop_on_invalid_header,
@@ -131,6 +134,24 @@ pub struct SessionSocketConfig {
     /// Default is true.
     #[default(true)]
     pub adapt_gap_wait: bool,
+    /// Optional coalesce window for packing multiple complete `SessionMessage`s into one
+    /// transport write of at most `C` bytes on stateless sockets.
+    ///
+    /// Unlike [`Self::max_buffered_segments`] (which applies only when `pack_delay` is `None`),
+    /// messages are never split across transport writes: when the next message would overflow `C`,
+    /// the buffered whole messages are flushed first, so packet loss drops only the messages in the
+    /// lost packet and unmodified receivers decode them unchanged. Isolated datagrams arriving
+    /// after an idle gap flush immediately without waiting. `None` (default) writes each message
+    /// immediately.
+    ///
+    /// `AsyncWrite::poll_flush` preserves strict flush semantics and forces any buffered messages
+    /// out immediately; callers that want burst packing (such as datagram bridges) should flush
+    /// only when idle or on shutdown rather than after every individual datagram write.
+    ///
+    /// Stateless datagram sockets only: [`SessionSocket::new`] (the acknowledged socket) and
+    /// stateless sockets with `datagram: false` reject it with [`SessionError::InvalidConfig`].
+    #[default(None)]
+    pub pack_delay: Option<Duration>,
     /// The first frame id of the stream, for a socket that succeeds an earlier stream under the
     /// same pseudonym. `None` (default) starts at 1; otherwise it must lie in
     /// `1..=`[`MAX_STREAM_BASE`], or the socket is not created
@@ -219,8 +240,46 @@ fn log_state_update_error(error: &SessionError, message: &'static str) {
 
 enum WriteState {
     WriteOnly,
-    Writing,
+    WritingAndFlushing,
     Flushing(usize),
+    WritingAndDraining,
+    Draining(usize),
+}
+
+/// Synchronous `Sink` adapter mapping `Segment` into `SessionMessage<C>` without the 1-item
+/// pending-future buffer of `futures::SinkExt::with`, so `start_send` delivers directly to the
+/// inner sink and `poll_drain_segments` does not need a trailing `poll_ready` poll.
+#[pin_project::pin_project]
+struct SegmentMapSink<S, F> {
+    #[pin]
+    inner: S,
+    map: F,
+}
+
+impl<const C: usize, S, F> futures::Sink<Segment> for SegmentMapSink<S, F>
+where
+    S: futures::Sink<SessionMessage<C>>,
+    F: FnMut(Segment) -> SessionMessage<C>,
+{
+    type Error = S::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
+        let this = self.project();
+        let msg = (this.map)(item);
+        this.inner.start_send(msg)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
+    }
 }
 
 /// Socket-like object implementing the Session protocol that can operate on any transport that
@@ -235,10 +294,157 @@ pub struct SessionSocket<const C: usize, S: SocketState<C>> {
     state: S,
     span: tracing::Span,
     // This is where upstream writes the to-be-segmented frame data to
-    upstream_frames_in: Pin<Box<dyn futures::io::AsyncWrite + Send>>,
+    upstream_frames_in: Pin<Box<dyn UpstreamWriter>>,
     // This is where upstream reads the reconstructed frame data from
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
     write_state: WriteState,
+}
+
+/// Builder for a stateless (unreliable) [`SessionSocket`].
+///
+/// Construct via [`SessionSocket::stateless_builder`].
+#[cfg(feature = "telemetry")]
+#[must_use = "builders do nothing unless `.build()` is called"]
+pub struct StatelessSocketBuilder<const C: usize, T, I, S = telemetry::NoopTracker> {
+    id: I,
+    transport: T,
+    cfg: SessionSocketConfig,
+    loss_signal: Option<Arc<FrameLossSignal>>,
+    stream_progress: Option<StreamProgress>,
+    pack_budget: Option<PackPayloadBudget>,
+    stats: S,
+}
+
+/// Builder for a stateless (unreliable) [`SessionSocket`].
+///
+/// Construct via [`SessionSocket::stateless_builder`].
+#[cfg(not(feature = "telemetry"))]
+#[must_use = "builders do nothing unless `.build()` is called"]
+pub struct StatelessSocketBuilder<const C: usize, T, I> {
+    id: I,
+    transport: T,
+    cfg: SessionSocketConfig,
+    loss_signal: Option<Arc<FrameLossSignal>>,
+    stream_progress: Option<StreamProgress>,
+    pack_budget: Option<PackPayloadBudget>,
+}
+
+#[cfg(feature = "telemetry")]
+impl<const C: usize, T, I, S> std::fmt::Debug for StatelessSocketBuilder<C, T, I, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StatelessSocketBuilder")
+            .field("cfg", &self.cfg)
+            .field("loss_signal", &self.loss_signal)
+            .field("stream_progress", &self.stream_progress)
+            .field("pack_budget", &self.pack_budget)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(not(feature = "telemetry"))]
+impl<const C: usize, T, I> std::fmt::Debug for StatelessSocketBuilder<C, T, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StatelessSocketBuilder")
+            .field("cfg", &self.cfg)
+            .field("loss_signal", &self.loss_signal)
+            .field("stream_progress", &self.stream_progress)
+            .field("pack_budget", &self.pack_budget)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "telemetry")]
+impl<const C: usize, T, I, S> StatelessSocketBuilder<C, T, I, S> {
+    /// Sets the [`FrameLossSignal`] stamped whenever this socket drops or loses a frame.
+    pub fn loss_signal(mut self, loss_signal: impl Into<Option<Arc<FrameLossSignal>>>) -> Self {
+        self.loss_signal = loss_signal.into();
+        self
+    }
+
+    /// Sets the [`StreamProgress`] updated with the highest sent and received frame ids.
+    pub fn stream_progress(mut self, progress: impl Into<Option<StreamProgress>>) -> Self {
+        self.stream_progress = progress.into();
+        self
+    }
+
+    /// Sets an optional dynamic [`PackPayloadBudget`] bounding packed writes when
+    /// [`SessionSocketConfig::pack_delay`] is `Some`.
+    pub fn pack_budget(mut self, budget: impl Into<Option<PackPayloadBudget>>) -> Self {
+        self.pack_budget = budget.into();
+        self
+    }
+
+    /// Sets the telemetry tracker attached to the socket pipeline.
+    pub fn stats<S2>(self, stats: S2) -> StatelessSocketBuilder<C, T, I, S2>
+    where
+        S2: SessionTelemetryTracker + Clone + Send + 'static,
+    {
+        StatelessSocketBuilder {
+            id: self.id,
+            transport: self.transport,
+            cfg: self.cfg,
+            loss_signal: self.loss_signal,
+            stream_progress: self.stream_progress,
+            pack_budget: self.pack_budget,
+            stats,
+        }
+    }
+
+    /// Builds the configured stateless [`SessionSocket`].
+    pub fn build(self) -> Result<SessionSocket<C, Stateless<C>>, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+        S: SessionTelemetryTracker + Clone + Send + 'static,
+    {
+        SessionSocket::<C, Stateless<C>>::build_stateless(
+            self.id,
+            self.transport,
+            self.cfg,
+            self.loss_signal,
+            self.stream_progress,
+            self.pack_budget,
+            self.stats,
+        )
+    }
+}
+
+#[cfg(not(feature = "telemetry"))]
+impl<const C: usize, T, I> StatelessSocketBuilder<C, T, I> {
+    /// Sets the [`FrameLossSignal`] stamped whenever this socket drops or loses a frame.
+    pub fn loss_signal(mut self, loss_signal: impl Into<Option<Arc<FrameLossSignal>>>) -> Self {
+        self.loss_signal = loss_signal.into();
+        self
+    }
+
+    /// Sets the [`StreamProgress`] updated with the highest sent and received frame ids.
+    pub fn stream_progress(mut self, progress: impl Into<Option<StreamProgress>>) -> Self {
+        self.stream_progress = progress.into();
+        self
+    }
+
+    /// Sets an optional dynamic [`PackPayloadBudget`] bounding packed writes when
+    /// [`SessionSocketConfig::pack_delay`] is `Some`.
+    pub fn pack_budget(mut self, budget: impl Into<Option<PackPayloadBudget>>) -> Self {
+        self.pack_budget = budget.into();
+        self
+    }
+
+    /// Builds the configured stateless [`SessionSocket`].
+    pub fn build(self) -> Result<SessionSocket<C, Stateless<C>>, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+    {
+        SessionSocket::<C, Stateless<C>>::build_stateless(
+            self.id,
+            self.transport,
+            self.cfg,
+            self.loss_signal,
+            self.stream_progress,
+            self.pack_budget,
+        )
+    }
 }
 
 // Ensure `state.stop()` runs even if the socket is dropped without
@@ -258,6 +464,25 @@ impl<const C: usize, S: SocketState<C>> PinnedDrop for SessionSocket<C, S> {
 }
 
 impl<const C: usize> SessionSocket<C, Stateless<C>> {
+    /// Starts building a stateless socket with optional loss signal, stream progress, pack budget,
+    /// and (when `telemetry` is enabled) telemetry tracker.
+    pub fn stateless_builder<T, I>(id: I, transport: T, cfg: SessionSocketConfig) -> StatelessSocketBuilder<C, T, I>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+    {
+        StatelessSocketBuilder {
+            id,
+            transport,
+            cfg,
+            loss_signal: None,
+            stream_progress: None,
+            pack_budget: None,
+            #[cfg(feature = "telemetry")]
+            stats: telemetry::NoopTracker,
+        }
+    }
+
     /// Creates a new stateless socket suitable for fast UDP-like communication.
     ///
     /// Note that this results in a faster socket than if created via [`SessionSocket::new`] with
@@ -279,15 +504,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
-        Self::new_stateless_tracked(
-            id,
-            transport,
-            cfg,
-            loss_signal,
-            None,
-            #[cfg(feature = "telemetry")]
-            stats,
-        )
+        let builder = Self::stateless_builder(id, transport, cfg).loss_signal(loss_signal);
+        #[cfg(feature = "telemetry")]
+        let builder = builder.stats(stats);
+        builder.build()
     }
 
     /// Like [`new_stateless`](Self::new_stateless), and additionally publishes the stream's progress in `progress`:
@@ -304,6 +524,27 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
+        let builder = Self::stateless_builder(id, transport, cfg)
+            .loss_signal(loss_signal)
+            .stream_progress(progress);
+        #[cfg(feature = "telemetry")]
+        let builder = builder.stats(stats);
+        builder.build()
+    }
+
+    fn build_stateless<T, I>(
+        id: I,
+        transport: T,
+        cfg: SessionSocketConfig,
+        loss_signal: Option<Arc<FrameLossSignal>>,
+        progress: Option<StreamProgress>,
+        pack_budget: Option<PackPayloadBudget>,
+        #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
+    ) -> Result<Self, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+    {
         let progress_out = progress.clone();
         let first_frame_id = first_frame_id(cfg.stream_base)?;
         let span = tracing::debug_span!("session.socket");
@@ -311,24 +552,50 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Preserve frame boundaries within the number of segments SeqIndicator can enumerate.
         let frame_size = session_frame_size::<C>(cfg.frame_size, (SeqIndicator::MAX + 1) as usize);
 
-        // Segment data incoming/outgoing using underlying transport
-        let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
-
-        // Check if we allow sending multiple segments to downstream in a single write
-        // The HWM cannot be 0 bytes
-        framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
-
-        // Downstream transport
-        let (packets_out, packets_in) = framed.split();
-        let packets_in = stop_on_invalid_header(packets_in);
-
         // If needed, add also stats to individual stages.
         #[cfg(feature = "telemetry")]
         let (s0, s1, s2, s3) = { (stats.clone(), stats.clone(), stats.clone(), stats.clone()) };
 
+        let (packets_out, packets_in) = if let Some(pack_delay) = cfg.pack_delay {
+            if !cfg.datagram {
+                return Err(SessionError::InvalidConfig(
+                    "datagram packing requires datagram mode".into(),
+                ));
+            }
+            if std::time::Instant::now().checked_add(pack_delay).is_none() {
+                return Err(SessionError::InvalidConfig(
+                    "pack_delay exceeds representable Instant deadline".into(),
+                ));
+            }
+            let (transport_rx, transport_tx) = futures::AsyncReadExt::split(transport);
+            (
+                future::Either::Left(packing::WholeMessagePackingSink::<C>::new(
+                    transport_tx,
+                    pack_delay,
+                    pack_budget,
+                    span.clone(),
+                )),
+                future::Either::Left(asynchronous_codec::FramedRead::new(transport_rx, SessionCodec::<C>)),
+            )
+        } else {
+            // Segment data incoming/outgoing using underlying transport
+            let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
+
+            // Check if we allow sending multiple segments to downstream in a single write
+            // The HWM cannot be 0 bytes
+            framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
+
+            // Downstream transport
+            let (packets_out, packets_in) = framed.split();
+            (future::Either::Right(packets_out), future::Either::Right(packets_in))
+        };
+
+        let packets_in = stop_on_invalid_header(packets_in);
+
         // Pipeline IN: Data incoming from Upstream
-        let upstream_frames_in = packets_out
-            .with(move |segment: Segment| {
+        let upstream_frames_in = SegmentMapSink {
+            inner: packets_out,
+            map: move |segment: Segment| {
                 #[cfg(feature = "telemetry")]
                 s0.outgoing_message(SessionMessageDiscriminants::Segment);
                 if let Some(progress) = &progress_out {
@@ -337,9 +604,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         .fetch_max(segment.frame_id, std::sync::atomic::Ordering::Relaxed);
                 }
 
-                future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
-            })
-            .segmenter_with_terminating_segment_from::<C>(frame_size, cfg.datagram, first_frame_id);
+                SessionMessage::<C>::Segment(segment)
+            },
+        }
+        .segmenter_with_terminating_segment_from::<C>(frame_size, cfg.datagram, first_frame_id);
 
         // Everything below the first frame id counts as seen, a predecessor stream's frames included
         let last_emitted_frame = Arc::new(AtomicU32::new(first_frame_id - 1));
@@ -484,10 +752,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             span: span.clone(),
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(downstream_frames_out),
-            write_state: if cfg.flush_immediately {
-                WriteState::Writing
-            } else {
-                WriteState::WriteOnly
+            write_state: match (cfg.flush_immediately, cfg.pack_delay.is_some()) {
+                (false, _) => WriteState::WriteOnly,
+                (true, false) => WriteState::WritingAndFlushing,
+                (true, true) => WriteState::WritingAndDraining,
             },
         })
     }
@@ -515,6 +783,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         if cfg.stream_base.is_some() {
             return Err(SessionError::InvalidConfig(
                 "a stream base is supported on stateless sockets only".into(),
+            ));
+        }
+        if cfg.pack_delay.is_some() {
+            return Err(SessionError::InvalidConfig(
+                "datagram packing is supported on stateless sockets only".into(),
             ));
         }
         let span = tracing::debug_span!("session.socket");
@@ -725,7 +998,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(downstream_frames_out),
             write_state: if cfg.flush_immediately {
-                WriteState::Writing
+                WriteState::WritingAndFlushing
             } else {
                 WriteState::WriteOnly
             },
@@ -752,13 +1025,22 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncWrit
                 WriteState::WriteOnly => {
                     return this.upstream_frames_in.as_mut().poll_write(cx, buf);
                 }
-                WriteState::Writing => {
+                WriteState::WritingAndFlushing => {
                     let len = futures::ready!(this.upstream_frames_in.as_mut().poll_write(cx, buf))?;
                     *this.write_state = WriteState::Flushing(len);
                 }
                 WriteState::Flushing(len) => {
                     let res = futures::ready!(this.upstream_frames_in.as_mut().poll_flush(cx)).map(|_| *len);
-                    *this.write_state = WriteState::Writing;
+                    *this.write_state = WriteState::WritingAndFlushing;
+                    return Poll::Ready(res);
+                }
+                WriteState::WritingAndDraining => {
+                    let len = futures::ready!(this.upstream_frames_in.as_mut().poll_write(cx, buf))?;
+                    *this.write_state = WriteState::Draining(len);
+                }
+                WriteState::Draining(len) => {
+                    let res = futures::ready!(this.upstream_frames_in.as_mut().poll_drain_segments(cx)).map(|_| *len);
+                    *this.write_state = WriteState::WritingAndDraining;
                     return Poll::Ready(res);
                 }
             }
@@ -2659,6 +2941,159 @@ mod tests {
             NoopTracker,
         );
         assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_stateful_socket_should_reject_pack_delay() -> anyhow::Result<()> {
+        let (alice, _bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let result = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::<MTU>::new("alice", AcknowledgementStateConfig::default()),
+            SessionSocketConfig {
+                pack_delay: Some(Duration::from_millis(10)),
+                ..Default::default()
+            },
+            None,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        );
+        assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_stateless_socket_should_reject_unrepresentable_pack_delay() -> anyhow::Result<()> {
+        let (alice, _bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let result = SessionSocket::<MTU, _>::stateless_builder(
+            "alice",
+            alice,
+            SessionSocketConfig {
+                datagram: true,
+                pack_delay: Some(Duration::MAX),
+                ..Default::default()
+            },
+        )
+        .build();
+        assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_stateless_socket_should_reject_pack_delay_without_datagram_mode() -> anyhow::Result<()> {
+        let (alice, _bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let result = SessionSocket::<MTU, _>::stateless_builder(
+            "alice",
+            alice,
+            SessionSocketConfig {
+                datagram: false,
+                flush_immediately: true,
+                pack_delay: Some(Duration::from_millis(10)),
+                ..Default::default()
+            },
+        )
+        .build();
+        assert!(matches!(result, Err(SessionError::InvalidConfig(_))));
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateless_packed_socket_cancelled_write_does_not_leak_length_into_next_write() -> anyhow::Result<()> {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        use futures::{AsyncRead, AsyncWrite, AsyncWriteExt};
+
+        struct GatedSink {
+            open: Arc<AtomicBool>,
+            waker: Arc<parking_lot::Mutex<Option<std::task::Waker>>>,
+            written: Arc<parking_lot::Mutex<Vec<Vec<u8>>>>,
+        }
+
+        impl AsyncRead for GatedSink {
+            fn poll_read(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+                Poll::Pending
+            }
+        }
+
+        impl AsyncWrite for GatedSink {
+            fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+                if !self.open.load(Ordering::Acquire) {
+                    *self.waker.lock() = Some(cx.waker().clone());
+                    return Poll::Pending;
+                }
+                self.written.lock().push(buf.to_vec());
+                Poll::Ready(Ok(buf.len()))
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        const WIRE_MTU: usize = 1500;
+        // Cover both single-segment (64 B) and multi-segment (4,000 B -> 3 segments) datagrams:
+        // cancelling a backpressured write must never leave `WriteState::Draining(len)` parked so
+        // that a subsequent 1-byte write misreports the cancelled write's length.
+        for datagram_len in [64usize, 4_000usize] {
+            let open = Arc::new(AtomicBool::new(false));
+            let waker = Arc::new(parking_lot::Mutex::new(None::<std::task::Waker>));
+            let written = Arc::new(parking_lot::Mutex::new(Vec::new()));
+
+            let mut socket = SessionSocket::<WIRE_MTU, _>::stateless_builder(
+                "alice",
+                GatedSink {
+                    open: open.clone(),
+                    waker: waker.clone(),
+                    written: written.clone(),
+                },
+                SessionSocketConfig {
+                    flush_immediately: true,
+                    datagram: true,
+                    pack_delay: Some(Duration::from_millis(5)),
+                    ..Default::default()
+                },
+            )
+            .build()?;
+
+            // Fill the packer's bounded queue until one write parks in `Poll::Pending`, then
+            // cancel that pending write.
+            let payload = vec![0xAAu8; datagram_len];
+            let mut parked = false;
+            for _ in 0..256 {
+                let poll =
+                    futures::future::poll_fn(|cx| Poll::Ready(Pin::new(&mut socket).poll_write(cx, &payload))).await;
+                match poll {
+                    Poll::Ready(Ok(n)) => assert_eq!(datagram_len, n),
+                    Poll::Ready(Err(e)) => anyhow::bail!("unexpected write error: {e}"),
+                    Poll::Pending => {
+                        parked = true;
+                        break;
+                    }
+                }
+            }
+            assert!(
+                parked,
+                "bounded packer queue should backpressure {datagram_len}-byte writes"
+            );
+
+            // Unblock the underlying writer so the packer drains, then issue a 1-byte write.
+            open.store(true, Ordering::Release);
+            if let Some(w) = waker.lock().take() {
+                w.wake();
+            }
+
+            let n = socket.write(&[0x42]).await?;
+            assert_eq!(
+                1, n,
+                "1-byte write after cancelled {datagram_len}-byte write must return Ok(1)"
+            );
+            socket.flush().await?;
+            assert!(!written.lock().is_empty());
+        }
         Ok(())
     }
 }

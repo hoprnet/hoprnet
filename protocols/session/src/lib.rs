@@ -46,7 +46,7 @@ pub use protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRe
 #[cfg(feature = "telemetry")]
 pub use socket::telemetry::{NoopTracker, SessionMessageDiscriminants, SessionTelemetryTracker};
 pub use socket::{
-    MAX_STREAM_BASE, SessionSocket, SessionSocketConfig, StreamProgress,
+    MAX_STREAM_BASE, PackPayloadBudget, SessionSocket, SessionSocketConfig, StatelessSocketBuilder, StreamProgress,
     ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
     loss_signal::FrameLossSignal,
     state::{SocketComponents, SocketState, Stateless},

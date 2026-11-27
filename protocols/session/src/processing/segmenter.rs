@@ -117,12 +117,15 @@ where
                 State::BufferingFrame => {
                     // Datagram mode: emit exactly one frame per write so datagram boundaries are
                     // preserved (the peer reads one datagram per read), regardless of `frame_size`.
-                    // Segment `buf` directly — there is nothing to accumulate, so the `frame`
-                    // buffer is left untouched. Segments drain on the next poll_write / poll_flush.
+                    // Check downstream readiness before accepting `buf` so a single-segment
+                    // datagram is submitted synchronously without stranding a stored length in
+                    // `Draining` if the caller cancels a pending write.
                     if *this.datagram {
                         if buf.is_empty() {
                             return Poll::Ready(Ok(0));
                         }
+                        futures::ready!(this.inner.as_mut().poll_ready(cx).map_err(std::io::Error::other))?;
+
                         segment_into(buf, session_socket_mtu::<C>(), *this.frame_id, this.ready_segments)
                             .map_err(std::io::Error::other)?;
 
@@ -133,7 +136,14 @@ where
                         );
 
                         *this.frame_id += 1;
-                        *this.state = State::WritingFrame;
+                        let first = this
+                            .ready_segments
+                            .pop_front()
+                            .expect("non-empty datagram produces at least one segment");
+                        this.inner.as_mut().start_send(first).map_err(std::io::Error::other)?;
+                        if !this.ready_segments.is_empty() {
+                            *this.state = State::WritingFrame;
+                        }
 
                         return Poll::Ready(Ok(buf.len()));
                     }
@@ -241,6 +251,62 @@ where
 
         *this.is_closed = true;
         this.inner.as_mut().poll_close(cx).map_err(std::io::Error::other)
+    }
+}
+
+/// Extension to [`futures::io::AsyncWrite`] allowing [`SessionSocket`](crate::SessionSocket) to
+/// push any buffered frame bytes and ready segments into the underlying sink without invoking
+/// `poll_flush` on that sink.
+pub(crate) trait UpstreamWriter: futures::io::AsyncWrite + Send {
+    fn poll_drain_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>>;
+}
+
+impl<const C: usize, S> UpstreamWriter for Segmenter<C, S>
+where
+    S: futures::Sink<Segment> + Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+{
+    #[instrument(name = "Segmenter::poll_drain_segments", level = "trace", skip(self, cx), fields(frame_id = self.frame_id, frame_size = self.frame.len(), ready_segments = self.ready_segments.len()), ret)]
+    fn poll_drain_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        if self.is_closed {
+            return Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "segmenter closed",
+            )));
+        }
+
+        let mut this = self.project();
+        loop {
+            if !this.ready_segments.is_empty() {
+                futures::ready!(this.inner.as_mut().poll_ready(cx).map_err(std::io::Error::other))?;
+
+                let segment = this
+                    .ready_segments
+                    .pop_front()
+                    .expect("ready_segments checked non-empty");
+                tracing::trace!(seg_id = %segment.id(), "segment draining out");
+
+                this.inner.as_mut().start_send(segment).map_err(std::io::Error::other)?;
+            } else if !this.frame.is_empty() {
+                segment_into(
+                    this.frame.as_slice(),
+                    session_socket_mtu::<C>(),
+                    *this.frame_id,
+                    this.ready_segments,
+                )
+                .map_err(std::io::Error::other)?;
+
+                tracing::trace!(num_segments = this.ready_segments.len(), "drained frame ready");
+
+                this.frame.clear();
+                *this.frame_id += 1;
+                *this.state = State::WritingFrame;
+            } else {
+                *this.state = State::BufferingFrame;
+                tracing::trace!("all segments drained");
+                return Poll::Ready(Ok(()));
+            }
+        }
     }
 }
 

@@ -669,6 +669,7 @@ where
             surb_idle_notify_period: cfg.session.surb_idle_notify_period,
             surb_target_notify: cfg.session.surb_target_notify,
             refusal_reply_budget: cfg.session.refusal_reply_budget,
+            datagram_pack_delay: cfg.session.datagram_pack_delay,
             maximum_sessions: cfg.session.maximum_managed_sessions,
             pix_config: cfg.incoming_session_pix_config.clone(),
             max_ssas_per_ssa_request: cfg.pix.max_ssas_per_request,

@@ -18,7 +18,7 @@ pub(crate) mod types;
 
 pub(crate) use reassembly::ReassemblerExt;
 pub(crate) use reorder::SharedReorder;
-pub(crate) use segmenter::SegmenterExt;
+pub(crate) use segmenter::{SegmenterExt, UpstreamWriter};
 pub(crate) use sequencer::{SequencerConfig, SequencerExt};
 
 #[cfg(test)]

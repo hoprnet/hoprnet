@@ -4412,6 +4412,17 @@ pub struct SessionManagerConfig {
     /// Default is true.
     #[default(true)]
     pub forward_receipts: bool,
+
+    /// Optional coalesce window for packing multiple complete datagrams into a single HOPR packet
+    /// payload on non-PIX stateless [`Capability::NoDelay`] sessions.
+    ///
+    /// Isolated datagrams arriving after an idle gap flush immediately with no added delay;
+    /// back-to-back burst datagrams pack up to `ApplicationData::PAYLOAD_SIZE` without splitting
+    /// messages across packets. Set to `None` to disable packing.
+    ///
+    /// Default is 10 ms.
+    #[default(Some(Duration::from_millis(10)))]
+    pub datagram_pack_delay: Option<Duration>,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -5010,7 +5021,9 @@ fn session_config_with(
         frame_timeout: cfg.max_frame_timeout,
         max_buffered_segments: cfg.max_buffered_segments,
         max_frames_behind_gap: (!can_retransmit).then_some(bound).flatten(),
+        datagram_pack_delay: cfg.datagram_pack_delay,
         stream_base: None,
+        max_surbs_per_data_packet: crate::DEFAULT_MAX_SURBS_PER_DATA_PACKET,
     }
 }
 
@@ -7302,6 +7315,7 @@ where
                         forward_routing,
                         HoprSessionConfig {
                             stream_base,
+                            max_surbs_per_data_packet: cfg.max_surbs_per_data_packet,
                             ..session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap)
                         },
                         (
@@ -7445,6 +7459,7 @@ where
                         forward_routing,
                         HoprSessionConfig {
                             stream_base,
+                            max_surbs_per_data_packet: cfg.max_surbs_per_data_packet,
                             ..session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap)
                         },
                         (

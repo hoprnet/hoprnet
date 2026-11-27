@@ -7,3 +7,4 @@ frame_mtu: 1452
 frame_timeout: 800ms
 max_buffered_segments: 0
 max_frames_behind_gap: ~
+datagram_pack_delay: ~
