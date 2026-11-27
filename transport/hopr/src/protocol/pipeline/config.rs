@@ -22,7 +22,14 @@ fn default_ack_out_buffer_size() -> usize {
 #[derive(Debug, Copy, Clone, smart_default::SmartDefault, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct AcknowledgementPipelineConfig {
-    /// Interval for which to wait to buffer acknowledgements before sending them out.
+    /// Maximum interval to wait for per-peer acknowledgements before flushing a partial batch.
+    ///
+    /// Full batches of `MAX_ACKNOWLEDGEMENTS_BATCH_SIZE` (33) flush immediately without waiting;
+    /// low-rate peers wait at most this interval before their partial batch flushes. A node's
+    /// `ack_buffer_interval` controls outgoing acknowledgements it sends back to peers, whereas a
+    /// receiver's `counter_flush_interval` controls its grace window for incoming acknowledgements
+    /// (the two knobs govern opposite sides of a link rather than constraining each other on the
+    /// same node).
     ///
     /// Default is 200 ms.
     #[default(default_ack_buffer_interval())]
@@ -31,10 +38,11 @@ pub struct AcknowledgementPipelineConfig {
         serde(default = "default_ack_buffer_interval", with = "humantime_serde")
     )]
     pub ack_buffer_interval: std::time::Duration,
-    /// Initial capacity when grouping outgoing acknowledgements.
+    /// Initial capacity of the per-peer map holding buffered partial acknowledgement batches.
     ///
-    /// If set too low, it causes additional reallocations in the outgoing acknowledgement processing pipeline.
-    /// The value should grow if `ack_buffer_interval` grows.
+    /// Each peer's buffered batch `Vec` is pre-allocated to `MAX_ACKNOWLEDGEMENTS_BATCH_SIZE` (33),
+    /// so this only sizes the map of concurrently buffered peers (avoiding map reallocations when
+    /// a node simultaneously buffers partial batches for many peers).
     ///
     /// Default is 5.
     #[default(default_ack_grouping_capacity())]
@@ -271,5 +279,12 @@ mod tests {
             ..PoolArbitrationConfig::default()
         };
         assert_eq!(disabled.to_arbitration(), ArbitrationConfig::Disabled);
+    }
+
+    #[test]
+    fn ack_pipeline_config_default_interval_is_200ms_and_valid() {
+        let cfg = AcknowledgementPipelineConfig::default();
+        assert_eq!(std::time::Duration::from_millis(200), cfg.ack_buffer_interval);
+        assert!(cfg.validate().is_ok());
     }
 }

@@ -2791,6 +2791,41 @@ mod tests {
     }
 
     #[test]
+    fn protocol_config_accepts_short_counter_flush_interval_with_default_ack_buffer_interval() {
+        // `ack_buffer_interval` governs outgoing ACKs sent back to peers while `counter_flush_interval`
+        // governs incoming ACK grace on this node, so a 500 ms `counter_flush_interval` with the
+        // default 200 ms `ack_buffer_interval` must remain valid.
+        let cfg = HoprProtocolConfig {
+            counter_flush_interval: Duration::from_millis(500),
+            ..Default::default()
+        };
+        assert_eq!(
+            Duration::from_millis(200),
+            cfg.packet.pipeline.ack_config.ack_buffer_interval
+        );
+        assert!(
+            cfg.validate().is_ok(),
+            "500 ms counter_flush_interval with default 200 ms ack_buffer_interval must validate"
+        );
+
+        // Independent field validation (10 ms minimum) still applies.
+        let mut too_short_ack = cfg.clone();
+        too_short_ack.packet.pipeline.ack_config.ack_buffer_interval = Duration::from_millis(9);
+        assert!(
+            too_short_ack.validate().is_err(),
+            "ack_buffer_interval below 10 ms must still fail validation"
+        );
+
+        // Schema-level PIX supervision pairing validation still applies.
+        let mut bad_pix = cfg;
+        bad_pix.pix.reconstructor.unused_verifier_lifetime = Duration::from_secs(30);
+        assert!(
+            bad_pix.validate().is_err(),
+            "PIX supervision pairing must still be enforced by HoprProtocolConfig::validate"
+        );
+    }
+
+    #[test]
     fn stream_protocol_config_coalesce_bounds_are_enforced() {
         assert!(
             StreamProtocolConfig {

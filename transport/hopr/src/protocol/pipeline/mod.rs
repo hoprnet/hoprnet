@@ -1,13 +1,15 @@
 //! HOPR packet processing pipeline.
 
+mod ack_batcher;
 mod builder;
 mod config;
 
+use ack_batcher::PerPeerAckBatchStream;
 pub use builder::{PacketPipelineBuilder, Unset};
 use bytes::Bytes;
 pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig, PoolArbitrationConfig};
 use futures::{SinkExt, StreamExt, future::Either};
-use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
+use futures_time::future::FutureExt as TimeExt;
 use hopr_api::{
     PeerId,
     node::TicketEvent,
@@ -137,6 +139,10 @@ lazy_static::lazy_static! {
     static ref METRIC_SENT_ACKS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_protocol_ack_sent_count",
         "Number of sent message acknowledgements"
+    ).unwrap();
+    static ref METRIC_SENT_ACK_BATCHES: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_protocol_ack_batches_sent_count",
+        "Number of sent acknowledgement batch packets"
     ).unwrap();
     static ref METRIC_TICKETS_COUNT: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_tickets_count",
@@ -653,85 +659,66 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
 {
-    ack_outgoing
-        .map(move |message| {
-            let ((destination, maybe_ack_key), span) = message.into().into_parts();
-            let _entered = span.enter();
-            let packet_key = packet_key.clone();
-            // Sign acknowledgement with the given half-key or generate a signed random one
-            let ack = maybe_ack_key
-                .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
-                .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key));
-            (destination, WithContext::new(ack, span.clone()))
-        })
-        .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
-        .filter(|acks| futures::future::ready(!acks.is_empty()))
-        // Group by sender, reusing the same HashMap across buffer cycles so we don't
-        // re-allocate its bucket storage every `cfg.ack_buffer_interval` (default 200ms).
-        //
-        // The halfbrown map uses a Vec backing for a small number of distinct senders
-        // (<32) and transitions to hashbrown otherwise — calling `drain()` keeps the
-        // underlying allocation, leaving us with only the per-group Vec<Ack> to allocate
-        // (which downstream consumes as owned values).
-        .scan(
-            halfbrown::HashMap::<OffchainPublicKey, Vec<WithContext<VerifiedAcknowledgement>>, ahash::RandomState>::with_capacity_and_hasher(
-                cfg.ack_grouping_capacity,
-                ahash::RandomState::default(),
-            ),
-            |groups, buffered_acks| {
-                for (dst, ack) in buffered_acks {
-                    groups.entry(dst).or_default().push(ack);
-                }
-                tracing::trace!(
-                    num_groups = groups.len(),
-                    num_acks = groups.values().map(|v| v.len()).sum::<usize>(),
-                    "acknowledgements grouped"
-                );
-                let drained: Vec<_> = groups.drain().collect();
-                futures::future::ready(Some(futures::stream::iter(drained)))
-            },
-        )
-        .flatten()
+    let signed_acks = std::pin::pin!(ack_outgoing.map(move |message| {
+        let ((destination, maybe_ack_key), span) = message.into().into_parts();
+        let _entered = span.enter();
+        let packet_key = packet_key.clone();
+        // Sign acknowledgement with the given half-key or generate a signed random one
+        let ack = maybe_ack_key
+            .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
+            .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key));
+        (destination, WithContext::new(ack, span.clone()))
+    }));
+
+    PerPeerAckBatchStream::new(signed_acks, cfg.ack_buffer_interval, cfg.ack_grouping_capacity)
         .for_each_concurrent(
-            cfg.ack_output_concurrency.filter(|&n| n > 0).unwrap_or(DEFAULT_ACK_OUTPUT_CONCURRENCY),
+            cfg.ack_output_concurrency
+                .filter(|&n| n > 0)
+                .unwrap_or(DEFAULT_ACK_OUTPUT_CONCURRENCY),
             move |(destination, acks)| {
                 let span = tracing::debug_span!(parent: None, "outgoing_ack_batch", peer = destination.to_peerid_str());
                 for ack in &acks {
                     span.follows_from(ack.span());
                 }
                 let acks = acks.into_iter().map(|ack| ack.value).collect::<Vec<_>>();
+                debug_assert!(acks.len() <= MAX_ACKNOWLEDGEMENTS_BATCH_SIZE);
                 let encoder = encoder.clone();
                 let mut wire_outgoing = wire_outgoing.clone();
                 async move {
-                    // Make sure that the acknowledgements are sent in batches of at most MAX_ACKNOWLEDGEMENTS_BATCH_SIZE
-                    // TODO: find better strategy to avoid reallocations
-                    let c = acks.chunks(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE).map(|c| c.to_vec()).collect::<Vec<_>>();
-                    for ack_chunk in c {
-                        let encoder = encoder.clone();
-                        #[cfg(all(feature = "telemetry", not(test)))]
-                        let ack_chunk_len = ack_chunk.len() as u64;
-                        match hopr_utils::parallelize::cpu::spawn_fifo_blocking(move || encoder.encode_acknowledgements(&ack_chunk, &destination), "ack_encode").await {
-                            Ok(Ok(ack_packet)) => {
-                                wire_outgoing
-                                    .feed((ack_packet.next_hop.into(), ack_packet.data))
-                                    .await
-                                    .unwrap_or_else(|error| {
-                                        tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
-                                    });
-
-                                #[cfg(all(feature = "telemetry", not(test)))]
-                                METRIC_SENT_ACKS.increment_by(ack_chunk_len);
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    let ack_count = acks.len() as u64;
+                    match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                        move || encoder.encode_acknowledgements(&acks, &destination),
+                        "ack_encode",
+                    )
+                    .await
+                    {
+                        Ok(Ok(ack_packet)) => {
+                            match wire_outgoing.send((ack_packet.next_hop.into(), ack_packet.data)).await {
+                                Ok(()) => {
+                                    #[cfg(all(feature = "telemetry", not(test)))]
+                                    {
+                                        METRIC_SENT_ACKS.increment_by(ack_count);
+                                        METRIC_SENT_ACK_BATCHES.increment();
+                                    }
+                                }
+                                Err(error) => {
+                                    tracing::error!(
+                                        %error,
+                                        "failed to forward an acknowledgement batch to the transport layer"
+                                    );
+                                }
                             }
-                            Ok(Err(error)) => tracing::error!(%error, "failed to encode acknowledgements"),
-                            Err(error) => tracing::error!(%error, "parallel processing of the outgoing acknowledgements failed"),
+                        }
+                        Ok(Err(error)) => tracing::error!(%error, "failed to encode acknowledgements"),
+                        Err(error) => {
+                            tracing::error!(%error, "parallel processing of the outgoing acknowledgements failed")
                         }
                     }
-                    if let Err(error) = wire_outgoing.flush().await {
-                        tracing::error!(%error, "failed to flush acknowledgements batch to the transport layer");
-                    }
                     tracing::trace!("acknowledgements out");
-                }.instrument(span)
-            }
+                }
+                .instrument(span)
+            },
         )
         .in_current_span()
         .await;
@@ -1647,6 +1634,412 @@ mod tests {
             }
             anyhow::Ok(())
         })?
+    }
+
+    struct PerPeerAckCountEncoder;
+
+    impl PacketEncoder for PerPeerAckCountEncoder {
+        type Error = std::io::Error;
+
+        fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
+            &self,
+            _: T,
+            _: ResolvedTransportRouting<HoprSurb>,
+            _: S,
+            _: Option<u8>,
+        ) -> Result<OutgoingPacket, Self::Error> {
+            unreachable!()
+        }
+
+        fn encode_acknowledgements(
+            &self,
+            acks: &[VerifiedAcknowledgement],
+            destination: &OffchainPublicKey,
+        ) -> Result<OutgoingPacket, Self::Error> {
+            let count = u8::try_from(acks.len())
+                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "ack batch exceeds u8::MAX"))?;
+            Ok(OutgoingPacket {
+                next_hop: *destination,
+                ack_challenge: Default::default(),
+                data: Bytes::from(vec![count]),
+                encrypted_pix_share: None,
+                minted_surbs: Vec::new(),
+                forward_receipt_tag: None,
+            })
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn full_ack_batch_flushes_immediately_without_waiting_for_interval() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        let key = OffchainKeypair::random();
+        let peer = *key.public();
+        let (mut ack_tx, ack_rx) = mpsc::channel(64);
+        let (wire_tx, mut wire_rx) = mpsc::channel(16);
+
+        let cfg = AcknowledgementPipelineConfig {
+            // Very long interval: must NOT wait for it once MAX_ACKNOWLEDGEMENTS_BATCH_SIZE is reached.
+            ack_buffer_interval: std::time::Duration::from_secs(10),
+            ..Default::default()
+        };
+
+        let pipeline = tokio::spawn(start_outgoing_ack_pipeline(
+            ack_rx,
+            std::sync::Arc::new(PerPeerAckCountEncoder),
+            cfg,
+            key,
+            wire_tx,
+        ));
+
+        for _ in 0..MAX_ACKNOWLEDGEMENTS_BATCH_SIZE {
+            ack_tx
+                .send(WithContext::new(
+                    (peer, Some(HalfKey::default())),
+                    tracing::Span::none(),
+                ))
+                .await?;
+        }
+
+        // Keep ack_tx open so the only trigger is hitting MAX_ACKNOWLEDGEMENTS_BATCH_SIZE.
+        let batch = tokio::time::timeout(std::time::Duration::from_millis(500), wire_rx.next())
+            .await
+            .context("full batch did not flush before ack_buffer_interval")?
+            .context("wire_rx closed early")?;
+        assert_eq!(batch.0, peer.into());
+        assert_eq!(
+            batch.1.as_ref(),
+            &[u8::try_from(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE)?],
+            "expected exactly MAX_ACKNOWLEDGEMENTS_BATCH_SIZE acks in the flushed batch"
+        );
+
+        drop(ack_tx);
+        pipeline.await?;
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn multi_peer_acks_flush_independently_on_full_or_deadline() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        let key = OffchainKeypair::random();
+        let peer_a = *OffchainKeypair::random().public();
+        let peer_b = *OffchainKeypair::random().public();
+        let (mut ack_tx, ack_rx) = mpsc::channel(128);
+        let (wire_tx, mut wire_rx) = mpsc::channel(16);
+
+        let interval = std::time::Duration::from_millis(120);
+        let cfg = AcknowledgementPipelineConfig {
+            ack_buffer_interval: interval,
+            ..Default::default()
+        };
+
+        let pipeline = tokio::spawn(start_outgoing_ack_pipeline(
+            ack_rx,
+            std::sync::Arc::new(PerPeerAckCountEncoder),
+            cfg,
+            key,
+            wire_tx,
+        ));
+
+        let peer_b_queued_at = std::time::Instant::now();
+        // Send 3 acks for peer B, then a full batch of 33 for peer A.
+        for _ in 0..3 {
+            ack_tx
+                .send(WithContext::new(
+                    (peer_b, Some(HalfKey::default())),
+                    tracing::Span::none(),
+                ))
+                .await?;
+        }
+        for _ in 0..MAX_ACKNOWLEDGEMENTS_BATCH_SIZE {
+            ack_tx
+                .send(WithContext::new(
+                    (peer_a, Some(HalfKey::default())),
+                    tracing::Span::none(),
+                ))
+                .await?;
+        }
+
+        // Peer A must arrive immediately (well before the 120 ms deadline) with all 33 acks.
+        let first = tokio::time::timeout(std::time::Duration::from_millis(80), wire_rx.next())
+            .await
+            .context("peer A full batch did not flush immediately")?
+            .context("wire_rx closed early")?;
+        assert_eq!(first.0, peer_a.into());
+        assert_eq!(first.1.as_ref(), &[u8::try_from(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE)?]);
+
+        // Peer B must arrive after its deadline (not prematurely when peer A flushed) with its 3 acks.
+        let second = tokio::time::timeout(std::time::Duration::from_millis(500), wire_rx.next())
+            .await
+            .context("peer B partial batch did not flush on deadline")?
+            .context("wire_rx closed early")?;
+        let elapsed_b = peer_b_queued_at.elapsed();
+        assert_eq!(second.0, peer_b.into());
+        assert_eq!(second.1.as_ref(), &[3u8]);
+        assert!(
+            elapsed_b >= std::time::Duration::from_millis(100),
+            "peer B flushed prematurely after {elapsed_b:?} (interval={interval:?})"
+        );
+
+        drop(ack_tx);
+        pipeline.await?;
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn continuous_acks_for_hot_peer_do_not_starve_expired_peer_deadline() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        let key = OffchainKeypair::random();
+        let hot_peer = *OffchainKeypair::random().public();
+        let cold_peer = *OffchainKeypair::random().public();
+        let (wire_tx, mut wire_rx) = mpsc::channel(64);
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let deadline_cutoff = std::time::Instant::now() + std::time::Duration::from_secs(2);
+
+        // Stream that yields one ack for `cold_peer` and then keeps `hot_peer` continuously
+        // `Poll::Ready` (never returning `Poll::Pending`) until stopped, so the timer branch is
+        // never reached and only the pre-poll expiry check in `PerPeerAckBatchStream` can emit
+        // `cold_peer`.
+        struct ContinuousHotStream {
+            cold_peer: Option<OffchainPublicKey>,
+            hot_peer: OffchainPublicKey,
+            stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+            cutoff: std::time::Instant,
+        }
+        impl futures::Stream for ContinuousHotStream {
+            type Item = WithContext<(OffchainPublicKey, Option<HalfKey>)>;
+
+            fn poll_next(
+                mut self: std::pin::Pin<&mut Self>,
+                _cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<Option<Self::Item>> {
+                if let Some(cold) = self.cold_peer.take() {
+                    return std::task::Poll::Ready(Some(WithContext::new(
+                        (cold, Some(HalfKey::default())),
+                        tracing::Span::none(),
+                    )));
+                }
+                if self.stop.load(std::sync::atomic::Ordering::Relaxed) || std::time::Instant::now() >= self.cutoff {
+                    return std::task::Poll::Ready(None);
+                }
+                std::task::Poll::Ready(Some(WithContext::new(
+                    (self.hot_peer, Some(HalfKey::default())),
+                    tracing::Span::none(),
+                )))
+            }
+        }
+
+        let cfg = AcknowledgementPipelineConfig {
+            ack_buffer_interval: std::time::Duration::from_millis(80),
+            ..Default::default()
+        };
+
+        let ack_stream = ContinuousHotStream {
+            cold_peer: Some(cold_peer),
+            hot_peer,
+            stop: stop.clone(),
+            cutoff: deadline_cutoff,
+        };
+
+        let pipeline = tokio::spawn(start_outgoing_ack_pipeline(
+            ack_stream,
+            std::sync::Arc::new(PerPeerAckCountEncoder),
+            cfg,
+            key,
+            wire_tx,
+        ));
+
+        let cold_peer_id: PeerId = cold_peer.into();
+        let found_cold = tokio::time::timeout(std::time::Duration::from_millis(500), async {
+            while let Some((peer, payload)) = wire_rx.next().await {
+                if peer == cold_peer_id {
+                    return Some(payload);
+                }
+            }
+            None
+        })
+        .await
+        .context("cold_peer deadline batch starved under hot_peer load")?;
+
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(found_cold.as_deref(), Some(&[1u8][..]));
+
+        // Drain any already-buffered hot batches so the pipeline exits cleanly.
+        drop(wire_rx);
+        pipeline.await?;
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn unrepresentable_ack_buffer_interval_does_not_panic_and_still_flushes_full_and_eof() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        let key = OffchainKeypair::random();
+        let peer_a = *OffchainKeypair::random().public();
+        let peer_b = *OffchainKeypair::random().public();
+        let (mut ack_tx, ack_rx) = mpsc::channel(64);
+        let (wire_tx, mut wire_rx) = mpsc::channel(16);
+
+        let cfg = AcknowledgementPipelineConfig {
+            ack_buffer_interval: std::time::Duration::MAX,
+            ..Default::default()
+        };
+
+        let pipeline = tokio::spawn(start_outgoing_ack_pipeline(
+            ack_rx,
+            std::sync::Arc::new(PerPeerAckCountEncoder),
+            cfg,
+            key,
+            wire_tx,
+        ));
+
+        ack_tx
+            .send(WithContext::new(
+                (peer_b, Some(HalfKey::default())),
+                tracing::Span::none(),
+            ))
+            .await?;
+        for _ in 0..MAX_ACKNOWLEDGEMENTS_BATCH_SIZE {
+            ack_tx
+                .send(WithContext::new(
+                    (peer_a, Some(HalfKey::default())),
+                    tracing::Span::none(),
+                ))
+                .await?;
+        }
+
+        let first = tokio::time::timeout(std::time::Duration::from_millis(500), wire_rx.next())
+            .await
+            .context("full batch did not flush with Duration::MAX interval")?
+            .context("wire_rx closed early")?;
+        assert_eq!(first.0, peer_a.into());
+        assert_eq!(first.1.as_ref(), &[u8::try_from(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE)?]);
+
+        // Closing the input must still flush the partial batch for peer B.
+        drop(ack_tx);
+        let second = tokio::time::timeout(std::time::Duration::from_millis(500), wire_rx.next())
+            .await
+            .context("partial batch did not flush on EOF with Duration::MAX interval")?
+            .context("wire_rx closed early")?;
+        assert_eq!(second.0, peer_b.into());
+        assert_eq!(second.1.as_ref(), &[1u8]);
+
+        pipeline.await?;
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn asymmetric_endpoints_flush_outgoing_partial_batches_on_their_own_ack_buffer_interval() -> anyhow::Result<()>
+    {
+        use anyhow::Context as _;
+
+        let key_a = OffchainKeypair::random();
+        let key_b = OffchainKeypair::random();
+        let peer_a = *key_a.public();
+        let peer_b = *key_b.public();
+
+        let (mut ack_tx_a, ack_rx_a) = mpsc::channel(32);
+        let (mut ack_tx_b, ack_rx_b) = mpsc::channel(32);
+        let (wire_tx_a, mut wire_rx_a_to_b) = mpsc::channel(16);
+        let (wire_tx_b, mut wire_rx_b_to_a) = mpsc::channel(16);
+
+        let interval_a = std::time::Duration::from_millis(200);
+        let interval_b = std::time::Duration::from_millis(50);
+
+        let pipeline_a = tokio::spawn(start_outgoing_ack_pipeline(
+            ack_rx_a,
+            std::sync::Arc::new(PerPeerAckCountEncoder),
+            AcknowledgementPipelineConfig {
+                ack_buffer_interval: interval_a,
+                ..Default::default()
+            },
+            key_a,
+            wire_tx_a,
+        ));
+        let pipeline_b = tokio::spawn(start_outgoing_ack_pipeline(
+            ack_rx_b,
+            std::sync::Arc::new(PerPeerAckCountEncoder),
+            AcknowledgementPipelineConfig {
+                ack_buffer_interval: interval_b,
+                ..Default::default()
+            },
+            key_b,
+            wire_tx_b,
+        ));
+
+        // Run two rounds while keeping both input streams open, proving each endpoint's own
+        // `ack_buffer_interval` independently governs its outgoing partial batches in both
+        // directions (and across timer resets).
+        for (a_count, b_count) in [(2u8, 3u8), (1u8, 4u8)] {
+            let round_start = std::time::Instant::now();
+            for _ in 0..a_count {
+                ack_tx_a
+                    .send(WithContext::new(
+                        (peer_b, Some(HalfKey::default())),
+                        tracing::Span::none(),
+                    ))
+                    .await?;
+            }
+            for _ in 0..b_count {
+                ack_tx_b
+                    .send(WithContext::new(
+                        (peer_a, Some(HalfKey::default())),
+                        tracing::Span::none(),
+                    ))
+                    .await?;
+            }
+
+            // Endpoint B (50 ms) must flush its B -> A partial batch before Endpoint A (200 ms)
+            // flushes its A -> B partial batch.
+            let first = tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                futures::future::select(wire_rx_a_to_b.next(), wire_rx_b_to_a.next()),
+            )
+            .await
+            .context("neither endpoint flushed its partial batch")?;
+
+            let (b_batch, b_elapsed) = match first {
+                Either::Right((Some(batch), _)) => (batch, round_start.elapsed()),
+                Either::Right((None, _)) => anyhow::bail!("wire_rx_b_to_a closed early"),
+                Either::Left((batch, _)) => {
+                    anyhow::bail!(
+                        "endpoint A (200 ms) flushed before endpoint B (50 ms): {batch:?} after {:?}",
+                        round_start.elapsed()
+                    );
+                }
+            };
+            assert_eq!(b_batch.0, peer_a.into());
+            assert_eq!(b_batch.1.as_ref(), &[b_count]);
+            assert!(
+                b_elapsed >= std::time::Duration::from_millis(40),
+                "endpoint B flushed prematurely after {b_elapsed:?} (interval={interval_b:?})"
+            );
+
+            // Endpoint A (200 ms) must then flush its A -> B partial batch on its own slower deadline.
+            let a_batch = tokio::time::timeout(std::time::Duration::from_secs(1), wire_rx_a_to_b.next())
+                .await
+                .context("endpoint A did not flush its partial batch")?
+                .context("wire_rx_a_to_b closed early")?;
+            let a_elapsed = round_start.elapsed();
+            assert_eq!(a_batch.0, peer_b.into());
+            assert_eq!(a_batch.1.as_ref(), &[a_count]);
+            assert!(
+                a_elapsed >= std::time::Duration::from_millis(180),
+                "endpoint A flushed prematurely after {a_elapsed:?} (interval={interval_a:?})"
+            );
+            assert!(
+                a_elapsed > b_elapsed,
+                "expected endpoint A ({a_elapsed:?}) to flush after endpoint B ({b_elapsed:?})"
+            );
+        }
+
+        drop(ack_tx_a);
+        drop(ack_tx_b);
+        pipeline_a.await?;
+        pipeline_b.await?;
+        Ok(())
     }
 
     #[rstest::rstest]
