@@ -30884,6 +30884,15 @@ mod tests {
 
         // Hold the PIX pool: the jobs queue ahead of every commitment ingest, in order.
         let release = Arc::new(AtomicBool::new(false));
+        // The pool is process-wide: release the holders on every exit, so a failure here cannot
+        // hang the other tests that need it.
+        struct ReleaseOnExit(Arc<AtomicBool>);
+        impl Drop for ReleaseOnExit {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::Relaxed);
+            }
+        }
+        let _release_on_exit = ReleaseOnExit(release.clone());
         let holders: Vec<_> = (0..256)
             .map(|_| {
                 let release = release.clone();
