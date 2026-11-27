@@ -969,38 +969,45 @@ mod tests {
             };
 
             let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-            // Only gaps measured once the read has started count, so a hiccup during the warm-up
-            // cannot fail a read that yields.
-            let reading = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let ticks = std::sync::Arc::new(std::sync::Mutex::new(Vec::<std::time::Instant>::new()));
             let ticker = tokio::spawn({
-                let (stop, reading) = (stop.clone(), reading.clone());
+                let (stop, ticks) = (stop.clone(), ticks.clone());
                 async move {
-                    let period = Duration::from_millis(1);
-                    let mut worst = Duration::ZERO;
-                    let mut last = std::time::Instant::now();
                     while !stop.load(std::sync::atomic::Ordering::Relaxed) {
-                        tokio::time::sleep(period).await;
-                        let now = std::time::Instant::now();
-                        if reading.load(std::sync::atomic::Ordering::Relaxed) {
-                            worst = worst.max(now.duration_since(last).saturating_sub(period));
-                        }
-                        last = now;
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                        ticks.lock().expect("ticks lock").push(std::time::Instant::now());
                     }
-                    worst
                 }
             });
             // Let the ticker start before the read begins.
             tokio::time::sleep(Duration::from_millis(5)).await;
 
-            reading.store(true, std::sync::atomic::Ordering::Relaxed);
             let started = std::time::Instant::now();
             let mut output = [0u8; 64];
             let read = tokio::time::timeout(Duration::from_secs(60), socket.read(&mut output)).await??;
-            let drain_time = started.elapsed();
+            let ended = std::time::Instant::now();
+            let drain_time = ended - started;
             assert_eq!(&output[..read], expected);
 
             stop.store(true, std::sync::atomic::Ordering::Relaxed);
-            let worst = ticker.await?;
+            ticker.await?;
+            // The longest stretch of the read without a timer tick: the gaps between ticks, clipped to the
+            // read. A read that never yields leaves one gap as long as the whole drain.
+            let mut points = vec![started];
+            points.extend(
+                ticks
+                    .lock()
+                    .expect("ticks lock")
+                    .iter()
+                    .copied()
+                    .filter(|tick| *tick > started && *tick < ended),
+            );
+            points.push(ended);
+            let worst = points
+                .windows(2)
+                .map(|pair| pair[1] - pair[0])
+                .max()
+                .unwrap_or_default();
 
             assert!(
                 drain_time > Duration::from_millis(20),
