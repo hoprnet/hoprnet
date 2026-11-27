@@ -40,7 +40,7 @@ const PONG_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3)
 /// Maximum number of pongs waiting for egress capacity node-wide; further pongs are dropped.
 const MAX_PENDING_PONGS: usize = 64;
 
-/// Cumulative count of pongs dropped because [`MAX_PENDING_PONGS`] pongs were already pending.
+/// Cumulative count of pongs dropped because `MAX_PENDING_PONGS` (64) pongs were already pending.
 pub static PONG_PENDING_LIMIT_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative count of pongs dropped because too many pongs were pending.
@@ -49,7 +49,7 @@ pub fn pong_pending_limit_drop_count() -> usize {
     PONG_PENDING_LIMIT_DROPS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// Cumulative count of pongs dropped because the egress lane stayed full for [`PONG_SEND_TIMEOUT`].
+/// Cumulative count of pongs dropped because the egress lane stayed full for `PONG_SEND_TIMEOUT` (3 s).
 pub static PONG_TIMEOUT_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative count of pongs dropped because their send timed out.
