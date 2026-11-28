@@ -23,7 +23,8 @@ impl Dial {
     pub const LOW: Self = Self(0.1);
     /// Half of the base rate.
     pub const MEDIUM: Self = Self(0.5);
-    /// Twice the base rate. Overcharge for a short burst, such as a new session that needs path evidence fast.
+    /// Twice the base rate. Below the default, so it slows probing down from the default while
+    /// keeping it above [`Dial::HIGH`].
     pub const ULTRA: Self = Self(2.0);
 
     /// A dial at `multiplier`, or `None` when it is not a positive finite number.
@@ -41,8 +42,12 @@ impl Dial {
 }
 
 impl Default for Dial {
+    /// Three times the base rate, the dial a node starts with.
+    ///
+    /// This dial and the default `probe_share` of `0.4` are the lowest pair that passed the
+    /// return-path test eight times out of eight.
     fn default() -> Self {
-        Self::HIGH
+        Self(3.0)
     }
 }
 
@@ -246,6 +251,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn the_generator_is_pulled_only_when_a_probe_is_due() {
         let control = ProbeControl::default();
+        // Pin the base rate: the default dial makes the second probe due inside the wait below.
+        control.set_dial(Some(Dial::HIGH));
         let (inner, polled) = counting();
         let mut stream = std::pin::pin!(paced(inner, &control, PACE));
 
@@ -279,6 +286,12 @@ mod tests {
         let held = tokio::time::timeout(Duration::from_secs(1), stream.next()).await;
 
         assert!(held.is_err());
+    }
+
+    #[test]
+    fn the_default_dial_is_three_times_the_base_rate() {
+        assert_eq!(Dial::default().multiplier(), 3.0);
+        assert_eq!(ProbeControl::default().dial(), Some(Dial(3.0)));
     }
 
     #[test]
